@@ -1,0 +1,13 @@
+# logfile created: 2026-03-23 09:15:00
+[09:15:00] SESSION START | Exercise: Knee Extension | Camera: 0 | imgsz: 320 | skip: 1
+[09:15:02] REP 1 | ROM: 78.4° | Form: 95% | Duration: 3.1s | Angle: 10°-89°
+[09:15:04] REP 2 | ROM: 79.1° | Form: 94% | Duration: 3.0s | Angle: 10°-89°
+[09:15:05] PARTIAL REP | ROM: 40.2° | Angle: 95°-135° | Reason: reversed_early
+[09:15:05] FORM WARNING | Keep your back straight against the chair
+[09:15:06] REP 3 | ROM: 77.8° | Form: 93% | Duration: 3.2s | Angle: 11°-89°
+[09:15:06] SWITCH | Knee Extension -> Squat
+[09:15:08] REP 1 | ROM: 83.0° | Form: 88% | Duration: 2.4s | Angle: 88°-171°
+[09:15:10] REP 2 | ROM: 83.0° | Form: 86% | Duration: 2.5s | Angle: 88°-170°
+[09:15:10] RESET | Reps cleared at count=2
+[09:15:12] REP 1 | ROM: 81.0° | Form: 90% | Duration: 2.6s | Angle: 89°-170°
+[09:15:13] SESSION END | Total Reps: 6 | Avg Form: 91% | Avg ROM: 80.4°

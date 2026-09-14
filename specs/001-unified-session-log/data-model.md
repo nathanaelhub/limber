@@ -137,7 +137,7 @@ the recorder also keeps the legacy 60-frame throttle so the plain-text log expor
 | set_id | INTEGER FK → exercise_sets.id | ON DELETE CASCADE |
 | frame_num | INTEGER | every 15th inference frame with a detected angle |
 | timestamp | TEXT | |
-| angle | REAL | degrees, smoothed angle from `metrics["current_angle"]` |
+| angle | REAL | degrees, the raw detected angle passed to `update()` (what the legacy PTA-Log line recorded) |
 | state | TEXT | `up`, `down`, `idle`, `neutral` |
 | rep_count | INTEGER | |
 

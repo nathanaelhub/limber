@@ -57,12 +57,15 @@ class SessionRecorder:
                  sample_every: int = 15, form_throttle_frames: int = 60,
                  form_throttle_seconds: float = 2.0): ...
     def start(self, patient_id: str | None, source: str, source_ref: str,
-              exercise_config: ExerciseConfig,
-              extras: dict | None = None) -> int                  # returns session_id; extras → sessions.source_extras
+              exercise_config: ExerciseConfig, exercise_key: str | None = None,
+              extras: dict | None = None) -> int   # session_id; extras → sessions.source_extras;
+                                                   # exercise_key is the config key (derived from name if absent)
     def observe(self, tracker: ExerciseTracker, metrics: dict, angle: float | None,
                 frame_num: int, assessment: OverallFormAssessment | None) -> None
-    def switch(self, new_exercise_config: ExerciseConfig, tracker: ExerciseTracker) -> None
-    def reset(self, tracker: ExerciseTracker) -> None
+    def switch(self, new_exercise_config: ExerciseConfig, tracker: ExerciseTracker,
+               frame_num: int = 0, exercise_key: str | None = None) -> None   # pass the OLD tracker
+    def reset(self, tracker: ExerciseTracker, frame_num: int = 0) -> None      # pass the tracker being replaced
+    def flush(self) -> None                                                   # write buffered samples now
     def end(self, session: ExerciseSession) -> Session
     @property
     def session_id(self) -> int | None
@@ -72,7 +75,7 @@ What `observe()` reads, and nothing else (constitution I):
 
 | Input | Engine source | Used for |
 |-------|---------------|----------|
-| `metrics["rep_count"]`, `metrics["current_angle"]` | return of `ExerciseTracker.update()` | frame samples, rep delta |
+| `metrics["rep_count"]` and the raw `angle` passed to `update()` | return of `ExerciseTracker.update()` / call-site value | frame samples (raw angle, as the legacy PTA line logged) |
 | `tracker.current_state` | public attribute | frame sample `state` |
 | `tracker.session.rep_metrics` | `ExerciseSession` (public output) | new `RepMetrics` since last call |
 | `tracker.session.partial_rep_metrics` | `ExerciseSession` | new `PartialRepMetrics` since last call |

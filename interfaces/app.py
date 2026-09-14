@@ -43,7 +43,7 @@ from ultralytics import YOLO
 from src.utils import get_angle_from_keypoints, extract_keypoint, calculate_angle
 
 # Import core analysis engine for real video processing
-from analyze import main as analyze_video, generate_session_report
+from analyze import main as analyze_video
 
 # Import observation logger helpers
 from src.observation_logger import list_observation_logs, load_observation_log

@@ -37,8 +37,9 @@ from collections import deque
 from ultralytics import YOLO
 from ultralytics.solutions import AIGym
 from src.form_assessment import FormAnalyzer
-from src.observation_logger import ObservationLogger
-from src.pta_raw_logger import PTARawLogger
+from src.ptlog.models import PatientNotFoundError
+from src.ptlog.recorder import SessionRecorder
+from src.ptlog.store import SessionStore, default_db_path
 
 
 # =============================================================================
@@ -854,9 +855,31 @@ def get_default_configs() -> Dict[str, ExerciseConfig]:
 # MAIN ANALYSIS FUNCTIONS
 # =============================================================================
 
+def _open_recording(patient_id: Optional[str]):
+    """Open the canonical record and validate the patient before any heavy work."""
+    patient_id = patient_id or "unassigned"
+    store = SessionStore(default_db_path()).open()
+    if store.get_patient(patient_id) is None:
+        store.close()
+        raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+    return store, patient_id
+
+
+def _close_recording(recorder, store, session, patient_id: str) -> None:
+    """End the canonical record for a finished session and report the outcome."""
+    try:
+        recorder.end(session)
+        print(f"\nSession {recorder.session_id} saved for patient {patient_id} ({session.total_reps} reps)")
+    except Exception as e:
+        print(f"Warning: session record could not be fully saved: {e}")
+    finally:
+        store.close()
+
+
 def main(video_path: str, exercise_name: str = "knee_extension",
          output_path: Optional[str] = None, config_path: str = "config.yaml",
-         model_path: str = "models/yolo11m-pose.pt", show_video: bool = True) -> ExerciseSession:
+         model_path: str = "models/yolo11m-pose.pt", show_video: bool = True,
+         patient_id: Optional[str] = None) -> ExerciseSession:
     """
     Process a video file for PT exercise analysis.
 
@@ -874,6 +897,7 @@ def main(video_path: str, exercise_name: str = "knee_extension",
         config_path: Path to configuration YAML
         model_path: Path to YOLO pose model
         show_video: Whether to display video during processing
+        patient_id: Pseudonymous patient ID for the canonical record (None -> "unassigned")
 
     Returns:
         ExerciseSession with complete metrics
@@ -893,6 +917,9 @@ def main(video_path: str, exercise_name: str = "knee_extension",
     print(f"Target angles: {exercise_config.down_angle}° - {exercise_config.up_angle}°")
     print(f"Target reps: {exercise_config.target_reps}")
     print(f"{'='*60}\n")
+
+    # Canonical record: validate the patient before loading the model
+    store, patient_id = _open_recording(patient_id)
 
     # Load YOLO model
     print("Loading YOLO pose model...")
@@ -914,13 +941,10 @@ def main(video_path: str, exercise_name: str = "knee_extension",
     # Initialize tracker
     tracker = ExerciseTracker(exercise_config, fps)
 
-    # Initialize observation logger
-    obs_logger = ObservationLogger(source="video")
-    obs_logger.start_session(exercise_config.name, target_reps=exercise_config.target_reps)
-
-    # Initialize raw PTA logger
-    pta_logger = PTARawLogger(source="video")
-    pta_logger.start_session(exercise_config.name)
+    # Canonical session record (single writer; replaces the legacy loggers)
+    recorder = SessionRecorder(store)
+    recorder.start(patient_id, "video", Path(video_path).name, exercise_config,
+                   exercise_key=exercise_name)
 
     # Setup video writer if output path specified
     writer = None
@@ -929,8 +953,6 @@ def main(video_path: str, exercise_name: str = "knee_extension",
         writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     frame_num = 0
-    prev_rep_count = 0
-    prev_partial_count = 0
 
     try:
         while True:
@@ -959,49 +981,8 @@ def main(video_path: str, exercise_name: str = "knee_extension",
             # Update tracker
             metrics = tracker.update(angle)
 
-            # Raw PTA log: frame-by-frame observation (throttled to every 15 frames)
-            if angle is not None and frame_num % 15 == 0:
-                pta_logger.log_observation(
-                    exercise=exercise_config.name,
-                    min_angle=exercise_config.down_angle,
-                    max_angle=exercise_config.up_angle,
-                    angle=angle,
-                    state=tracker.current_state,
-                    count=metrics['rep_count'],
-                )
-
-            # Log new reps to observation logger
-            current_reps = metrics['rep_count']
-            if current_reps > prev_rep_count:
-                rep_list = tracker.session.rep_metrics
-                if rep_list:
-                    r = rep_list[-1]
-                    obs_logger.log_rep(
-                        rep_number=r.rep_number,
-                        exercise=exercise_config.name,
-                        rom=r.rom,
-                        form_score=r.form_score,
-                        duration_seconds=r.duration_seconds,
-                        min_angle=r.min_angle,
-                        max_angle=r.max_angle,
-                    )
-                    pta_logger.log_rep_completed(exercise_config.name, current_reps)
-                prev_rep_count = current_reps
-
-            # Log partial reps to observation logger
-            current_partial_count = len(tracker.session.partial_rep_metrics)
-            if current_partial_count > prev_partial_count:
-                p = tracker.session.partial_rep_metrics[-1]
-                obs_logger.log_partial_rep(
-                    exercise=p.exercise,
-                    rom=p.rom,
-                    min_angle=p.min_angle,
-                    max_angle=p.max_angle,
-                    duration_seconds=p.duration_seconds,
-                    reason=p.reason,
-                )
-                pta_logger.log_partial_rep(p.exercise, p.rom, p.reason)
-                prev_partial_count = current_partial_count
+            # Canonical record: reps, partial reps, angle samples
+            recorder.observe(tracker, metrics, angle, frame_num, None)
 
             # Draw skeleton from YOLO results
             annotated_frame = results[0].plot() if results else frame.copy()
@@ -1040,23 +1021,13 @@ def main(video_path: str, exercise_name: str = "knee_extension",
             writer.release()
         cv2.destroyAllWindows()
 
-        # Finalize session and close loggers — must run even on exception
+        # Finalize session and save the canonical record — must run even on exception
         try:
             session = tracker.finalize_session()
-            obs_logger.end_session(
-                total_reps=session.total_reps,
-                avg_form_score=session.avg_form_score,
-                avg_rom=session.avg_rom,
-                warnings=session.warnings,
-            )
-            pta_logger.end_session(
-                total_reps=session.total_reps,
-                avg_form_score=session.avg_form_score,
-                avg_rom=session.avg_rom,
-            )
         except Exception as e:
             print(f"Warning: session finalization error: {e}")
             session = tracker.session
+        _close_recording(recorder, store, session, patient_id)
 
     print(f"\n\n{'='*60}")
     print("Session Complete!")
@@ -1156,7 +1127,8 @@ def analyze_webcam(exercise_name: str = "knee_extension",
                    camera_id: int = 0,
                    record_output: Optional[str] = None,
                    frame_skip: int = 1,
-                   imgsz: int = 320) -> ExerciseSession:
+                   imgsz: int = 320,
+                   patient_id: Optional[str] = None) -> ExerciseSession:
     """
     Real-time PT session monitoring using webcam.
 
@@ -1182,6 +1154,9 @@ def analyze_webcam(exercise_name: str = "knee_extension",
     exercise_names = list(exercises.keys())
     current_exercise_idx = exercise_names.index(exercise_name) if exercise_name in exercise_names else 0
     exercise_config = exercises[exercise_names[current_exercise_idx]]
+
+    # Canonical record: validate the patient before loading the model
+    store, patient_id = _open_recording(patient_id)
 
     # Load model
     print("Loading YOLO pose model...")
@@ -1234,20 +1209,11 @@ def analyze_webcam(exercise_name: str = "knee_extension",
     last_angle = None
     last_assessment = None
 
-    # Session logger (auto-numbered, capped at 50 lines, timestamped)
-    logger = SessionLogger(log_dir="logs")
-    logger.log(f"SESSION START | Exercise: {exercise_config.name} | Camera: {camera_id} | imgsz: {imgsz} | skip: {frame_skip}")
-    prev_rep_count = 0
-    prev_partial_count = 0
-    last_form_log_frame = -999  # throttle form event logging to every ~2 seconds
-
-    # Structured observation logger
-    obs_logger = ObservationLogger(source="webcam")
-    obs_logger.start_session(exercise_config.name, target_reps=exercise_config.target_reps)
-
-    # Raw PTA logger
-    pta_logger = PTARawLogger(source="webcam")
-    pta_logger.start_session(exercise_config.name)
+    # Canonical session record (single writer; replaces the legacy loggers)
+    recorder = SessionRecorder(store)
+    recorder.start(patient_id, "webcam", str(camera_id), exercise_config,
+                   exercise_key=exercise_names[current_exercise_idx],
+                   extras={"camera_id": camera_id, "imgsz": imgsz, "frame_skip": frame_skip})
 
     # Setup recording
     writer = None
@@ -1303,72 +1269,13 @@ def analyze_webcam(exercise_name: str = "knee_extension",
                 # Update tracker
                 metrics = tracker.update(angle)
 
-                # Raw PTA log: frame-by-frame observation (throttled to every 15 frames)
-                if angle is not None and frame_num % 15 == 0:
-                    pta_logger.log_observation(
-                        exercise=exercise_config.name,
-                        min_angle=exercise_config.down_angle,
-                        max_angle=exercise_config.up_angle,
-                        angle=angle,
-                        state=tracker.current_state,
-                        count=metrics['rep_count'],
-                    )
-
                 # Attach form assessment data to metrics dict
                 if last_assessment is not None:
                     metrics['form_status'] = last_assessment.status.value
                     metrics['form_messages'] = [f.message for f in last_assessment.feedback_messages[:2]]
 
-                # Log new rep completions
-                current_reps = metrics['rep_count']
-                if current_reps > prev_rep_count:
-                    rep_list = tracker.session.rep_metrics
-                    if rep_list:
-                        r = rep_list[-1]
-                        logger.log(
-                            f"REP {r.rep_number} | ROM: {r.rom:.1f}° | "
-                            f"Form: {r.form_score:.0f}% | Duration: {r.duration_seconds:.1f}s | "
-                            f"Angle: {r.min_angle:.0f}°-{r.max_angle:.0f}°"
-                        )
-                        obs_logger.log_rep(
-                            rep_number=r.rep_number,
-                            exercise=exercise_config.name,
-                            rom=r.rom,
-                            form_score=r.form_score,
-                            duration_seconds=r.duration_seconds,
-                            min_angle=r.min_angle,
-                            max_angle=r.max_angle,
-                        )
-                        pta_logger.log_rep_completed(exercise_config.name, current_reps)
-                    prev_rep_count = current_reps
-
-                # Log partial reps
-                current_partial_count = len(tracker.session.partial_rep_metrics)
-                if current_partial_count > prev_partial_count:
-                    p = tracker.session.partial_rep_metrics[-1]
-                    logger.log(
-                        f"PARTIAL REP | ROM: {p.rom:.1f}° | "
-                        f"Angle: {p.min_angle:.0f}°-{p.max_angle:.0f}° | "
-                        f"Reason: {p.reason}"
-                    )
-                    obs_logger.log_partial_rep(
-                        exercise=p.exercise,
-                        rom=p.rom,
-                        min_angle=p.min_angle,
-                        max_angle=p.max_angle,
-                        duration_seconds=p.duration_seconds,
-                        reason=p.reason,
-                    )
-                    pta_logger.log_partial_rep(p.exercise, p.rom, p.reason)
-                    prev_partial_count = current_partial_count
-
-                # Log form warnings (throttled to once every ~2 s @ 30 fps)
-                if (last_assessment is not None and
-                        last_assessment.status.value in ('warning', 'poor', 'stop') and
-                        frame_num - last_form_log_frame >= 60):
-                    msgs = [f.message for f in last_assessment.feedback_messages[:1]]
-                    logger.log(f"FORM {last_assessment.status.value.upper()} | {' | '.join(msgs)}")
-                    last_form_log_frame = frame_num
+                # Canonical record: reps, partial reps, form events, angle samples
+                recorder.observe(tracker, metrics, angle, frame_num, last_assessment)
 
                 # Draw metrics panel
                 annotated_frame = draw_metrics_panel(annotated_frame, metrics)
@@ -1397,64 +1304,33 @@ def analyze_webcam(exercise_name: str = "knee_extension",
             if key == ord('q'):
                 break
             elif key == ord('r'):
-                # Log interrupted partial rep if mid-movement
+                # Record an interrupted partial rep if mid-movement, then the reset
                 tracker._record_partial_rep("interrupted")
-                if len(tracker.session.partial_rep_metrics) > prev_partial_count:
-                    p = tracker.session.partial_rep_metrics[-1]
-                    obs_logger.log_partial_rep(
-                        exercise=p.exercise, rom=p.rom,
-                        min_angle=p.min_angle, max_angle=p.max_angle,
-                        duration_seconds=p.duration_seconds, reason=p.reason,
-                    )
-                    pta_logger.log_partial_rep(p.exercise, p.rom, p.reason)
+                recorder.reset(tracker, frame_num)
                 # Reset tracker and form analyzer
-                obs_logger.log_reset(exercise_config.name, tracker.rep_count)
-                pta_logger.log_reset(exercise_config.name, tracker.rep_count)
-                logger.log(f"RESET | Reps cleared at count={tracker.rep_count}")
                 tracker = ExerciseTracker(exercise_config, fps)
                 form_analyzer.reset()
                 last_keypoints = None
                 last_angle = None
                 last_assessment = None
-                prev_rep_count = 0
-                prev_partial_count = 0
                 print("Rep counter reset")
             elif key == ord('p'):
                 paused = not paused
                 print("Paused" if paused else "Resumed")
             elif key == ord('n'):
-                # Log interrupted partial rep if mid-movement
+                # Record an interrupted partial rep if mid-movement
                 tracker._record_partial_rep("interrupted")
-                if len(tracker.session.partial_rep_metrics) > prev_partial_count:
-                    p = tracker.session.partial_rep_metrics[-1]
-                    try:
-                        obs_logger.log_partial_rep(
-                            exercise=p.exercise, rom=p.rom,
-                            min_angle=p.min_angle, max_angle=p.max_angle,
-                            duration_seconds=p.duration_seconds, reason=p.reason,
-                        )
-                        pta_logger.log_partial_rep(p.exercise, p.rom, p.reason)
-                    except Exception as log_err:
-                        print(f"Warning: failed to log partial rep: {log_err}")
                 # Switch to next exercise
-                prev_name = exercise_config.name
                 current_exercise_idx = (current_exercise_idx + 1) % len(exercise_names)
                 exercise_config = exercises[exercise_names[current_exercise_idx]]
-                try:
-                    obs_logger.log_exercise_change(prev_name, exercise_config.name)
-                    pta_logger.log_exercise_change(prev_name, exercise_config.name)
-                    logger.log(f"SWITCH | {prev_name} -> {exercise_config.name}")
-                except Exception as log_err:
-                    print(f"Warning: failed to log exercise change: {log_err}")
+                recorder.switch(exercise_config, tracker, frame_num,
+                                exercise_key=exercise_names[current_exercise_idx])
                 tracker = ExerciseTracker(exercise_config, fps)
                 base_exercise = exercise_names[current_exercise_idx].replace('_right', '').replace('_left', '')
                 form_analyzer = FormAnalyzer(base_exercise)
                 last_keypoints = None
                 last_angle = None
                 last_assessment = None
-                last_form_log_frame = -999
-                prev_rep_count = 0
-                prev_partial_count = 0
                 print(f"Switched to: {exercise_config.name}")
             elif key == ord('s'):
                 # Save current frame
@@ -1469,29 +1345,14 @@ def analyze_webcam(exercise_name: str = "knee_extension",
             writer.release()
         cv2.destroyAllWindows()
 
-        # Finalize session and close all loggers — must run even if the
-        # loop exited via an exception so log files are left in a valid state.
+        # Finalize session and save the canonical record — must run even if the
+        # loop exited via an exception so the record is left in a valid state.
         try:
             session = tracker.finalize_session()
-            logger.close(
-                f"Total Reps: {session.total_reps} | "
-                f"Avg Form: {session.avg_form_score:.0f}% | "
-                f"Avg ROM: {session.avg_rom:.1f}°"
-            )
-            obs_logger.end_session(
-                total_reps=session.total_reps,
-                avg_form_score=session.avg_form_score,
-                avg_rom=session.avg_rom,
-                warnings=session.warnings,
-            )
-            pta_logger.end_session(
-                total_reps=session.total_reps,
-                avg_form_score=session.avg_form_score,
-                avg_rom=session.avg_rom,
-            )
         except Exception as e:
             print(f"Warning: session finalization error: {e}")
             session = tracker.session
+        _close_recording(recorder, store, session, patient_id)
 
     return session
 
@@ -1714,8 +1575,8 @@ Examples:
     video_parser.add_argument("--config", "-c", default="config.yaml", help="Config file")
     video_parser.add_argument("--model", "-m", default="models/yolo11m-pose.pt", help="YOLO model")
     video_parser.add_argument("--no-display", action="store_true", help="Don't show video")
-    video_parser.add_argument("--report", "-r", nargs="*", default=["json", "csv"],
-                              help="Report formats (json, csv)")
+    video_parser.add_argument("--patient", "-p", default=None,
+                              help="Pseudonymous patient ID for the session record (default: unassigned)")
 
     # Webcam mode
     webcam_parser = subparsers.add_parser("webcam", help="Real-time webcam analysis")
@@ -1729,6 +1590,8 @@ Examples:
                                help="Run YOLO every Nth frame (1=all, 2=every other). Higher=faster but less smooth.")
     webcam_parser.add_argument("--imgsz", type=int, default=320,
                                help="YOLO inference image size (320=fast, 640=accurate). Default 320.")
+    webcam_parser.add_argument("--patient", "-p", default=None,
+                               help="Pseudonymous patient ID for the session record (default: unassigned)")
 
     # Image mode
     image_parser = subparsers.add_parser("image", help="Analyze single image")
@@ -1749,28 +1612,35 @@ Examples:
     args = parser.parse_args()
 
     if args.mode == "video":
-        session = main(
-            video_path=args.input,
-            exercise_name=args.exercise,
-            output_path=args.output,
-            config_path=args.config,
-            model_path=args.model,
-            show_video=not args.no_display
-        )
-        if args.report:
-            generate_session_report(session, formats=args.report)
+        try:
+            main(
+                video_path=args.input,
+                exercise_name=args.exercise,
+                output_path=args.output,
+                config_path=args.config,
+                model_path=args.model,
+                show_video=not args.no_display,
+                patient_id=args.patient
+            )
+        except PatientNotFoundError:
+            print(f"Patient '{args.patient}' not found. Register it with: patients add {args.patient}")
+            raise SystemExit(1)
 
     elif args.mode == "webcam":
-        session = analyze_webcam(
-            exercise_name=args.exercise,
-            config_path=args.config,
-            model_path=args.model,
-            camera_id=args.camera,
-            record_output=args.record,
-            frame_skip=args.skip_frames,
-            imgsz=args.imgsz
-        )
-        generate_session_report(session)
+        try:
+            analyze_webcam(
+                exercise_name=args.exercise,
+                config_path=args.config,
+                model_path=args.model,
+                camera_id=args.camera,
+                record_output=args.record,
+                frame_skip=args.skip_frames,
+                imgsz=args.imgsz,
+                patient_id=args.patient
+            )
+        except PatientNotFoundError:
+            print(f"Patient '{args.patient}' not found. Register it with: patients add {args.patient}")
+            raise SystemExit(1)
 
     elif args.mode == "image":
         analyze_single_frame(

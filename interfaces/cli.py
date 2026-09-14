@@ -34,6 +34,8 @@ import time
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.ptlog.models import PatientNotFoundError  # noqa: E402
+
 # ANSI color codes for terminal output
 class Colors:
     HEADER = '\033[95m'
@@ -150,7 +152,7 @@ def cmd_analyze(args):
 
     try:
         # Import analysis module
-        from analyze import main, generate_session_report, load_config
+        from analyze import main, load_config
 
         # Validate exercise
         exercises = load_config()
@@ -167,7 +169,8 @@ def cmd_analyze(args):
             video_path=args.video,
             exercise_name=args.exercise,
             output_path=args.output,
-            show_video=not args.headless
+            show_video=not args.headless,
+            patient_id=args.patient
         )
 
         # Print results
@@ -190,18 +193,14 @@ def cmd_analyze(args):
         print(f"  Tempo Consistency: {color_text(f'σ = {session.tempo_consistency:.2f}s', Colors.BLUE)}")
         print()
 
-        # Generate report if requested
-        if args.report:
-            print_info("Generating session report...")
-            report_files = generate_session_report(session, formats=args.report)
-            for fmt, path in report_files.items():
-                print_success(f"Report saved: {path}")
-
         if args.output:
             print_success(f"Annotated video saved: {args.output}")
 
         return 0
 
+    except PatientNotFoundError:
+        print_error(f"Patient '{args.patient}' not found. Register it with: patients add {args.patient}")
+        return 1
     except ImportError as e:
         print_error(f"Could not import analysis module: {e}")
         print_info("Make sure you're running from the project directory")
@@ -233,12 +232,13 @@ def cmd_webcam(args):
     input(color_text("Press Enter to start...", Colors.CYAN))
 
     try:
-        from analyze import analyze_webcam, generate_session_report
+        from analyze import analyze_webcam
 
         session = analyze_webcam(
             exercise_name=args.exercise,
             camera_id=args.camera,
-            record_output=args.record
+            record_output=args.record,
+            patient_id=args.patient
         )
 
         # Print session summary
@@ -249,15 +249,11 @@ def cmd_webcam(args):
         print(f"  Average Form Score: {session.avg_form_score:.1f}%")
         print(f"  Average ROM: {session.avg_rom}°")
 
-        # Generate report
-        print()
-        print_info("Generating session report...")
-        report_files = generate_session_report(session)
-        for fmt, path in report_files.items():
-            print_success(f"Report saved: {path}")
-
         return 0
 
+    except PatientNotFoundError:
+        print_error(f"Patient '{args.patient}' not found. Register it with: patients add {args.patient}")
+        return 1
     except ImportError as e:
         print_error(f"Could not import analysis module: {e}")
         return 1
@@ -685,8 +681,8 @@ Examples:
     analyze_parser.add_argument("--exercise", "-e", default="knee_extension",
                                 help="Exercise to analyze")
     analyze_parser.add_argument("--output", "-o", help="Output video path")
-    analyze_parser.add_argument("--report", "-r", nargs="*", default=["json"],
-                                choices=["json", "csv"], help="Report formats")
+    analyze_parser.add_argument("--patient", "-p", default=None,
+                                help="Pseudonymous patient ID for the session record (default: unassigned)")
     analyze_parser.add_argument("--headless", action="store_true",
                                 help="Don't display video during processing")
 
@@ -699,6 +695,8 @@ Examples:
     webcam_parser.add_argument("--camera", "-c", type=int, default=0,
                                help="Camera device ID")
     webcam_parser.add_argument("--record", help="Record session to file")
+    webcam_parser.add_argument("--patient", "-p", default=None,
+                               help="Pseudonymous patient ID for the session record (default: unassigned)")
 
     # Report command
     report_parser = subparsers.add_parser("report", help="View session reports")

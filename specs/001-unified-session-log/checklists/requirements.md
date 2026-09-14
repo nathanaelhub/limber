@@ -41,3 +41,10 @@
 - `/speckit-analyze` (2026-09-14): 10 findings, 1 critical (an unnamed fifth legacy writer,
   `generate_session_report()`); all remediated in spec Assumptions, research D14, data-model
   `source_extras`, plan tree, and tasks T011/T013/T016/T019/T022/T023/T042/T045/T055.
+- `/speckit-implement` US1 checkpoint (2026-09-14): T001–T020 done. Suite 176 passed. Engine files
+  (`src/form_assessment.py`, `src/utils.py`, `config.yaml`, engine tests) untouched; `analyze.py` hunks
+  confined to the two runner loops, imports, two helpers, and argparse. End-to-end run of
+  `videos/Squats.demo.video.mp4` with `--patient unassigned` against a scratch database recorded
+  4 reps / avg form 67.5 / avg ROM 117.3, identical to the on-screen summary (SC-001), and left
+  `sessions/`, `observation_logs/`, `pta_logs/`, `logs/` unchanged (SC-006). Quickstart step 5's
+  crash case is covered by the SIGKILL test in `tests/test_ptlog_recovery.py`.

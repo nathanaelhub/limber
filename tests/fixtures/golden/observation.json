@@ -1,0 +1,143 @@
+{
+  "session_id": "session_2026-03-23_091500",
+  "source": "webcam",
+  "start_time": "2026-03-23T09:15:00",
+  "end_time": "2026-03-23T09:15:13.333333",
+  "duration_seconds": 13.3,
+  "initial_exercise": "Knee Extension",
+  "target_reps": 10,
+  "events": [
+    {
+      "type": "session_start",
+      "timestamp": "2026-03-23T09:15:00",
+      "exercise": "Knee Extension",
+      "target_reps": 10
+    },
+    {
+      "type": "rep",
+      "timestamp": "2026-03-23T09:15:02",
+      "rep_number": 1,
+      "exercise": "Knee Extension",
+      "rom": 78.4,
+      "form_score": 95.0,
+      "duration_seconds": 3.1,
+      "min_angle": 10.2,
+      "max_angle": 88.6
+    },
+    {
+      "type": "rep",
+      "timestamp": "2026-03-23T09:15:04",
+      "rep_number": 2,
+      "exercise": "Knee Extension",
+      "rom": 79.1,
+      "form_score": 94.0,
+      "duration_seconds": 3.0,
+      "min_angle": 9.8,
+      "max_angle": 88.9
+    },
+    {
+      "type": "partial_rep",
+      "timestamp": "2026-03-23T09:15:05",
+      "exercise": "Knee Extension",
+      "rom": 40.2,
+      "min_angle": 95.0,
+      "max_angle": 135.2,
+      "duration_seconds": 1.3,
+      "reason": "reversed_early"
+    },
+    {
+      "type": "rep",
+      "timestamp": "2026-03-23T09:15:06",
+      "rep_number": 3,
+      "exercise": "Knee Extension",
+      "rom": 77.8,
+      "form_score": 93.0,
+      "duration_seconds": 3.2,
+      "min_angle": 11.0,
+      "max_angle": 88.8
+    },
+    {
+      "type": "partial_rep",
+      "timestamp": "2026-03-23T09:15:06.666667",
+      "exercise": "Knee Extension",
+      "rom": 40.0,
+      "min_angle": 100.0,
+      "max_angle": 140.0,
+      "duration_seconds": 0.8,
+      "reason": "interrupted"
+    },
+    {
+      "type": "exercise_change",
+      "timestamp": "2026-03-23T09:15:06.666667",
+      "from_exercise": "Knee Extension",
+      "to_exercise": "Squat"
+    },
+    {
+      "type": "rep",
+      "timestamp": "2026-03-23T09:15:08",
+      "rep_number": 1,
+      "exercise": "Squat",
+      "rom": 83.0,
+      "form_score": 88.0,
+      "duration_seconds": 2.4,
+      "min_angle": 88.0,
+      "max_angle": 171.0
+    },
+    {
+      "type": "rep",
+      "timestamp": "2026-03-23T09:15:10",
+      "rep_number": 2,
+      "exercise": "Squat",
+      "rom": 83.0,
+      "form_score": 86.0,
+      "duration_seconds": 2.5,
+      "min_angle": 87.5,
+      "max_angle": 170.5
+    },
+    {
+      "type": "reset",
+      "timestamp": "2026-03-23T09:15:10.666667",
+      "exercise": "Squat",
+      "rep_count_at_reset": 2
+    },
+    {
+      "type": "rep",
+      "timestamp": "2026-03-23T09:15:12.666667",
+      "rep_number": 1,
+      "exercise": "Squat",
+      "rom": 81.0,
+      "form_score": 90.0,
+      "duration_seconds": 2.6,
+      "min_angle": 89.0,
+      "max_angle": 170.0
+    },
+    {
+      "type": "session_end",
+      "timestamp": "2026-03-23T09:15:13.333333",
+      "total_reps": 6,
+      "avg_form_score": 91.0,
+      "avg_rom": 80.4,
+      "duration_seconds": 13.3
+    }
+  ],
+  "summary": {
+    "total_reps": 6,
+    "exercises_performed": [
+      {
+        "exercise": "Knee Extension",
+        "reps": 3,
+        "avg_form_score": 94.0,
+        "avg_rom": 78.4
+      },
+      {
+        "exercise": "Squat",
+        "reps": 3,
+        "avg_form_score": 88.0,
+        "avg_rom": 82.3
+      }
+    ],
+    "avg_form_score": 91.0,
+    "avg_rom": 80.4,
+    "warnings": []
+  }
+}
