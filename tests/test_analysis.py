@@ -330,6 +330,12 @@ class TestAngleWithHorizontal:
 # REP COUNTING STATE MACHINE TESTS
 # =============================================================================
 
+
+def _hold(tracker, angle):
+    """Feed an angle for a full smoothing window so the moving average settles on it."""
+    for _ in range(tracker.angle_buffer.maxlen):
+        tracker.update(angle)
+
 class TestRepCountingStateMachine:
     """Tests for the rep counting logic."""
 
@@ -362,18 +368,18 @@ class TestRepCountingStateMachine:
             assert tracker.current_state == "neutral"
             assert tracker.rep_count == 0
 
-            # Move to down position
-            tracker.update(90)
+            # Move to down position (hold so the 5-frame moving average settles)
+            _hold(tracker, 90)
             assert tracker.current_state == "down"
             assert tracker.rep_count == 0
 
             # Move to up position
-            tracker.update(170)
+            _hold(tracker, 170)
             assert tracker.current_state == "up"
             assert tracker.rep_count == 0  # Not counted until back to down
 
             # Return to down (completes rep)
-            tracker.update(90)
+            _hold(tracker, 90)
             assert tracker.current_state == "down"
             assert tracker.rep_count == 1  # Rep completed!
 
@@ -406,7 +412,7 @@ class TestRepCountingStateMachine:
             angles = [90, 170, 90, 170, 90, 170, 90]  # down-up-down-up-down-up-down
 
             for angle in angles:
-                tracker.update(angle)
+                _hold(tracker, angle)  # settle the moving average at each position
 
             assert tracker.rep_count == 3
 

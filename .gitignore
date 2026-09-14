@@ -69,5 +69,6 @@ videos/
 .env
 .env.local
 
-# Claude Code
-.claude/
+# Claude Code (keep Spec Kit skills, ignore local settings)
+.claude/*
+!.claude/skills/

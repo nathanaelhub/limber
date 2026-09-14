@@ -17,6 +17,10 @@ An intelligent exercise monitoring system using YOLO11 pose estimation to provid
 git clone https://github.com/nathanaelhub/pt-assist.git
 cd pt-assist
 
+# Create and activate a virtual environment (Python 3.11-3.13; 3.14 lacks torch wheels)
+python3.13 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
