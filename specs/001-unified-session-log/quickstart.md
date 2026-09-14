@@ -73,7 +73,8 @@ head -14 exports/P-017_*.txt          # PTA header block + first observation lin
 python -c "import json;d=json.load(open(sorted(__import__('glob').glob('exports/P-017_*.json'))[-1]));print(d['summary'])"
 ```
 
-Expected: four files under `exports/` named with the pseudonymous ID and start time only;
+Expected: four files under `exports/` named with the pseudonymous ID and start time only
+(the text log is numbered `..._01.log`);
 structures match [contracts/exports.md](contracts/exports.md); exporting twice yields
 identical files (US4 scenario 4).
 

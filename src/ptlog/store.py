@@ -16,20 +16,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional
 
+from .privacy import validate_label, validate_patient_id
 from .models import (
     UNASSIGNED_ID,
     UNASSIGNED_LABEL,
+    BuiltinPatientError,
     ControlEvent,
+    DeleteReport,
+    DuplicatePatientError,
     ExerciseSet,
     ExerciseSetInfo,
     FormEvent,
     FrameSample,
+    LedgerRow,
+    LogRow,
     PartialRepEvent,
     Patient,
     PatientNotFoundError,
     RepEvent,
     Session,
     SessionNotFoundError,
+    SessionSummaryRow,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -399,7 +406,10 @@ class SessionStore:
         if row is None:
             raise SessionNotFoundError(f"Session {session_id} not found")
         if row["status"] == "running":
-            self._finish_session(session_id, status="completed", end_time=self._now())
+            now = self._now()
+            last = self._last_activity_time(session_id)
+            end_time = last if (last and _ts_key(last) > _ts_key(now)) else now   # never before the last event
+            self._finish_session(session_id, status="completed", end_time=end_time)
         return self.load_session(session_id)
 
     def record_export(self, session_id: int, fmt: str, path: Path | str) -> int:
@@ -512,3 +522,257 @@ class SessionStore:
                 "SELECT * FROM control_events WHERE session_id = ? ORDER BY timestamp, frame_num, id", (session_id,))
         ]
         return session
+
+    # ---------------------------------------------------------------- patients (write)
+
+    def add_patient(self, patient_id: str, label: Optional[str] = None,
+                    notes: Optional[str] = None) -> Patient:
+        """Register a pseudonymous patient. Raises PatientValidationError / DuplicatePatientError."""
+        pid = validate_patient_id(patient_id)
+        label = validate_label(label)
+        if self.conn.execute("SELECT 1 FROM patients WHERE id = ?", (pid,)).fetchone():
+            raise DuplicatePatientError(f"Patient ID '{pid}' is already in use (IDs are case-insensitive)")
+        self.conn.execute(
+            "INSERT INTO patients (id, label, notes, created_at, is_builtin) VALUES (?, ?, ?, ?, 0)",
+            (pid, label, (notes or None), self._now()),
+        )
+        self.conn.commit()
+        return self.get_patient(pid)
+
+    def update_patient(self, patient_id: str, label: Optional[str] = None,
+                       notes: Optional[str] = None) -> Patient:
+        """Change label and/or notes; a None argument leaves that field unchanged."""
+        current = self.get_patient(patient_id)
+        if current is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        new_label = current.label if label is None else validate_label(label)
+        new_notes = current.notes if notes is None else (notes or None)
+        self.conn.execute("UPDATE patients SET label = ?, notes = ? WHERE id = ?",
+                          (new_label, new_notes, current.id))
+        self.conn.commit()
+        return self.get_patient(current.id)
+
+    def delete_patient(self, patient_id: str) -> DeleteReport:
+        """Remove the patient and everything tied to them, including export files (FR-017)."""
+        current = self.get_patient(patient_id)
+        if current is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        if current.is_builtin:
+            raise BuiltinPatientError("The built-in 'unassigned' patient cannot be deleted")
+        pid = current.id
+        sessions = [r[0] for r in self.conn.execute("SELECT id FROM sessions WHERE patient_id = ?", (pid,))]
+        events = 0
+        export_paths: List[str] = []
+        if sessions:
+            marks = ",".join("?" * len(sessions))
+            for sql in (
+                f"SELECT COUNT(*) FROM reps r JOIN exercise_sets s ON s.id = r.set_id WHERE s.session_id IN ({marks})",
+                f"SELECT COUNT(*) FROM partial_reps p JOIN exercise_sets s ON s.id = p.set_id WHERE s.session_id IN ({marks})",
+                f"SELECT COUNT(*) FROM form_events f JOIN exercise_sets s ON s.id = f.set_id WHERE s.session_id IN ({marks})",
+                f"SELECT COUNT(*) FROM control_events WHERE session_id IN ({marks})",
+            ):
+                events += self.conn.execute(sql, sessions).fetchone()[0]
+            export_paths = [r[0] for r in self.conn.execute(
+                f"SELECT path FROM exports WHERE session_id IN ({marks})", sessions)]
+        self.conn.execute("DELETE FROM patients WHERE id = ?", (pid,))   # cascades through every child table
+        self.conn.commit()
+        removed_files = 0
+        for path in export_paths:
+            try:
+                Path(path).unlink()
+                removed_files += 1
+            except FileNotFoundError:
+                continue
+        return DeleteReport(patient_id=pid, sessions=len(sessions), events=events, export_files=removed_files)
+
+    def reassign_session(self, session_id: int, patient_id: str) -> None:
+        target = self.get_patient(patient_id)
+        if target is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        if self.conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)).fetchone() is None:
+            raise SessionNotFoundError(f"Session {session_id} not found")
+        self.conn.execute("UPDATE sessions SET patient_id = ? WHERE id = ?", (target.id, session_id))
+        self.conn.commit()
+
+    # ---------------------------------------------------------------- history and event log
+
+    def list_sessions(self, patient_id: Optional[str] = None) -> List[SessionSummaryRow]:
+        """Sessions newest first, with the exercises performed and summary numbers."""
+        if patient_id is None:
+            rows = self.conn.execute("SELECT * FROM sessions ORDER BY start_time DESC, id DESC").fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM sessions WHERE patient_id = ? ORDER BY start_time DESC, id DESC", (patient_id,)
+            ).fetchall()
+        if not rows:
+            return []
+        ids = [r["id"] for r in rows]
+        marks = ",".join("?" * len(ids))
+        names: dict = {}
+        for s in self.conn.execute(
+            f"SELECT session_id, exercise_name FROM exercise_sets WHERE session_id IN ({marks}) ORDER BY session_id, ordinal",
+            ids,
+        ):
+            names.setdefault(s["session_id"], []).append(s["exercise_name"])
+        return [
+            SessionSummaryRow(
+                id=r["id"], patient_id=r["patient_id"], start_time=r["start_time"], end_time=r["end_time"],
+                source=r["source"], status=r["status"], exercises=names.get(r["id"], []),
+                total_reps=r["total_reps"], avg_form_score=r["avg_form_score"],
+            )
+            for r in rows
+        ]
+
+    def session_ordinal(self, session_id: int) -> int:
+        """1-based position of the session among its patient's sessions (PTA-Log file numbering)."""
+        row = self.conn.execute("SELECT patient_id, start_time FROM sessions WHERE id = ?", (session_id,)).fetchone()
+        if row is None:
+            raise SessionNotFoundError(f"Session {session_id} not found")
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE patient_id = ? AND (start_time < ? OR (start_time = ? AND id <= ?))",
+            (row["patient_id"], row["start_time"], row["start_time"], session_id),
+        ).fetchone()[0]
+
+    # Ordering of rows that share a timestamp and frame (mirrors the legacy loop order).
+    _RANK = {"session_start": -1, "sample": 0, "rep": 1, "partial_rep": 2, "form": 3, "switch": 4, "reset": 5, "session_end": 9}
+
+    def event_log(self, session_id: int) -> List[LogRow]:
+        """Chronological union of every event plus synthetic session_start / session_end rows."""
+        session = self.load_session(session_id)
+        rows: List[LogRow] = []
+        first = session.sets[0] if session.sets else None
+        rows.append(LogRow("session_start", session.start_time, 0, first.ordinal if first else None, {
+            "exercise": first.exercise_name if first else None,
+            "target_reps": first.target_reps if first else None,
+            "side": first.side if first else None,
+            "source": session.source, "source_ref": session.source_ref,
+        }))
+        for es in session.sets:
+            for r in es.reps:
+                rows.append(LogRow("rep", r.timestamp, r.frame_num, es.ordinal, {
+                    "rep_number": r.rep_number, "exercise": es.exercise_name, "min_angle": r.min_angle,
+                    "max_angle": r.max_angle, "rom": r.rom, "duration_seconds": r.duration_seconds,
+                    "form_score": r.form_score, "out_of_range": r.out_of_range}))
+            for pr in es.partial_reps:
+                rows.append(LogRow("partial_rep", pr.timestamp, pr.frame_num, es.ordinal, {
+                    "reason": pr.reason, "exercise": es.exercise_name, "min_angle": pr.min_angle,
+                    "max_angle": pr.max_angle, "rom": pr.rom, "duration_seconds": pr.duration_seconds}))
+            for f in es.form_events:
+                rows.append(LogRow("form", f.timestamp, f.frame_num, es.ordinal, {
+                    "severity": f.severity, "status": f.status, "message": f.message,
+                    "body_part": f.body_part, "exercise": es.exercise_name}))
+        for c in session.control_events:
+            es = self._set_open_at(session, c.timestamp, closing=c.from_exercise if c.kind == "switch" else None)
+            data = {"exercise": es.exercise_name if es else None}
+            if c.kind == "switch":
+                data.update({"from_exercise": c.from_exercise, "to_exercise": c.to_exercise})
+            else:
+                data.update({"rep_count_at_reset": c.rep_count_at_reset})
+            rows.append(LogRow(c.kind, c.timestamp, c.frame_num, es.ordinal if es else None, data))
+        if session.status != "running" and session.end_time:
+            rows.append(LogRow("session_end", session.end_time, 10 ** 9, None, {
+                "total_reps": session.total_reps, "avg_form_score": session.avg_form_score,
+                "avg_rom": session.avg_rom, "duration_seconds": session.duration_seconds,
+                "status": session.status}))
+        rows.sort(key=lambda r: (_ts_key(r.timestamp), r.frame_num, self._RANK.get(r.type, 8)))
+        return rows
+
+    @staticmethod
+    def _set_open_at(session: Session, timestamp: str, closing: Optional[str] = None):
+        """The exercise set open at `timestamp`: the last set started at or before it.
+
+        For a switch, `closing` names the exercise being left, so the event attaches to
+        the set it closed rather than the one that opened at the same instant.
+        """
+        key = _ts_key(timestamp)
+        candidates = [es for es in session.sets if _ts_key(es.start_time) <= key]
+        if closing is not None:
+            named = [es for es in candidates if es.exercise_name == closing]
+            if named:
+                return named[-1]
+        if candidates:
+            return candidates[-1]
+        return session.sets[0] if session.sets else None
+
+    # ---------------------------------------------------------------- legacy import support
+
+    def import_session(self, patient_id: str, source: str, source_ref: str, start_time: str,
+                       end_time: Optional[str], sets: List[dict], control_events: List[ControlEvent],
+                       status: str = "completed") -> int:
+        """Create a finished session from parsed legacy data (importer only).
+
+        `sets` items: {"info": ExerciseSetInfo, "start_time", "end_time", "reps": [RepEvent],
+        "partial_reps": [PartialRepEvent], "form_events": [FormEvent]}.
+        """
+        if self.get_patient(patient_id) is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        cur = self.conn.execute(
+            """
+            INSERT INTO sessions (patient_id, schema_version, source, source_ref, status, start_time)
+            VALUES (?, ?, ?, ?, 'running', ?)
+            """,
+            (patient_id, SCHEMA_VERSION, source, source_ref, start_time),
+        )
+        sid = int(cur.lastrowid)
+        for ordinal, item in enumerate(sets, 1):
+            info: ExerciseSetInfo = item["info"]
+            c2 = self.conn.execute(
+                """
+                INSERT INTO exercise_sets (session_id, ordinal, exercise_key, exercise_name, side, target_reps,
+                                           up_angle, down_angle, start_time, end_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (sid, ordinal, info.exercise_key, info.exercise_name, info.side, int(info.target_reps),
+                 float(info.up_angle), float(info.down_angle), item["start_time"], item.get("end_time")),
+            )
+            set_id = int(c2.lastrowid)
+            for rep in item.get("reps", []):
+                self.add_rep(set_id, rep)
+            for partial in item.get("partial_reps", []):
+                self.add_partial_rep(set_id, partial)
+            for fe in item.get("form_events", []):
+                self.add_form_event(set_id, fe)
+        for c in control_events:
+            self.add_control_event(sid, c)
+        self.conn.commit()
+        self._finish_session(sid, status=status, end_time=end_time or self._last_activity_time(sid) or start_time)
+        return sid
+
+    def imported_session_keys(self) -> set:
+        """(first exercise name lower, start time to the second, total reps) of every imported session."""
+        keys = set()
+        rows = self.conn.execute(
+            "SELECT id, start_time, total_reps FROM sessions WHERE source_ref = 'legacy-import'").fetchall()
+        for r in rows:
+            first = self.conn.execute(
+                "SELECT exercise_name FROM exercise_sets WHERE session_id = ? ORDER BY ordinal LIMIT 1", (r["id"],)
+            ).fetchone()
+            keys.add(((first["exercise_name"] if first else "").lower(), (r["start_time"] or "")[:19], int(r["total_reps"] or 0)))
+        return keys
+
+    def ledger_lookup(self, sha256: str) -> Optional[LedgerRow]:
+        row = self.conn.execute("SELECT * FROM import_ledger WHERE file_sha256 = ?", (sha256,)).fetchone()
+        if row is None:
+            return None
+        return LedgerRow(file_sha256=row["file_sha256"], source_path=row["source_path"], session_id=row["session_id"],
+                         outcome=row["outcome"], imported_at=row["imported_at"], reason=row["reason"])
+
+    def ledger_add(self, row: LedgerRow) -> None:
+        self.conn.execute(
+            """
+            INSERT OR REPLACE INTO import_ledger (file_sha256, source_path, session_id, outcome, reason, imported_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (row.file_sha256, row.source_path, row.session_id, row.outcome, row.reason, row.imported_at or self._now()),
+        )
+        self.conn.commit()
+
+
+def _ts_key(ts: Optional[str]):
+    """Sort key for ISO timestamps that may or may not carry microseconds."""
+    if not ts:
+        return datetime.min
+    try:
+        return datetime.fromisoformat(ts)
+    except ValueError:
+        return datetime.min

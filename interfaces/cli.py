@@ -8,16 +8,19 @@ This module provides a clean, user-friendly CLI for all PT Assistant functions.
 Commands:
     analyze     Process a video file for exercise analysis
     webcam      Start real-time webcam analysis
-    report      View or export a session report
+    patients    Register and manage pseudonymous patients
+    sessions    List sessions and read a session's event log
     list        List available exercises
-    history     View patient session history
+    export      Export a session in a legacy file format
+    import-legacy  Import pre-existing session files once
     progress    Show progress charts for an exercise
     calibrate   Help set up optimal camera positioning
 
 Usage Examples:
     python cli.py analyze --video session.mp4 --exercise knee_extension
     python cli.py webcam --exercise shoulder_flexion --reps 10
-    python cli.py report --session-id 20240115_001
+    python cli.py patients add P-017 --label "Post-op knee"
+    python cli.py sessions list --patient P-017
     python cli.py list-exercises
     python cli.py progress --exercise "Knee Extension" --days 30
 
@@ -34,7 +37,13 @@ import time
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.ptlog.models import PatientNotFoundError  # noqa: E402
+from src.ptlog.models import (  # noqa: E402
+    BuiltinPatientError, DuplicatePatientError, PatientNotFoundError,
+    PatientValidationError, PTLogError, SessionNotFoundError,
+)
+from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
+import json  # noqa: E402
+import sqlite3  # noqa: E402
 
 # ANSI color codes for terminal output
 class Colors:
@@ -262,55 +271,6 @@ def cmd_webcam(args):
         return 1
 
 
-def cmd_report(args):
-    """Handle the report command."""
-    print_header("AI PT Assistant - Session Report")
-
-    try:
-        from src.session_tracker import SessionTracker
-
-        tracker = SessionTracker(data_dir=args.data_dir, patient_id=args.patient or "default")
-
-        if args.session_id:
-            # Load specific session
-            session = tracker.get_session_by_id(args.session_id)
-            if session is None:
-                print_error(f"Session not found: {args.session_id}")
-                return 1
-
-            print(tracker.generate_session_summary_card(session))
-
-        elif args.list:
-            # List all sessions
-            sessions = tracker.session_history
-            if not sessions:
-                print_warning("No sessions found")
-                return 0
-
-            print(f"{'Session ID':<35} {'Date':<12} {'Form Score':<12} {'Exercises'}")
-            print("-" * 70)
-            for s in sessions:
-                ex_count = len(s.exercises)
-                print(f"{s.session_id:<35} {s.date:<12} {s.overall_form_score:>8.1f}% {ex_count:>8}")
-
-        elif args.latest:
-            # Show latest session
-            if tracker.session_history:
-                latest = tracker.session_history[-1]
-                print(tracker.generate_session_summary_card(latest))
-            else:
-                print_warning("No sessions found")
-
-        else:
-            print_info("Use --session-id, --list, or --latest to view reports")
-
-        return 0
-
-    except Exception as e:
-        print_error(f"Could not load session data: {e}")
-        return 1
-
-
 def cmd_list_exercises(args):
     """Handle the list-exercises command."""
     print_header("Available Exercises")
@@ -372,9 +332,11 @@ def cmd_progress(args):
 
     try:
         from src.session_tracker import SessionTracker
-
-        tracker = SessionTracker(data_dir=args.data_dir, patient_id=args.patient or "default")
-
+        from src.ptlog import views
+        patient_id = args.patient or "unassigned"
+        with SessionStore(default_db_path()).open() as store:
+            history = views.load_session_data_for_trends(store, patient_id)
+        tracker = SessionTracker.from_history(history, patient_id)
         progress = tracker.calculate_progress(args.exercise, days_back=args.days)
 
         if progress is None:
@@ -419,6 +381,151 @@ def cmd_progress(args):
     except Exception as e:
         print_error(f"Could not generate progress report: {e}")
         return 1
+
+
+def _patient_dict(p) -> dict:
+    return {"id": p.id, "label": p.label, "notes": p.notes, "created_at": p.created_at,
+            "is_builtin": p.is_builtin, "session_count": p.session_count,
+            "last_session_at": p.last_session_at}
+
+
+def cmd_patients(args):
+    """Handle the patients command group (add, list, edit, delete, reassign)."""
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            sub = args.patients_cmd
+            if sub == "add":
+                p = store.add_patient(args.id, label=args.label, notes=args.notes)
+                print_success(f"Registered patient {p.id}")
+            elif sub == "list":
+                patients = store.list_patients()
+                if args.json:
+                    print(json.dumps([_patient_dict(p) for p in patients], indent=2))
+                else:
+                    print(f"{'ID':<20} {'Label':<32} {'Sessions':>8}  Last session")
+                    for p in patients:
+                        last = (p.last_session_at or "")[:16].replace("T", " ")
+                        print(f"{p.id:<20} {(p.label or ''):<32} {p.session_count:>8}  {last}")
+            elif sub == "edit":
+                p = store.update_patient(args.id, label=args.label, notes=args.notes)
+                print_success(f"Updated patient {p.id}")
+            elif sub == "delete":
+                p = store.get_patient(args.id)
+                if p is None:
+                    raise PatientNotFoundError(f"Patient '{args.id}' not found")
+                if p.is_builtin:
+                    raise BuiltinPatientError("The built-in 'unassigned' patient cannot be deleted")
+                if not args.yes:
+                    answer = input(f"Delete patient {p.id} and {p.session_count} sessions? [y/N] ")
+                    if answer.strip().lower() not in ("y", "yes"):
+                        print_info("Cancelled; nothing deleted")
+                        return 0
+                report = store.delete_patient(p.id)
+                print_success(f"Deleted patient {report.patient_id}: {report.sessions} sessions, "
+                              f"{report.events} events, {report.export_files} export files removed")
+            elif sub == "reassign":
+                store.reassign_session(args.session_id, args.to)
+                print_success(f"Reassigned session {args.session_id} to {args.to}")
+            else:
+                print_error("Usage: patients {add,list,edit,delete,reassign}")
+                return 1
+        return 0
+    except (PatientValidationError, DuplicatePatientError, BuiltinPatientError,
+            PatientNotFoundError, SessionNotFoundError) as e:
+        print_error(str(e))
+        return 1
+    except sqlite3.OperationalError as e:
+        print_error(f"Database error: {e}")
+        return 2
+
+
+def cmd_sessions(args):
+    """Handle the sessions command group (list, show)."""
+    from src.ptlog import views
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            if args.sessions_cmd == "list":
+                rows = store.list_sessions(args.patient)
+                if args.json:
+                    print(json.dumps([{
+                        "id": r.id, "patient_id": r.patient_id, "start_time": r.start_time, "end_time": r.end_time,
+                        "source": r.source, "status": r.status, "exercises": r.exercises,
+                        "total_reps": r.total_reps, "avg_form_score": r.avg_form_score} for r in rows], indent=2))
+                else:
+                    print(f"{'ID':>5}  {'Date':<16} {'Patient':<14} {'Source':<7} {'Exercises':<34} {'Reps':>4}  {'Avg form':<13} Status")
+                    for t in views.session_table_rows(store, args.patient):
+                        print(f"{t['id']:>5}  {t['date']:<16} {t['patient_id']:<14} {t['source']:<7} "
+                              f"{t['exercises'][:34]:<34} {t['total_reps']:>4}  {t['avg_form_score']:<13} {t['status']}")
+            elif args.sessions_cmd == "show":
+                session = store.load_session(args.session_id)
+                if args.json:
+                    from dataclasses import asdict
+                    events = [asdict(r) for r in store.event_log(args.session_id)]
+                    print(json.dumps({"session": {
+                        "id": session.id, "patient_id": session.patient_id, "source": session.source,
+                        "source_ref": session.source_ref, "status": session.status, "start_time": session.start_time,
+                        "end_time": session.end_time, "total_reps": session.total_reps,
+                        "avg_form_score": session.avg_form_score, "avg_rom": session.avg_rom,
+                        "duration_seconds": session.duration_seconds}, "events": events}, indent=2))
+                else:
+                    for line in views.session_header_lines(session)[:-1]:
+                        print(line)
+                    print()
+                    for line in views.event_log_lines(store, args.session_id):
+                        print(line)
+            else:
+                print_error("Usage: sessions {list,show}")
+                return 1
+        return 0
+    except SessionNotFoundError as e:
+        print_error(str(e))
+        return 1
+    except sqlite3.OperationalError as e:
+        print_error(f"Database error: {e}")
+        return 2
+
+
+def cmd_export(args):
+    """Handle the export command: write a session in one or all legacy formats."""
+    from src.ptlog.exports import FORMATS, write_export
+    fmts = list(FORMATS) if args.format == "all" else [args.format]
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            for fmt in fmts:
+                for path in write_export(store, args.session_id, fmt, args.out):
+                    print(path)
+        return 0
+    except SessionNotFoundError as e:
+        print_error(str(e))
+        return 1
+    except (OSError, sqlite3.OperationalError) as e:
+        print_error(f"Could not write export: {e}")
+        return 2
+
+
+def cmd_import_legacy(args):
+    """Handle import-legacy: bring pre-existing session files into the canonical record once."""
+    from src.ptlog.importer import import_legacy
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            report = import_legacy(store, Path(args.sessions_dir), Path(args.obs_dir), dry_run=args.dry_run)
+        for e in report.entries:
+            if e.outcome == "imported":
+                line = "imported (dry run)" if args.dry_run else f"imported → session {e.session_id}"
+            elif e.outcome == "duplicate":
+                line = f"duplicate ({e.detail})"
+            elif e.outcome == "malformed":
+                line = f"malformed: {e.detail}"
+            else:
+                line = f"skipped ({e.detail})"
+            print(f"{e.path.name}: {line}")
+        suffix = " (dry run, nothing written)" if args.dry_run else ""
+        print(f"Totals: imported {report.imported}, duplicate {report.duplicates}, "
+              f"malformed {report.malformed}, skipped {report.skipped}{suffix}")
+        return 0
+    except (OSError, sqlite3.OperationalError) as e:
+        print_error(f"Import failed: {e}")
+        return 2
 
 
 def cmd_calibrate(args):
@@ -523,63 +630,6 @@ def cmd_calibrate(args):
     return 0
 
 
-def cmd_history(args):
-    """Handle the history command."""
-    print_header("Patient Session History")
-
-    try:
-        from src.session_tracker import SessionTracker
-
-        tracker = SessionTracker(data_dir=args.data_dir, patient_id=args.patient or "default")
-
-        if not tracker.session_history:
-            print_warning("No session history found")
-            return 0
-
-        print(f"Patient ID: {tracker.patient_id}")
-        print(f"Total Sessions: {len(tracker.session_history)}")
-        print()
-
-        # Summary statistics
-        total_reps = 0
-        total_exercises = 0
-        all_form_scores = []
-
-        for session in tracker.session_history:
-            for ex in session.exercises:
-                total_reps += ex.reps_completed
-                total_exercises += 1
-                all_form_scores.append(ex.avg_form_score)
-
-        if all_form_scores:
-            print(f"Total Reps (all time): {total_reps}")
-            print(f"Average Form Score: {np.mean(all_form_scores):.1f}%")
-            print()
-
-        # Show exercises needing attention
-        concerns = tracker.get_exercises_needing_attention()
-        if concerns:
-            print(color_text("Exercises Needing Attention:", Colors.YELLOW))
-            for concern in concerns[:3]:
-                print(f"  • {concern['exercise']}")
-                for reason in concern['reasons']:
-                    print(f"      - {reason}")
-            print()
-
-        # Export option
-        if args.export:
-            filepath = tracker.export_patient_history(format=args.export)
-            print_success(f"History exported: {filepath}")
-
-        return 0
-
-    except Exception as e:
-        print_error(f"Could not load history: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
-
-
 # =============================================================================
 # INTERACTIVE MODE
 # =============================================================================
@@ -616,7 +666,7 @@ def interactive_menu():
             try:
                 exercise = exercises[int(ex_choice) - 1]
                 args = argparse.Namespace(
-                    exercise=exercise, reps=10, camera=0, record=None
+                    exercise=exercise, reps=10, camera=0, record=None, patient=None
                 )
                 cmd_webcam(args)
             except (ValueError, IndexError):
@@ -627,18 +677,15 @@ def interactive_menu():
             if os.path.exists(video_path):
                 args = argparse.Namespace(
                     video=video_path, exercise="knee_extension",
-                    output=None, report=["json"], headless=False
+                    output=None, headless=False, patient=None
                 )
                 cmd_analyze(args)
             else:
                 print_error(f"File not found: {video_path}")
 
         elif choice == "3":
-            args = argparse.Namespace(
-                data_dir="./sessions", patient=None, session_id=None,
-                list=True, latest=False, export=None
-            )
-            cmd_history(args)
+            args = argparse.Namespace(sessions_cmd="list", patient=None, json=False)
+            cmd_sessions(args)
 
         elif choice == "4":
             args = argparse.Namespace(verbose=True)
@@ -665,7 +712,9 @@ def main():
 Examples:
   %(prog)s analyze --video session.mp4 --exercise knee_extension
   %(prog)s webcam --exercise shoulder_flexion --reps 10
-  %(prog)s report --latest
+  %(prog)s patients add P-017 --label "Post-op knee"
+  %(prog)s sessions list --patient P-017
+  %(prog)s sessions show 3
   %(prog)s list-exercises --verbose
   %(prog)s progress --exercise "Knee Extension" --days 30 --chart
   %(prog)s calibrate
@@ -698,17 +747,6 @@ Examples:
     webcam_parser.add_argument("--patient", "-p", default=None,
                                help="Pseudonymous patient ID for the session record (default: unassigned)")
 
-    # Report command
-    report_parser = subparsers.add_parser("report", help="View session reports")
-    report_parser.add_argument("--session-id", "-s", help="Specific session ID")
-    report_parser.add_argument("--list", "-l", action="store_true",
-                               help="List all sessions")
-    report_parser.add_argument("--latest", action="store_true",
-                               help="Show most recent session")
-    report_parser.add_argument("--patient", "-p", help="Patient ID")
-    report_parser.add_argument("--data-dir", "-d", default="./sessions",
-                               help="Session data directory")
-
     # List exercises command
     list_parser = subparsers.add_parser("list-exercises", help="List available exercises")
     list_parser.add_argument("--verbose", "-v", action="store_true",
@@ -723,16 +761,49 @@ Examples:
     progress_parser.add_argument("--chart", "-c", action="store_true",
                                  help="Generate progress chart")
     progress_parser.add_argument("--patient", "-p", help="Patient ID")
-    progress_parser.add_argument("--data-dir", default="./sessions",
-                                 help="Session data directory")
 
-    # History command
-    history_parser = subparsers.add_parser("history", help="View patient history")
-    history_parser.add_argument("--patient", "-p", help="Patient ID")
-    history_parser.add_argument("--data-dir", "-d", default="./sessions",
-                                help="Session data directory")
-    history_parser.add_argument("--export", "-e", choices=["json", "csv"],
-                                help="Export format")
+    # Patients command group
+    patients_parser = subparsers.add_parser("patients", help="Manage pseudonymous patients")
+    patients_sub = patients_parser.add_subparsers(dest="patients_cmd")
+    pa = patients_sub.add_parser("add", help="Register a patient")
+    pa.add_argument("id", help="Pseudonymous ID: 1-32 letters, digits, or hyphens")
+    pa.add_argument("--label", default=None, help="Short label (max 60 chars, no identifying text)")
+    pa.add_argument("--notes", default=None, help="Free-text notes")
+    pl = patients_sub.add_parser("list", help="List patients")
+    pl.add_argument("--json", action="store_true", help="Output JSON")
+    pe = patients_sub.add_parser("edit", help="Edit a patient's label or notes")
+    pe.add_argument("id")
+    pe.add_argument("--label", default=None)
+    pe.add_argument("--notes", default=None)
+    pd_ = patients_sub.add_parser("delete", help="Delete a patient and all their sessions")
+    pd_.add_argument("id")
+    pd_.add_argument("--yes", "-y", action="store_true", help="Skip the confirmation prompt")
+    pr = patients_sub.add_parser("reassign", help="Move a session to another patient")
+    pr.add_argument("session_id", type=int)
+    pr.add_argument("--to", required=True, help="Target patient ID")
+
+    # Sessions command group
+    sessions_parser = subparsers.add_parser("sessions", help="Browse recorded sessions")
+    sessions_sub = sessions_parser.add_subparsers(dest="sessions_cmd")
+    sl = sessions_sub.add_parser("list", help="List sessions newest first")
+    sl.add_argument("--patient", "-p", default=None, help="Only this patient's sessions")
+    sl.add_argument("--json", action="store_true", help="Output JSON")
+    ss = sessions_sub.add_parser("show", help="Show a session's full event log")
+    ss.add_argument("session_id", type=int)
+    ss.add_argument("--json", action="store_true", help="Output JSON")
+
+    # Export command
+    export_parser = subparsers.add_parser("export", help="Export a session in a legacy file format")
+    export_parser.add_argument("session_id", type=int)
+    export_parser.add_argument("--format", "-f", required=True,
+                               choices=["pta_log", "observation_json", "csv_report", "text_log", "all"])
+    export_parser.add_argument("--out", "-o", default=None, help="Output directory (default: exports/)")
+
+    # Import legacy command
+    import_parser = subparsers.add_parser("import-legacy", help="Import pre-existing session files once")
+    import_parser.add_argument("--sessions-dir", default="sessions", help="Folder of legacy session JSON files")
+    import_parser.add_argument("--obs-dir", default="observation_logs", help="Folder of legacy observation logs")
+    import_parser.add_argument("--dry-run", action="store_true", help="Report what would be imported without writing")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")
@@ -749,14 +820,18 @@ Examples:
         return cmd_analyze(args)
     elif args.command == "webcam":
         return cmd_webcam(args)
-    elif args.command == "report":
-        return cmd_report(args)
     elif args.command == "list-exercises":
         return cmd_list_exercises(args)
     elif args.command == "progress":
         return cmd_progress(args)
-    elif args.command == "history":
-        return cmd_history(args)
+    elif args.command == "patients":
+        return cmd_patients(args)
+    elif args.command == "sessions":
+        return cmd_sessions(args)
+    elif args.command == "export":
+        return cmd_export(args)
+    elif args.command == "import-legacy":
+        return cmd_import_legacy(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":

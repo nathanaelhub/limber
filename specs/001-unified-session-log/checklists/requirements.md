@@ -48,3 +48,13 @@
   4 reps / avg form 67.5 / avg ROM 117.3, identical to the on-screen summary (SC-001), and left
   `sessions/`, `observation_logs/`, `pta_logs/`, `logs/` unchanged (SC-006). Quickstart step 5's
   crash case is covered by the SIGKILL test in `tests/test_ptlog_recovery.py`.
+- `/speckit-implement` completion (2026-09-14): T001–T055 done. Suite 247 passed (legacy logger
+  tests and tracker writer tests removed with the writers). Quickstart run against a scratch
+  database: step 2 register/reject; step 4 list newest first and full event log with units;
+  step 6 four exports with pseudonymous names; step 7 import of the repo's real legacy folders
+  (6 imported, 1 genuinely truncated file reported malformed, 4 CSVs skipped, second run 6
+  duplicates, nothing created); step 9 cascade delete removed the 4 export files and the
+  built-in patient was refused; step 8 covered by tests/test_app_pages.py (8 pages render
+  headlessly); step 5 covered by the SIGKILL test; SC-006 legacy folders unchanged.
+  Final gate: engine files untouched vs main, no network imports under src/ptlog, no
+  identifying strings in fixtures, requirements.txt unchanged.

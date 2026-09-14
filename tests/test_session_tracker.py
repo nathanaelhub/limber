@@ -2,7 +2,8 @@
 Tests for Session Tracking Module
 ==================================
 
-Tests data persistence, progress calculations, and export formats.
+Tests the analysis methods (trends, comparison, attention flags, summary card).
+The writer methods were retired by the unified session log (specs/001-unified-session-log).
 
 Run with:
     pytest tests/test_session_tracker.py -v
@@ -25,8 +26,6 @@ from src.session_tracker import (
     SessionData,
     ExerciseRecord,
     ProgressMetrics,
-    create_exercise_record_from_tracker,
-    quick_session_report,
 )
 
 
@@ -127,147 +126,12 @@ class TestSessionTrackerInit:
         assert tracker.current_session is None
         assert len(tracker.session_history) == 0
 
-    def test_data_dir_creation(self, temp_data_dir):
-        """Test that data directory is created if it doesn't exist."""
-        new_dir = Path(temp_data_dir) / "new_subdir"
-        tracker = SessionTracker(data_dir=str(new_dir), patient_id="test")
-
-        assert new_dir.exists()
-
-
-# =============================================================================
-# SESSION LIFECYCLE TESTS
-# =============================================================================
-
-class TestSessionLifecycle:
-    """Tests for session start, update, and end."""
-
-    def test_start_session(self, session_tracker):
-        """Test starting a new session."""
-        session_id = session_tracker.start_session()
-
-        assert session_tracker.current_session is not None
-        assert "test_patient" in session_id
-        assert session_tracker.current_session.patient_id == "test_patient"
-        assert session_tracker.current_session.date == datetime.now().strftime('%Y-%m-%d')
-
-    def test_start_session_with_metadata(self, session_tracker):
-        """Test starting session with metadata."""
-        metadata = {"location": "home", "equipment": "resistance_band"}
-        session_id = session_tracker.start_session(metadata=metadata)
-
-        assert session_tracker.current_session.metadata == metadata
-
-    def test_add_exercise_record(self, session_tracker, sample_exercise_record):
-        """Test adding exercise record to session."""
-        session_tracker.start_session()
-        session_tracker.add_exercise_record(sample_exercise_record)
-
-        assert len(session_tracker.current_session.exercises) == 1
-        assert session_tracker.current_session.exercises[0].exercise_name == "Knee Extension"
-
-    def test_add_exercise_without_session_raises(self, session_tracker, sample_exercise_record):
-        """Should raise error if no active session."""
-        with pytest.raises(ValueError, match="No active session"):
-            session_tracker.add_exercise_record(sample_exercise_record)
-
-    def test_end_session(self, session_tracker, sample_exercise_record):
-        """Test ending a session."""
-        session_tracker.start_session()
-        session_tracker.add_exercise_record(sample_exercise_record)
-        # Backdate start_time by 1 minute so duration calculation is non-zero
-        start = datetime.now() - timedelta(minutes=1)
-        session_tracker.current_session.start_time = start.strftime('%H:%M:%S')
-        session_tracker.end_session(therapist_notes="Good progress today")
-
-        assert session_tracker.current_session.end_time != ""
-        assert session_tracker.current_session.duration_minutes > 0
-        assert session_tracker.current_session.therapist_notes == "Good progress today"
-        assert session_tracker.current_session.overall_form_score > 0
-
-    def test_end_session_without_start_raises(self, session_tracker):
-        """Should raise error if no session to end."""
-        with pytest.raises(ValueError, match="No active session"):
-            session_tracker.end_session()
-
-
 # =============================================================================
 # DATA PERSISTENCE TESTS
 # =============================================================================
 
-class TestDataPersistence:
-    """Tests for saving and loading session data."""
-
-    def test_save_session_json(self, session_tracker, sample_exercise_record):
-        """Test saving session as JSON."""
-        session_tracker.start_session()
-        session_tracker.add_exercise_record(sample_exercise_record)
-        session_tracker.end_session()
-
-        filepath = session_tracker.save_session(format="json")
-
-        assert Path(filepath).exists()
-        assert filepath.endswith(".json")
-
-        # Verify content
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-            assert data['patient_id'] == "test_patient"
-            assert len(data['exercises']) == 1
-
-    def test_save_session_csv(self, session_tracker, sample_exercise_record):
-        """Test saving session as CSV."""
-        session_tracker.start_session()
-        session_tracker.add_exercise_record(sample_exercise_record)
-        session_tracker.end_session()
-
-        filepath = session_tracker.save_session(format="csv")
-
-        assert Path(filepath).exists()
-        assert filepath.endswith(".csv")
-
-        # Verify content
-        with open(filepath, 'r') as f:
-            content = f.read()
-            assert "Knee Extension" in content
-            assert "test_patient" in content
-
-    def test_save_without_session_raises(self, session_tracker):
-        """Should raise error if no session to save."""
-        with pytest.raises(ValueError, match="No session to save"):
-            session_tracker.save_session()
-
-    def test_load_saved_session(self, temp_data_dir, sample_exercise_record):
-        """Test that saved sessions are loaded on init."""
-        # Create and save a session
-        tracker1 = SessionTracker(data_dir=temp_data_dir, patient_id="load_test")
-        tracker1.start_session()
-        tracker1.add_exercise_record(sample_exercise_record)
-        tracker1.end_session()
-        tracker1.save_session()
-
-        # Create new tracker - should load saved session
-        tracker2 = SessionTracker(data_dir=temp_data_dir, patient_id="load_test")
-
-        assert len(tracker2.session_history) == 1
-        assert tracker2.session_history[0].patient_id == "load_test"
-
-
 class TestSessionRetrieval:
     """Tests for retrieving session data."""
-
-    def test_get_session_by_id(self, session_tracker, sample_exercise_record):
-        """Test retrieving session by ID."""
-        session_tracker.start_session()
-        session_id = session_tracker.current_session.session_id
-        session_tracker.add_exercise_record(sample_exercise_record)
-        session_tracker.end_session()
-        session_tracker.save_session()
-
-        session = session_tracker.get_session_by_id(session_id)
-
-        assert session is not None
-        assert session.session_id == session_id
 
     def test_get_nonexistent_session(self, session_tracker):
         """Should return None for nonexistent session."""
@@ -369,53 +233,11 @@ class TestProgressTracking:
 
 
 # =============================================================================
-# EXPORT TESTS
-# =============================================================================
-
-class TestExport:
-    """Tests for data export functionality."""
-
-    def test_export_history_csv(self, multiple_sessions):
-        """Test exporting full history as CSV."""
-        filepath = multiple_sessions.export_patient_history(format="csv")
-
-        assert Path(filepath).exists()
-        assert filepath.endswith(".csv")
-
-        with open(filepath, 'r') as f:
-            content = f.read()
-            assert "Knee Extension" in content
-
-    def test_export_history_json(self, multiple_sessions):
-        """Test exporting full history as JSON."""
-        filepath = multiple_sessions.export_patient_history(format="json")
-
-        assert Path(filepath).exists()
-
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-            assert data['patient_id'] == "progress_test"
-            assert data['total_sessions'] == 5
-
-
-# =============================================================================
 # VISUALIZATION TESTS
 # =============================================================================
 
 class TestVisualization:
     """Tests for visualization methods."""
-
-    def test_generate_summary_card(self, session_tracker, sample_exercise_record):
-        """Test generating session summary card."""
-        session_tracker.start_session()
-        session_tracker.add_exercise_record(sample_exercise_record)
-        session_tracker.end_session()
-
-        summary = session_tracker.generate_session_summary_card()
-
-        assert "PT SESSION SUMMARY" in summary
-        assert "Knee Extension" in summary
-        assert "85" in summary  # form score
 
     def test_summary_card_no_session(self, session_tracker):
         """Should handle no session gracefully."""
@@ -424,97 +246,5 @@ class TestVisualization:
 
 
 # =============================================================================
-# FLAG GENERATION TESTS
-# =============================================================================
-
-class TestFlagGeneration:
-    """Tests for automatic flag generation."""
-
-    def test_low_form_score_flag(self, session_tracker):
-        """Low form score should generate flag."""
-        session_tracker.start_session()
-
-        low_form_record = ExerciseRecord(
-            exercise_name="Test Exercise",
-            reps_completed=10,
-            target_reps=10,
-            avg_form_score=50.0,  # Low form score
-            min_rom=90,
-            max_rom=150,
-            rom_range=60,
-            avg_rep_duration=2.5
-        )
-        session_tracker.add_exercise_record(low_form_record)
-
-        # Should have generated a flag
-        assert len(session_tracker.current_session.flags_for_review) > 0
-        assert any("Low form score" in flag for flag in session_tracker.current_session.flags_for_review)
-
-    def test_low_rep_completion_flag(self, session_tracker):
-        """Low rep completion should generate flag."""
-        session_tracker.start_session()
-
-        low_reps_record = ExerciseRecord(
-            exercise_name="Test Exercise",
-            reps_completed=3,  # Only 3 of 10
-            target_reps=10,
-            avg_form_score=85.0,
-            min_rom=90,
-            max_rom=150,
-            rom_range=60,
-            avg_rep_duration=2.5
-        )
-        session_tracker.add_exercise_record(low_reps_record)
-
-        assert len(session_tracker.current_session.flags_for_review) > 0
-        assert any("3/10" in flag for flag in session_tracker.current_session.flags_for_review)
-
-
-# =============================================================================
 # HELPER FUNCTION TESTS
 # =============================================================================
-
-class TestHelperFunctions:
-    """Tests for helper functions."""
-
-    def test_create_exercise_record_from_tracker(self):
-        """Test converting tracker session to exercise record."""
-        # Create a mock tracker session
-        class MockRepMetrics:
-            def __init__(self, min_a, max_a, form, dur):
-                self.min_angle = min_a
-                self.max_angle = max_a
-                self.form_score = form
-                self.duration_seconds = dur
-
-        class MockTrackerSession:
-            def __init__(self):
-                self.rep_metrics = [
-                    MockRepMetrics(90, 160, 85, 2.1),
-                    MockRepMetrics(92, 165, 82, 2.3),
-                    MockRepMetrics(88, 162, 88, 2.0),
-                ]
-                self.target_reps = 10
-                self.warnings = ["Test warning"]
-
-        mock_session = MockTrackerSession()
-        record = create_exercise_record_from_tracker("Knee Extension", mock_session)
-
-        assert record.exercise_name == "Knee Extension"
-        assert record.reps_completed == 3
-        assert record.avg_form_score == 85.0  # Average of 85, 82, 88
-        assert record.target_reps == 10
-
-    def test_quick_session_report(self, session_tracker, sample_exercise_record):
-        """Test quick report generation."""
-        session_tracker.start_session()
-        session_tracker.add_exercise_record(sample_exercise_record)
-        session_tracker.end_session()
-
-        report = quick_session_report(session_tracker)
-
-        assert "PT SESSION SUMMARY" in report
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

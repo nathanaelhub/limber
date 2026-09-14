@@ -127,12 +127,14 @@ No other line in the loops changes. The engine classes are not edited.
 ## Export functions (`src/ptlog/exports/*.py`) — pure functions
 
 ```python
-def to_pta_log_text(session: Session, samples: list[FrameSample], ordinal: int) -> str
+def to_pta_log_text(session: Session, ordinal: int = 1) -> str     # samples come from session.sets[].samples
 def to_observation_dict(session: Session) -> dict      # exact legacy shape; feeds session_summary
 def to_observation_json(session: Session) -> str        # json.dumps(dict, indent=2)
-def to_csv_report(session: Session) -> str
+def to_csv_report(session: Session, patient: Patient | None = None) -> str   # patient notes → "Therapist Notes"
 def to_text_log(session: Session) -> list[str]          # one string per 50-line legacy file
-def write_export(store, session_id: int, fmt: str, out_dir: Path) -> Path   # names + records
+def write_export(store, session_id: int, fmt: str, out_dir: Path | None = None) -> list[Path]
+    # names {patient_id}_{YYYYMMDD_HHMMSS}.{txt|json|csv}; text_log writes ..._01.log, ..._02.log;
+    # records every path in the exports table; store.session_ordinal(id) numbers the PTA-Log header
 ```
 
 Each function depends only on its arguments and the format specification in `exports.md`.

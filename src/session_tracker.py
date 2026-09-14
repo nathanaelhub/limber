@@ -104,263 +104,38 @@ class SessionTracker:
     """
     Manages PT session data persistence and progress tracking.
 
-    This class handles:
-    - Creating and saving session records
-    - Loading historical session data
-    - Calculating progress metrics
-    - Generating reports and visualizations
+    Analysis over session history built from the canonical record (src/ptlog):
+    - Progress trends per exercise
+    - Session comparison
+    - Exercises needing attention
+    - Charts and summary cards
 
     Usage:
-        tracker = SessionTracker(data_dir="./sessions", patient_id="PT001")
-        tracker.start_session()
-        # ... during exercise ...
-        tracker.add_exercise_record(exercise_record)
-        # ... end of session ...
-        tracker.end_session(therapist_notes="Good progress today")
-        tracker.save_session()
+        history = views.load_session_data_for_trends(store, "P-017")
+        tracker = SessionTracker.from_history(history, "P-017")
+        tracker.calculate_progress("Knee Extension", days_back=30)
     """
 
-    def __init__(self, data_dir: str = "./sessions", patient_id: str = "default"):
+    def __init__(self, data_dir: Optional[str] = None, patient_id: str = "default"):
         """
-        Initialize the SessionTracker.
-
-        Args:
-            data_dir: Directory for storing session data
-            patient_id: Identifier for the patient (would be encrypted in production)
+        Create an analysis-only tracker. Session data comes from the canonical record
+        (see src/ptlog/views.py:load_session_data_for_trends and from_history); this
+        class no longer reads or writes files.
         """
-        self.data_dir = Path(data_dir)
+        self.data_dir = Path(data_dir) if data_dir else None
         self.patient_id = patient_id
         self.current_session: Optional[SessionData] = None
         self.session_history: List[SessionData] = []
 
-        # Create data directory if it doesn't exist
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-
-        # Load existing sessions for this patient
-        self._load_patient_history()
-
-    def _load_patient_history(self):
-        """Load all historical sessions for the current patient."""
-        self.session_history = []
-
-        # Look for session files matching patient ID
-        pattern = f"{self.patient_id}_*.json"
-        session_files = sorted(self.data_dir.glob(pattern))
-
-        for filepath in session_files:
-            try:
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    session = self._dict_to_session(data)
-                    self.session_history.append(session)
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"Warning: Could not load session file {filepath}: {e}")
-
-    def _dict_to_session(self, data: Dict) -> SessionData:
-        """Convert dictionary to SessionData object."""
-        exercises = [
-            ExerciseRecord(**ex) for ex in data.get('exercises', [])
-        ]
-
-        return SessionData(
-            session_id=data['session_id'],
-            patient_id=data['patient_id'],
-            date=data['date'],
-            start_time=data['start_time'],
-            end_time=data.get('end_time', ''),
-            duration_minutes=data.get('duration_minutes', 0),
-            exercises=exercises,
-            overall_form_score=data.get('overall_form_score', 0),
-            therapist_notes=data.get('therapist_notes', ''),
-            flags_for_review=data.get('flags_for_review', []),
-            metadata=data.get('metadata', {})
-        )
-
-    def start_session(self, metadata: Dict[str, Any] = None) -> str:
-        """
-        Start a new PT session.
-
-        Args:
-            metadata: Optional metadata (e.g., equipment used, location)
-
-        Returns:
-            Session ID for the new session
-        """
-        now = datetime.now()
-        session_id = f"{self.patient_id}_{now.strftime('%Y%m%d_%H%M%S')}"
-
-        self.current_session = SessionData(
-            session_id=session_id,
-            patient_id=self.patient_id,
-            date=now.strftime('%Y-%m-%d'),
-            start_time=now.strftime('%H:%M:%S'),
-            end_time='',
-            duration_minutes=0,
-            metadata=metadata or {}
-        )
-
-        return session_id
-
-    def add_exercise_record(self, record: ExerciseRecord):
-        """
-        Add an exercise record to the current session.
-
-        Args:
-            record: ExerciseRecord with exercise data
-        """
-        if self.current_session is None:
-            raise ValueError("No active session. Call start_session() first.")
-
-        self.current_session.exercises.append(record)
-
-        # Check for issues that should be flagged
-        if record.avg_form_score < 60:
-            self.current_session.flags_for_review.append(
-                f"{record.exercise_name}: Low form score ({record.avg_form_score:.0f}%)"
-            )
-
-        if record.reps_completed < record.target_reps * 0.5:
-            self.current_session.flags_for_review.append(
-                f"{record.exercise_name}: Completed only {record.reps_completed}/{record.target_reps} reps"
-            )
-
-    def end_session(self, therapist_notes: str = ""):
-        """
-        End the current session and calculate summary metrics.
-
-        Args:
-            therapist_notes: Notes from the therapist about the session
-        """
-        if self.current_session is None:
-            raise ValueError("No active session to end.")
-
-        now = datetime.now()
-        self.current_session.end_time = now.strftime('%H:%M:%S')
-
-        # Calculate duration
-        start = datetime.strptime(
-            f"{self.current_session.date} {self.current_session.start_time}",
-            '%Y-%m-%d %H:%M:%S'
-        )
-        end = datetime.strptime(
-            f"{self.current_session.date} {self.current_session.end_time}",
-            '%Y-%m-%d %H:%M:%S'
-        )
-        self.current_session.duration_minutes = (end - start).seconds / 60
-
-        # Calculate overall form score
-        if self.current_session.exercises:
-            form_scores = [ex.avg_form_score for ex in self.current_session.exercises]
-            self.current_session.overall_form_score = np.mean(form_scores)
-
-        self.current_session.therapist_notes = therapist_notes
-
-    def save_session(self, format: str = "json") -> str:
-        """
-        Save the current session to disk.
-
-        Args:
-            format: Output format ("json" or "csv")
-
-        Returns:
-            Path to the saved file
-
-        HIPAA Note:
-        -----------
-        In production, this data should be encrypted before writing to disk.
-        Consider using libraries like 'cryptography' for AES encryption.
-        """
-        if self.current_session is None:
-            raise ValueError("No session to save.")
-
-        # Add to history
-        self.session_history.append(self.current_session)
-
-        if format == "json":
-            filepath = self._save_json()
-        elif format == "csv":
-            filepath = self._save_csv()
-        else:
-            raise ValueError(f"Unknown format: {format}")
-
-        # Clear current session
-        saved_session = self.current_session
-        self.current_session = None
-
-        return str(filepath)
-
-    def _save_json(self) -> Path:
-        """Save session as JSON file."""
-        filepath = self.data_dir / f"{self.current_session.session_id}.json"
-
-        # Convert to dictionary
-        data = {
-            'session_id': self.current_session.session_id,
-            'patient_id': self.current_session.patient_id,
-            'date': self.current_session.date,
-            'start_time': self.current_session.start_time,
-            'end_time': self.current_session.end_time,
-            'duration_minutes': self.current_session.duration_minutes,
-            'exercises': [asdict(ex) for ex in self.current_session.exercises],
-            'overall_form_score': self.current_session.overall_form_score,
-            'therapist_notes': self.current_session.therapist_notes,
-            'flags_for_review': self.current_session.flags_for_review,
-            'metadata': self.current_session.metadata
-        }
-
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-
-        return filepath
-
-    def _save_csv(self) -> Path:
-        """Save session as CSV file."""
-        filepath = self.data_dir / f"{self.current_session.session_id}.csv"
-
-        with open(filepath, 'w', newline='') as f:
-            writer = csv.writer(f)
-
-            # Header section
-            writer.writerow(['PT Session Report'])
-            writer.writerow(['Session ID', self.current_session.session_id])
-            writer.writerow(['Patient ID', self.current_session.patient_id])
-            writer.writerow(['Date', self.current_session.date])
-            writer.writerow(['Duration (min)', f"{self.current_session.duration_minutes:.1f}"])
-            writer.writerow(['Overall Form Score', f"{self.current_session.overall_form_score:.1f}%"])
-            writer.writerow([])
-
-            # Exercise details
-            writer.writerow([
-                'Exercise', 'Reps', 'Target', 'Form Score',
-                'ROM Min', 'ROM Max', 'ROM Range', 'Avg Rep Time'
-            ])
-
-            for ex in self.current_session.exercises:
-                writer.writerow([
-                    ex.exercise_name,
-                    ex.reps_completed,
-                    ex.target_reps,
-                    f"{ex.avg_form_score:.1f}%",
-                    f"{ex.min_rom:.1f}°",
-                    f"{ex.max_rom:.1f}°",
-                    f"{ex.rom_range:.1f}°",
-                    f"{ex.avg_rep_duration:.2f}s"
-                ])
-
-            writer.writerow([])
-
-            # Flags and notes
-            if self.current_session.flags_for_review:
-                writer.writerow(['Flags for Review'])
-                for flag in self.current_session.flags_for_review:
-                    writer.writerow([flag])
-                writer.writerow([])
-
-            if self.current_session.therapist_notes:
-                writer.writerow(['Therapist Notes'])
-                writer.writerow([self.current_session.therapist_notes])
-
-        return filepath
+    @classmethod
+    def from_history(cls, history: List["SessionData"], patient_id: str = "default") -> "SessionTracker":
+        """Build a tracker for analysis only, from SessionData built off the canonical record."""
+        tracker = cls.__new__(cls)
+        tracker.data_dir = None
+        tracker.patient_id = patient_id
+        tracker.current_session = None
+        tracker.session_history = list(history)
+        return tracker
 
     def get_session_by_id(self, session_id: str) -> Optional[SessionData]:
         """Retrieve a specific session by ID."""
@@ -713,139 +488,6 @@ class SessionTracker:
     # EXPORT METHODS
     # =========================================================================
 
-    def export_patient_history(self, format: str = "csv") -> str:
-        """
-        Export all patient session history to a single file.
-
-        Args:
-            format: "csv" or "json"
-
-        Returns:
-            Path to exported file
-        """
-        filename = f"{self.patient_id}_history_{datetime.now().strftime('%Y%m%d')}"
-
-        if format == "csv":
-            filepath = self.data_dir / f"{filename}.csv"
-            self._export_history_csv(filepath)
-        else:
-            filepath = self.data_dir / f"{filename}.json"
-            self._export_history_json(filepath)
-
-        return str(filepath)
-
-    def _export_history_csv(self, filepath: Path):
-        """Export all sessions to a single CSV."""
-        with open(filepath, 'w', newline='') as f:
-            writer = csv.writer(f)
-
-            # Header
-            writer.writerow([
-                'Session ID', 'Date', 'Duration (min)', 'Exercise',
-                'Reps', 'Target Reps', 'Form Score', 'ROM Min',
-                'ROM Max', 'ROM Range', 'Avg Rep Time'
-            ])
-
-            for session in self.session_history:
-                for ex in session.exercises:
-                    writer.writerow([
-                        session.session_id,
-                        session.date,
-                        f"{session.duration_minutes:.1f}",
-                        ex.exercise_name,
-                        ex.reps_completed,
-                        ex.target_reps,
-                        f"{ex.avg_form_score:.1f}",
-                        f"{ex.min_rom:.1f}",
-                        f"{ex.max_rom:.1f}",
-                        f"{ex.rom_range:.1f}",
-                        f"{ex.avg_rep_duration:.2f}"
-                    ])
-
-    def _export_history_json(self, filepath: Path):
-        """Export all sessions to a single JSON."""
-        data = {
-            "patient_id": self.patient_id,
-            "export_date": datetime.now().isoformat(),
-            "total_sessions": len(self.session_history),
-            "sessions": []
-        }
-
-        for session in self.session_history:
-            session_data = {
-                'session_id': session.session_id,
-                'date': session.date,
-                'duration_minutes': session.duration_minutes,
-                'overall_form_score': session.overall_form_score,
-                'exercises': [asdict(ex) for ex in session.exercises],
-                'flags_for_review': session.flags_for_review,
-                'therapist_notes': session.therapist_notes
-            }
-            data["sessions"].append(session_data)
-
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-
-
 # =============================================================================
 # CONVENIENCE FUNCTIONS
 # =============================================================================
-
-def create_exercise_record_from_tracker(exercise_name: str,
-                                        tracker_session: Any) -> ExerciseRecord:
-    """
-    Create an ExerciseRecord from an ExerciseTracker session.
-
-    This bridges the analyze.py ExerciseSession with the session tracker.
-
-    Args:
-        exercise_name: Name of the exercise
-        tracker_session: ExerciseSession object from analyze.py
-
-    Returns:
-        ExerciseRecord for session tracking
-    """
-    # Extract metrics from tracker session
-    rep_metrics = tracker_session.rep_metrics if hasattr(tracker_session, 'rep_metrics') else []
-
-    if rep_metrics:
-        min_roms = [r.min_angle for r in rep_metrics]
-        max_roms = [r.max_angle for r in rep_metrics]
-        form_scores = [r.form_score for r in rep_metrics]
-        durations = [r.duration_seconds for r in rep_metrics]
-
-        return ExerciseRecord(
-            exercise_name=exercise_name,
-            reps_completed=len(rep_metrics),
-            target_reps=tracker_session.target_reps if hasattr(tracker_session, 'target_reps') else 10,
-            avg_form_score=np.mean(form_scores) if form_scores else 0,
-            min_rom=min(min_roms) if min_roms else 0,
-            max_rom=max(max_roms) if max_roms else 0,
-            rom_range=max(max_roms) - min(min_roms) if max_roms and min_roms else 0,
-            avg_rep_duration=np.mean(durations) if durations else 0,
-            form_warnings=tracker_session.warnings if hasattr(tracker_session, 'warnings') else []
-        )
-    else:
-        return ExerciseRecord(
-            exercise_name=exercise_name,
-            reps_completed=0,
-            target_reps=10,
-            avg_form_score=0,
-            min_rom=0,
-            max_rom=0,
-            rom_range=0,
-            avg_rep_duration=0
-        )
-
-
-def quick_session_report(session_tracker: SessionTracker) -> str:
-    """
-    Generate a quick text report of the current/last session.
-
-    Args:
-        session_tracker: SessionTracker instance
-
-    Returns:
-        Formatted report string
-    """
-    return session_tracker.generate_session_summary_card()

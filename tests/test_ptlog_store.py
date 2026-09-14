@@ -243,3 +243,200 @@ class TestSessionWrites:
             starts = s.conn.execute("SELECT start_time FROM sessions ORDER BY id").fetchall()
         assert a != b
         assert starts[0][0] == starts[1][0]
+
+
+# ======================================================================================
+# T022 — patients (User Story 2)
+# ======================================================================================
+
+from src.ptlog.models import (  # noqa: E402
+    BuiltinPatientError,
+    DuplicatePatientError,
+    PatientNotFoundError,
+    PatientValidationError,
+)
+
+
+class TestPatients:
+    def test_add_patient_stores_fields(self, store):
+        p = store.add_patient("P-017", label="Post-op knee", notes="Week 3 after surgery")
+        assert (p.id, p.label, p.notes, p.is_builtin, p.session_count) == ("P-017", "Post-op knee", "Week 3 after surgery", False, 0)
+        assert p.created_at == "2026-03-23T09:15:00"
+        assert store.get_patient("P-017").label == "Post-op knee"
+
+    def test_add_patient_validates(self, store):
+        with pytest.raises(PatientValidationError):
+            store.add_patient("John Smith")
+        with pytest.raises(PatientValidationError):
+            store.add_patient("P-018", label="x" * 61)
+
+    def test_duplicate_id_is_case_insensitive(self, store):
+        store.add_patient("P-017")
+        with pytest.raises(DuplicatePatientError):
+            store.add_patient("p-017")
+
+    def test_update_patient_changes_label_and_notes_only(self, store):
+        store.add_patient("P-017", label="old", notes="n1")
+        p = store.update_patient("P-017", label="new")
+        assert (p.label, p.notes) == ("new", "n1")
+        p = store.update_patient("P-017", notes="n2")
+        assert (p.label, p.notes) == ("new", "n2")
+        with pytest.raises(PatientNotFoundError):
+            store.update_patient("ghost", label="x")
+
+    def test_list_patients_order_and_counts(self, store):
+        store.add_patient("zeta")
+        store.add_patient("Alpha")
+        sid = store.start_session("zeta", "webcam", "0")
+        store.end_session(sid)
+        ids = [p.id for p in store.list_patients()]
+        assert ids == ["unassigned", "Alpha", "zeta"]
+        zeta = store.get_patient("zeta")
+        assert zeta.session_count == 1 and zeta.last_session_at == "2026-03-23T09:15:00"
+
+    def test_delete_patient_cascades_and_removes_export_files(self, store, tmp_path):
+        store.add_patient("P-017")
+        sid = store.start_session("P-017", "webcam", "0")
+        set_id = store.open_set(sid, KNEE)
+        store.add_rep(set_id, _rep(1))
+        store.add_partial_rep(set_id, PartialRepEvent("reversed_early", 95.0, 135.2, 40.2, 1.3, "2026-03-23T09:15:12", 300))
+        store.add_form_event(set_id, FormEvent("warning", "warning", "Keep your back straight", "2026-03-23T09:15:13", 330))
+        store.add_control_event(sid, ControlEvent("reset", "2026-03-23T09:15:14", 360, rep_count_at_reset=1))
+        store.add_frame_samples(set_id, [FrameSample(15, "2026-03-23T09:15:00.5", 92.0, "down", 0)])
+        store.end_session(sid)
+        f1, f2 = tmp_path / "a.csv", tmp_path / "b.txt"
+        f1.write_text("x"); f2.write_text("y")
+        store.record_export(sid, "csv_report", f1)
+        store.record_export(sid, "pta_log", f2)
+        other_sid = store.start_session("unassigned", "webcam", "0")
+        store.end_session(other_sid)
+
+        report = store.delete_patient("P-017")
+
+        assert (report.patient_id, report.sessions, report.events, report.export_files) == ("P-017", 1, 4, 2)
+        assert not f1.exists() and not f2.exists()
+        for table in ("exercise_sets", "reps", "partial_reps", "form_events", "control_events", "frame_samples", "exports"):
+            assert store.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0, table
+        assert store.get_patient("P-017") is None
+        assert store.get_patient("unassigned").session_count == 1
+
+    def test_delete_builtin_and_unknown_refused(self, store):
+        with pytest.raises(BuiltinPatientError):
+            store.delete_patient("unassigned")
+        with pytest.raises(PatientNotFoundError):
+            store.delete_patient("ghost")
+
+    def test_reassign_session(self, store):
+        store.add_patient("P-017")
+        sid = store.start_session("unassigned", "video", "clip.mp4")
+        store.end_session(sid)
+        store.reassign_session(sid, "P-017")
+        assert store.conn.execute("SELECT patient_id FROM sessions WHERE id = ?", (sid,)).fetchone()[0] == "P-017"
+        assert store.get_patient("P-017").session_count == 1
+        assert store.get_patient("unassigned").session_count == 0
+        with pytest.raises(PatientNotFoundError):
+            store.reassign_session(sid, "ghost")
+        from src.ptlog.models import SessionNotFoundError
+        with pytest.raises(SessionNotFoundError):
+            store.reassign_session(999, "P-017")
+
+
+# ======================================================================================
+# T027 — reads (User Story 3)
+# ======================================================================================
+
+import time  # noqa: E402
+
+from src.ptlog.models import SessionNotFoundError  # noqa: E402
+
+
+def _seed_two_set_session(store, patient="unassigned"):
+    sid = store.start_session(patient, "webcam", "0")
+    s1 = store.open_set(sid, KNEE)
+    store.add_rep(s1, _rep(1, ts="2026-03-23T09:15:02", form=95.0, rom=78.4, frame=60))
+    store.add_partial_rep(s1, PartialRepEvent("reversed_early", 95.0, 135.2, 40.2, 1.3, "2026-03-23T09:15:05", 150))
+    store.add_form_event(s1, FormEvent("warning", "warning", "Keep your back straight against the chair",
+                                       "2026-03-23T09:15:05.500000", 165, body_part="trunk"))
+    store.add_partial_rep(s1, PartialRepEvent("interrupted", 100.0, 140.0, 40.0, 0.8, "2026-03-23T09:15:06.666667", 200))
+    store.close_set(s1, "2026-03-23T09:15:06.666667")
+    store.add_control_event(sid, ControlEvent("switch", "2026-03-23T09:15:06.666667", 200,
+                                              from_exercise="Knee Extension", to_exercise="Squat"))
+    s2 = store.open_set(sid, SQUAT)
+    store.add_rep(s2, _rep(1, ts="2026-03-23T09:15:08", form=88.0, rom=83.0, frame=240))
+    store.add_control_event(sid, ControlEvent("reset", "2026-03-23T09:15:10.666667", 320, rep_count_at_reset=1))
+    store.add_rep(s2, _rep(1, ts="2026-03-23T09:15:12.666667", form=90.0, rom=81.0, frame=380))
+    return sid
+
+
+class TestReads:
+    def test_list_sessions_newest_first_with_summary_columns(self, store, fake_clock):
+        store.add_patient("P-017")
+        a = store.start_session("P-017", "video", "clip.mp4"); store.open_set(a, KNEE); store.end_session(a)
+        fake_clock.advance(60)
+        b = store.start_session("unassigned", "webcam", "0"); store.open_set(b, SQUAT); store.end_session(b)
+        fake_clock.advance(60)
+        c = _seed_two_set_session(store, "P-017"); store.end_session(c)
+        rows = store.list_sessions()
+        assert [r.id for r in rows] == [c, b, a]
+        top = rows[0]
+        assert (top.patient_id, top.source, top.status, top.exercises, top.total_reps, top.avg_form_score) == \
+               ("P-017", "webcam", "completed", ["Knee Extension", "Squat"], 3, 91.0)
+        assert top.end_time is not None
+        assert [r.id for r in store.list_sessions(patient_id="P-017")] == [c, a]
+
+    def test_load_session_full_graph(self, store):
+        sid = _seed_two_set_session(store)
+        store.end_session(sid)
+        s = store.load_session(sid)
+        assert [x.ordinal for x in s.sets] == [1, 2]
+        assert len(s.sets[0].reps) == 1 and len(s.sets[0].partial_reps) == 2 and len(s.sets[0].form_events) == 1
+        assert len(s.sets[1].reps) == 2
+        assert [c.kind for c in s.control_events] == ["switch", "reset"]
+        assert s.sets[0].end_time == "2026-03-23T09:15:06.666667"
+
+    def test_event_log_ordered_and_tagged(self, store):
+        sid = _seed_two_set_session(store)
+        store.end_session(sid)
+        log = store.event_log(sid)
+        assert [r.type for r in log] == [
+            "session_start", "rep", "partial_rep", "form", "partial_rep", "switch", "rep", "reset", "rep", "session_end",
+        ]
+        assert log[0].data["exercise"] == "Knee Extension" and log[0].data["target_reps"] == 10
+        assert [r.set_ordinal for r in log[1:6]] == [1, 1, 1, 1, 1]
+        assert log[6].set_ordinal == 2 and log[7].data["exercise"] == "Squat"
+        assert log[4].type == "partial_rep" and log[5].type == "switch"   # same timestamp: partial before switch
+        assert log[-1].data["total_reps"] == 3 and log[-1].data["avg_form_score"] == 91.0
+
+    def test_interrupted_session_log_ends_with_computed_summary_marked_interrupted(self, store):
+        sid = _seed_two_set_session(store)
+        store._interrupt_running("recovered_on_open")
+        log = store.event_log(sid)
+        assert log[-1].type == "session_end"
+        assert log[-1].data["status"] == "interrupted" and log[-1].data["total_reps"] == 3
+        assert log[-1].timestamp == "2026-03-23T09:15:12.666667"   # last recorded event
+        assert store.load_session(sid).status == "interrupted"
+
+    def test_running_session_log_has_no_end_row(self, store):
+        sid = _seed_two_set_session(store)
+        log = store.event_log(sid)
+        assert log[-1].type != "session_end"
+
+    def test_unknown_session_raises(self, store):
+        with pytest.raises(SessionNotFoundError):
+            store.event_log(999)
+        with pytest.raises(SessionNotFoundError):
+            store.load_session(999)
+
+    def test_performance_500_events_and_200_sessions(self, store):
+        sid = store.start_session("unassigned", "webcam", "0")
+        set_id = store.open_set(sid, KNEE)
+        for n in range(1, 251):
+            store.add_rep(set_id, _rep(n, ts=f"2026-03-23T09:{15 + n // 60:02d}:{n % 60:02d}", frame=60 * n))
+            store.add_form_event(set_id, FormEvent("warning", "warning", f"msg {n}", f"2026-03-23T09:{15 + n // 60:02d}:{n % 60:02d}.5", 60 * n + 30))
+        store.end_session(sid)
+        t0 = time.perf_counter(); log = store.event_log(sid); elapsed = time.perf_counter() - t0
+        assert len(log) == 502 and elapsed < 2.0
+        for _ in range(199):
+            s = store.start_session("unassigned", "video", "clip.mp4"); store.open_set(s, SQUAT); store.end_session(s)
+        t0 = time.perf_counter(); rows = store.list_sessions(); elapsed = time.perf_counter() - t0
+        assert len(rows) == 200 and elapsed < 2.0

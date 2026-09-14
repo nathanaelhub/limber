@@ -8,7 +8,8 @@ using Ultralytics YOLO11.
 Modules:
     - analyze: Core video/image analysis with pose estimation
     - form_assessment: Biomechanical form checking and feedback
-    - session_tracker: Progress tracking across multiple sessions
+    - ptlog: The canonical session record (patients, sessions, events, exports)
+    - session_tracker: Trend analysis over history built from the record
     - utils: Helper functions for angle calculation and visualization
 """
 

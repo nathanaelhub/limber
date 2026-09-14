@@ -46,7 +46,27 @@ from src.utils import get_angle_from_keypoints, extract_keypoint, calculate_angl
 from analyze import main as analyze_video
 
 # Import observation logger helpers
-from src.observation_logger import list_observation_logs, load_observation_log
+from src.ptlog.store import SessionStore, default_db_path
+from src.ptlog import views as ptviews
+from src.ptlog.exports import FORMATS, to_observation_dict
+from src.ptlog.models import PTLogError
+from src.session_tracker import SessionTracker
+
+
+def _open_store():
+    return SessionStore(default_db_path()).open()
+
+
+def list_observation_logs(patient_id=None):
+    """Sessions newest first from the canonical record (drop-in for the retired file lister)."""
+    with _open_store() as store:
+        return ptviews.session_refs(store, patient_id)
+
+
+def load_observation_log(ref):
+    """Observation-log dict for a session id or SessionRef (drop-in for the retired file loader)."""
+    with _open_store() as store:
+        return to_observation_dict(store.load_session(int(str(ref))))
 
 # Import Smart PT Summary generator
 from src.session_summary import generate_session_summary
@@ -286,9 +306,10 @@ def render_sidebar():
             'home': '🏠 Dashboard',
             'live': '📹 Live Session',
             'video': '🎬 Video Analysis',
+            'patients': '👥 Patients',
+            'sessions': '📋 Sessions',
             'pt_summary': '🩺 PT Summary',
             'obs_logs': '🔬 Observation Logs',
-            'logs': '📋 Session Logs',
             'progress': '📊 Progress Report',
             'learn': '📚 How It Works'
         }
@@ -300,10 +321,18 @@ def render_sidebar():
 
         st.markdown("---")
 
-        # Settings
+        # Patient (pseudonymous IDs from the canonical record)
+        st.markdown("### Patient")
+        with _open_store() as store:
+            patients = store.list_patients()
+        ids = [p.id for p in patients]
+        labels = {p.id: (f"{p.id} · {p.label}" if p.label else p.id) for p in patients}
+        current = st.session_state.get("patient_id") or "unassigned"
+        st.session_state.patient_id = st.selectbox(
+            "Patient", ids, index=ids.index(current) if current in ids else 0,
+            format_func=lambda i: labels.get(i, i), key="patient_select")
+
         st.markdown("### Settings")
-        st.selectbox("Patient ID", ["Default", "Patient 001", "Patient 002"],
-                     key="patient_id")
         st.toggle("Show Technical Details", key="show_technical")
 
         st.markdown("---")
@@ -600,7 +629,8 @@ def page_video_analysis():
                             output_path=annotated_path,
                             config_path=config_path,
                             model_path=model_path,
-                            show_video=False
+                            show_video=False,
+                            patient_id=st.session_state.get("patient_id")
                         )
                         st.success("✅ Video analysis complete!")
                     except Exception as e:
@@ -1038,7 +1068,7 @@ def page_pt_summary():
             else:
                 return "background-color: #3a1010; color: #ef9a9a"
 
-        styled = display_df.style.applymap(_color_form, subset=["Form Score (%)"])
+        styled = display_df.style.map(_color_form, subset=["Form Score (%)"])
         st.dataframe(styled, use_container_width=True, hide_index=True)
 
     # ── Summary text (collapsible) ────────────────────────────────────────────
@@ -1098,8 +1128,8 @@ def page_observation_logs():
 
     if not log_files:
         st.info(
-            "No observation logs found yet. Run a video or webcam analysis session to generate logs.\n\n"
-            "**Command line:** `python analyze.py video --input videos/Squats.demo.video.mp4 --exercise squat`"
+            "No sessions recorded yet. Run a video or webcam session to create one.\n\n"
+            "**Command line:** `python analyze.py video --input videos/Squats.demo.video.mp4 --exercise squat --patient unassigned`"
         )
         return
 
@@ -1228,7 +1258,7 @@ def page_observation_logs():
                             return "color: #ff6b6b"
                     return ""
 
-                styled = renamed.style.applymap(color_form, subset=["Form %"])
+                styled = renamed.style.map(color_form, subset=["Form %"])
                 st.dataframe(styled, use_container_width=True, hide_index=True)
 
                 # Download
@@ -1320,238 +1350,200 @@ def page_observation_logs():
             st.download_button(
                 "📄 Download Full Log (JSON)",
                 raw_json,
-                file_name=selected_file.name,
+                file_name=f"{selected_file.stem}.json",
                 mime="application/json",
             )
         with dl2:
-            st.caption(f"📁 `observation_logs/{selected_file.name}`")
+            st.caption(f"🗄️ canonical record · session {selected_file.id} · patient {selected_file.patient_id}")
 
 
 # =============================================================================
-# PAGE: SESSION LOG ANALYSIS
+# PAGE: PATIENTS (pseudonymous registry)
 # =============================================================================
 
-def page_session_logs():
-    """Render the session log analysis page."""
-    import pandas as pd
+def page_patients():
+    """Register, edit, and delete pseudonymous patients (all logic lives in src/ptlog)."""
+    st.markdown("## 👥 Patients")
+    st.caption("Patients are identified only by a pseudonymous ID. Do not enter names, dates of birth, "
+               "or medical record numbers anywhere on this page.")
 
-    st.markdown("## 📋 Session Log Analysis")
+    with _open_store() as store:
+        patients = store.list_patients()
 
-    sessions_dir = Path(__file__).parent.parent / "sessions"
-    json_files = sorted(sessions_dir.glob("*.json"), reverse=True)
+    rows = [{"ID": p.id, "Label": p.label or "", "Sessions": p.session_count,
+             "Last session": ptviews.date_minute(p.last_session_at), "Notes": p.notes or ""} for p in patients]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    if not json_files:
-        st.info("No session logs found. Complete a webcam or video session first to generate logs.")
+    st.markdown("### Register a patient")
+    with st.form("add_patient_form", clear_on_submit=True):
+        new_id = st.text_input("Pseudonymous ID", placeholder="P-017", help="1-32 letters, digits, or hyphens")
+        new_label = st.text_input("Label (optional)", placeholder="Post-op knee", help="Max 60 characters")
+        new_notes = st.text_area("Notes (optional)")
+        if st.form_submit_button("Register"):
+            try:
+                with _open_store() as store:
+                    store.add_patient(new_id, label=new_label or None, notes=new_notes or None)
+                st.success(f"Registered patient {new_id}")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+
+    editable = [p for p in patients if not p.is_builtin]
+    st.markdown("### Edit or delete")
+    if not editable:
+        st.info("No patients registered yet.")
+        return
+    pid = st.selectbox("Patient", [p.id for p in editable], key="patients_edit_select")
+    current = next(p for p in editable if p.id == pid)
+    with st.form("edit_patient_form"):
+        label = st.text_input("Label", value=current.label or "")
+        notes = st.text_area("Notes", value=current.notes or "")
+        if st.form_submit_button("Save changes"):
+            try:
+                with _open_store() as store:
+                    store.update_patient(pid, label=label, notes=notes)
+                st.success(f"Updated patient {pid}")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+    confirm = st.checkbox(f"I understand this permanently deletes {pid} and its {current.session_count} sessions",
+                          key="patients_delete_confirm")
+    if st.button("Delete patient", disabled=not confirm, key="patients_delete_button"):
+        try:
+            with _open_store() as store:
+                report = store.delete_patient(pid)
+            st.success(f"Deleted {report.patient_id}: {report.sessions} sessions, {report.events} events, "
+                       f"{report.export_files} export files removed")
+            st.rerun()
+        except PTLogError as exc:
+            st.error(str(exc))
+
+
+# =============================================================================
+# PAGE: SESSIONS (history and full event log from the canonical record)
+# =============================================================================
+
+_EXPORT_MIME = {"pta_log": ("txt", "text/plain"), "observation_json": ("json", "application/json"),
+                "csv_report": ("csv", "text/csv"), "text_log": ("log", "text/plain")}
+_EXPORT_LABEL = {"pta_log": "PTA-Log text", "observation_json": "Observation JSON",
+                 "csv_report": "CSV report", "text_log": "Session text log"}
+
+
+def page_sessions():
+    """Session history newest first, a session's full event log, and the four exports."""
+    st.markdown("## 📋 Sessions")
+    scope = st.radio("Show", ["Selected patient", "All patients"], horizontal=True, key="sessions_scope")
+    patient_filter = st.session_state.get("patient_id") if scope == "Selected patient" else None
+
+    with _open_store() as store:
+        rows = ptviews.session_table_rows(store, patient_filter)
+    if not rows:
+        st.info("No sessions recorded yet for this selection. Run a video or webcam session to create one.")
         return
 
-    # Session selector
-    file_names = [f.name for f in json_files]
-    selected_name = st.selectbox("Select Session", file_names)
-    selected_path = sessions_dir / selected_name
+    table = pd.DataFrame(rows).rename(columns={
+        "id": "ID", "date": "Date", "patient_id": "Patient", "source": "Source", "exercises": "Exercises",
+        "total_reps": ptviews.metric_label("total_reps"), "avg_form_score": ptviews.metric_label("avg_form_score"),
+        "status": "Status"})
+    st.dataframe(table, use_container_width=True, hide_index=True)
 
-    with open(selected_path) as f:
-        data = json.load(f)
+    ids = [r["id"] for r in rows]
+    by_id = {r["id"]: r for r in rows}
+    sid = st.selectbox("Open session", ids, key="sessions_open",
+                       format_func=lambda i: f"#{i} · {by_id[i]['date']} · {by_id[i]['exercises']} · {by_id[i]['total_reps']} reps")
 
-    summary = data.get("session_summary", {})
-    rep_details = data.get("rep_details", [])
-    recommendations = data.get("recommendations", [])
-    warnings = data.get("warnings", [])
+    with _open_store() as store:
+        session = store.load_session(sid)
+        header = ptviews.session_header_lines(session)
+        lines = ptviews.event_log_lines(store, sid)
+        rendered = {fmt: FORMATS[fmt][1](store, session) for fmt in FORMATS}
 
-    # Summary header
-    st.markdown(f"**Exercise:** {summary.get('exercise', 'Unknown')}  |  "
-                f"**Date:** {summary.get('start_time', '')[:19].replace('T', ' ')}")
+    st.markdown("  \n".join(header))
+    if session.status == "interrupted":
+        st.warning("This session was interrupted. The summary is computed from the events recorded before the interruption.")
+    with st.expander("Metric definitions"):
+        for field in ("rom", "form_score", "duration_seconds", "avg_form_score", "avg_rom"):
+            st.markdown(f"**{ptviews.metric_label(field)}** — {ptviews.metric_definition(field)}")
+    st.code("\n".join(lines), language=None)
 
-    st.markdown("### Summary")
-    col1, col2, col3, col4 = st.columns(4)
-    completion = summary.get('completion_rate', 0)
-    with col1:
-        st.metric("Reps Completed",
-                  f"{summary.get('total_reps', 0)}/{summary.get('target_reps', 0)}",
-                  f"{completion:.0f}%")
-    with col2:
-        st.metric("Avg Form Score", f"{summary.get('avg_form_score', 0):.1f}%")
-    with col3:
-        st.metric("Avg ROM", f"{summary.get('avg_range_of_motion', 0):.1f}°")
-    with col4:
-        st.metric("Tempo Consistency σ", f"{summary.get('tempo_consistency_std', 0):.2f}s")
-
-    st.markdown("---")
-
-    if rep_details:
-        df = pd.DataFrame(rep_details)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("### ROM per Rep")
-            chart_data = df.set_index("rep_number")[["rom"]]
-            st.bar_chart(chart_data)
-
-        with col2:
-            st.markdown("### Form Score per Rep")
-            chart_data = df.set_index("rep_number")[["form_score"]]
-            st.line_chart(chart_data)
-
-        st.markdown("### Angle Range per Rep")
-        angle_df = df[["rep_number", "min_angle", "max_angle"]].set_index("rep_number")
-        st.area_chart(angle_df)
-
-        st.markdown("### Rep Details")
-        display_df = df[["rep_number", "min_angle", "max_angle", "rom", "duration_seconds", "form_score"]].rename(columns={
-            "rep_number": "Rep", "min_angle": "Min °", "max_angle": "Max °",
-            "rom": "ROM °", "duration_seconds": "Duration (s)", "form_score": "Form %"
-        })
-        st.dataframe(display_df, use_container_width=True)
-    else:
-        st.info("No rep data recorded in this session.")
-
-    # Recommendations
-    if recommendations:
-        st.markdown("### Recommendations")
-        for rec in recommendations:
-            st.info(f"💡 {rec}")
-
-    if warnings:
-        st.markdown("### Warnings")
-        for w in warnings:
-            st.warning(f"⚠️ {w}")
-
-    # Download
-    st.markdown("---")
-    with open(selected_path) as f:
-        raw_json = f.read()
-    st.download_button("📄 Download Session JSON", raw_json,
-                       file_name=selected_name, mime="application/json")
-
-    # Raw text logs viewer
-    st.markdown("---")
-    st.markdown("### 📝 Raw Session Logs")
-    logs_dir = Path(__file__).parent.parent / "logs"
-    log_files = sorted(logs_dir.glob("logfile-*.log"), reverse=True) if logs_dir.exists() else []
-
-    if log_files:
-        log_names = [f.name for f in log_files]
-        selected_log = st.selectbox("Select Log File", log_names, key="log_select")
-        log_path = logs_dir / selected_log
-        with open(log_path) as lf:
-            log_content = lf.read()
-        lines = log_content.strip().splitlines()
-        st.caption(f"{len(lines)} lines  ·  {log_path.name}")
-        st.code(log_content, language=None)
-        st.download_button("📄 Download Log File", log_content,
-                           file_name=selected_log, mime="text/plain")
-    else:
-        st.info("No log files found yet. Run a webcam session to generate logs.")
+    st.markdown("### Export")
+    base = f"{session.patient_id}_{datetime.fromisoformat(session.start_time):%Y%m%d_%H%M%S}"
+    cols = st.columns(4)
+    for col, fmt in zip(cols, FORMATS):
+        ext, mime = _EXPORT_MIME[fmt]
+        content = rendered[fmt]
+        if isinstance(content, list):
+            content = "\n".join(content)
+        with col:
+            st.download_button(_EXPORT_LABEL[fmt], content, file_name=f"{base}.{ext}", mime=mime, key=f"dl_{fmt}_{sid}")
 
 
 # =============================================================================
-# PAGE: PROGRESS REPORT
+# PAGE: PROGRESS REPORT (trend math from src/session_tracker fed by the record)
 # =============================================================================
 
 def page_progress_report():
-    """Render the progress report page."""
+    """Progress over time for the selected patient, from the canonical record."""
     st.markdown("## 📊 Progress Report")
+    pid = st.session_state.get("patient_id") or "unassigned"
+    with _open_store() as store:
+        history = ptviews.load_session_data_for_trends(store, pid)
+    if not history:
+        st.info(f"No sessions recorded for patient {pid} yet.")
+        return
 
-    # Time period selector
-    col1, col2 = st.columns([3, 1])
+    exercises = sorted({e.exercise_name for s in history for e in s.exercises})
+    col1, col2 = st.columns([2, 1])
     with col1:
-        time_range = st.select_slider(
-            "Time Period",
-            options=["1 Week", "2 Weeks", "1 Month", "3 Months", "6 Months", "1 Year"],
-            value="1 Month"
-        )
+        days = st.select_slider("Time period (days)", options=[7, 14, 30, 90, 180, 365], value=30, key="progress_days")
     with col2:
-        exercise_filter = st.selectbox(
-            "Exercise",
-            ["All Exercises", "Knee Extension", "Shoulder Flexion", "Squat"]
-        )
+        exercise = st.selectbox("Exercise", exercises, key="progress_exercise")
 
+    tracker = SessionTracker.from_history(history, pid)
+    progress = tracker.calculate_progress(exercise, days_back=days)
+
+    total_reps = sum(e.reps_completed for s in history for e in s.exercises)
+    form_scores = [s.overall_form_score for s in history if s.exercises]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Sessions", len(history))
+    c2.metric(ptviews.metric_label("total_reps"), total_reps)
+    c3.metric(ptviews.metric_label("avg_form_score"), f"{sum(form_scores) / len(form_scores):.1f}" if form_scores else "n/a")
+    c4.metric("ROM trend", progress.rom_trend if progress else "n/a",
+              f"{progress.rom_change_percent:+.1f}%" if progress else None)
     st.markdown("---")
 
-    # Summary metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Sessions", "23", "+5 from last period")
-    with col2:
-        st.metric("Total Reps", "482", "+87")
-    with col3:
-        st.metric("Avg Form Score", "81%", "+4%")
-    with col4:
-        st.metric("ROM Improvement", "+12°", "from baseline")
-
-    st.markdown("---")
-
-    # Progress charts (using placeholder data)
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### Form Score Trend")
-        # Sample data for chart
-        import pandas as pd
-        dates = pd.date_range(start='2024-01-01', periods=30, freq='D')
-        scores = np.random.normal(80, 5, 30).clip(60, 100)
-        chart_data = pd.DataFrame({'Date': dates, 'Form Score': scores})
-        st.line_chart(chart_data.set_index('Date'))
-
-    with col2:
-        st.markdown("### Range of Motion Trend")
-        rom_values = np.random.normal(85, 8, 30).clip(60, 110)
-        chart_data = pd.DataFrame({'Date': dates, 'ROM (degrees)': rom_values})
-        st.line_chart(chart_data.set_index('Date'))
-
-    st.markdown("---")
-
-    # Exercise breakdown
-    st.markdown("### Exercise Breakdown")
-
-    exercises = [
-        {"name": "Knee Extension", "sessions": 8, "avg_form": 82, "rom_change": "+8°", "trend": "↑"},
-        {"name": "Shoulder Flexion", "sessions": 6, "avg_form": 78, "rom_change": "+5°", "trend": "↑"},
-        {"name": "Squat", "sessions": 5, "avg_form": 75, "rom_change": "+3°", "trend": "→"},
-        {"name": "Hip Abduction", "sessions": 4, "avg_form": 80, "rom_change": "+6°", "trend": "↑"},
-    ]
-
-    for ex in exercises:
-        col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
+    if progress is None:
+        st.info("At least two sessions with this exercise inside the period are needed to compute a trend.")
+    else:
+        chart = pd.DataFrame({"Date": progress.dates, ptviews.metric_label("rom"): progress.rom_values,
+                              ptviews.metric_label("form_score"): progress.form_scores}).set_index("Date")
+        col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**{ex['name']}**")
+            st.markdown(f"### {ptviews.metric_label('rom')}")
+            st.line_chart(chart[[ptviews.metric_label("rom")]])
+            st.caption(ptviews.metric_definition("rom"))
         with col2:
-            st.write(f"{ex['sessions']} sessions")
-        with col3:
-            form_color = "🟢" if ex['avg_form'] >= 80 else ("🟡" if ex['avg_form'] >= 60 else "🔴")
-            st.write(f"{form_color} {ex['avg_form']}%")
-        with col4:
-            st.write(f"ROM: {ex['rom_change']}")
-        with col5:
-            st.write(ex['trend'])
+            st.markdown(f"### {ptviews.metric_label('form_score')}")
+            st.line_chart(chart[[ptviews.metric_label("form_score")]])
+            st.caption(ptviews.metric_definition("form_score"))
+
+    st.markdown("### Areas for attention")
+    try:
+        concerns = tracker.get_exercises_needing_attention()
+    except Exception:
+        concerns = []
+    if concerns:
+        for c in concerns:
+            st.warning(f"**{c.get('exercise', '')}** — {', '.join(c.get('concerns', []))}" if isinstance(c, dict) else str(c))
+    else:
+        st.success("No exercises are flagged for attention in the recorded sessions.")
 
     st.markdown("---")
-
-    # Areas for improvement
-    st.markdown("### Areas for Attention")
-    st.warning("⚠️ **Squat** - Form score has been declining. Focus on knee alignment.")
-    st.info("💡 **Shoulder Flexion** - Good progress! Consider increasing resistance.")
-
-    # Export options
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.download_button(
-            "📄 Export Full Report (PDF)",
-            b"pdf_placeholder",
-            file_name="progress_report.pdf",
-            mime="application/pdf",
-            disabled=True
-        )
-    with col2:
-        st.download_button(
-            "📊 Export Data (CSV)",
-            "date,exercise,reps,form_score\n2024-01-15,Knee Extension,10,85",
-            file_name="session_data.csv",
-            mime="text/csv"
-        )
-    with col3:
-        if st.button("📧 Email Report"):
-            st.toast("Report sent!")
+    csv_rows = ["date,exercise,reps,form_score,rom_range"] + [
+        f"{s.date},{e.exercise_name},{e.reps_completed},{e.avg_form_score:.1f},{e.rom_range:.1f}"
+        for s in history for e in s.exercises]
+    st.download_button("📊 Export session data (CSV)", "\n".join(csv_rows) + "\n",
+                       file_name=f"{pid}_progress.csv", mime="text/csv")
 
 
 # =============================================================================
@@ -1792,12 +1784,14 @@ def main():
         page_live_session()
     elif page == 'video':
         page_video_analysis()
+    elif page == 'patients':
+        page_patients()
+    elif page == 'sessions':
+        page_sessions()
     elif page == 'pt_summary':
         page_pt_summary()
     elif page == 'obs_logs':
         page_observation_logs()
-    elif page == 'logs':
-        page_session_logs()
     elif page == 'progress':
         page_progress_report()
     elif page == 'learn':

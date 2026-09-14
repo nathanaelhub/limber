@@ -43,7 +43,8 @@ Lines, in order:
 
 `NNNN` is the session's 1-based ordinal among the patient's sessions, zero-padded to 4.
 Interrupted sessions end with the Session Summary line computed from events, followed by an
-`ERROR | "Session interrupted"` line and then `System halted.`.
+`ERROR | "Session interrupted"` line and then `System halted.`. Form events are not part of
+this format (the legacy writer never received them).
 
 ## 2. Observation JSON (`observation_json`, `.json`) — from `ObservationLogger`
 
@@ -96,9 +97,12 @@ Therapist Notes             (block present only when non-empty)
 {notes}
 ```
 
-One exercise row per exercise set. `ROM Min`/`ROM Max` are the set's minimum `min_angle` and
-maximum `max_angle`; `ROM Range` their difference; `Avg Rep Time` mean rep duration. Flags:
-`Session interrupted` when applicable. Notes: the patient's notes field (no PHI by rule).
+One exercise row per exercise set over reps not flagged out of range. `ROM Min`/`ROM Max` are
+the set's minimum `min_angle` and maximum `max_angle`; `ROM Range` their difference; `Avg Rep
+Time` mean rep duration. Flags reproduce the legacy rules (form score below 60; fewer than half
+the target reps) plus `Session interrupted` when applicable. Notes: the patient's notes field
+(no PHI by rule). Partial reps with reason `interrupted` never appear in the text log, because
+the legacy loop replaced the tracker before its logging block could see them.
 Written with `csv.writer` defaults (`\r\n` line endings).
 
 ## 4. Plain-text session log (`text_log`, `.log`) — from `SessionLogger`
@@ -114,7 +118,7 @@ files start with `# continued: ...`. Entry lines are `[HH:MM:SS] MESSAGE`:
 | form | `FORM {STATUS} \| {message}` |
 | switch | `SWITCH \| {a} -> {b}` |
 | reset | `RESET \| Reps cleared at count={n}` |
-| end | `SESSION END \| Total Reps: {n} \| Avg Form: {f:.0f}% \| Avg ROM: {r:.1f}°` |
+| end | `SESSION END \| Total Reps: {n} \| Avg Form: {f:.0f}% \| Avg ROM: {r:.1f}°` (`SESSION INTERRUPTED \| …` for an interrupted session) |
 
 `imgsz` and `skip` are read from the session's `source_extras` JSON (`camera_id`, `imgsz`,
 `frame_skip`) so the start line can be reproduced; for video sessions the legacy writer was

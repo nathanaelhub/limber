@@ -2,6 +2,91 @@
 
 ---
 
+## Update 3 — 2026-09-14 — Unified PT Session Log
+
+Feature spec: `specs/001-unified-session-log/` (built with GitHub Spec Kit under the project
+constitution in `.specify/memory/constitution.md`).
+
+### 1. One canonical session record (`src/ptlog/`)
+
+Every session is now written once, by one writer, into a local SQLite file at
+`data/ptassist.db` (override with the `PTASSIST_DB` environment variable). The record holds
+patients, sessions, exercise sets, completed reps, partial reps, form feedback events,
+exercise switches, counter resets, and downsampled angle samples. Every event is committed
+as it happens, so a crash or camera loss loses at most the last second; a session left
+open by an interruption is marked `interrupted` on the next start and its summary is
+computed from the events that were recorded.
+
+- `SessionStore` — schema, forward-only migrations, single writer, all reads
+- `SessionRecorder` — the only engine-facing adapter; reads the tracker's public outputs and
+  never touches thresholds, the state machine, or form checks
+- `views` — unit-labelled rendering shared by the CLI and web app, plus the bridge that
+  feeds the existing trend math in `src/session_tracker.py`
+- Every metric has a unit and a plain-language definition (`METRIC_DEFINITIONS`)
+
+### 2. Retired writers
+
+The four legacy loggers and the per-session report writer no longer run:
+`SessionLogger` (numbered text logs), `PTARawLogger` (PTA-Log pipe text),
+`ObservationLogger` (observation JSON), `SessionTracker` file persistence, and
+`generate_session_report`. A session run now creates **no files** in `logs/`, `pta_logs/`,
+`observation_logs/`, or `sessions/`. `SessionTracker` keeps only its analysis methods.
+
+### 3. Exports (legacy formats, byte for byte)
+
+Any session can be exported in the four legacy layouts, each generated from the record and
+verified against golden files produced by the original writers:
+PTA-Log text (`.txt`), observation JSON (`.json`), CSV report (`.csv`), and the plain-text
+session log (`.log`, 50-line files). Files are named `{patient_id}_{start}.{ext}` under
+`exports/` and are removed when their patient is deleted.
+
+### 4. Pseudonymous patients
+
+```
+python interfaces/cli.py patients add P-017 --label "Post-op knee"
+python interfaces/cli.py patients list | edit | delete | reassign
+python analyze.py video --input clip.mp4 --exercise squat --patient P-017
+python analyze.py webcam --exercise squat --patient P-017
+```
+
+IDs are 1-32 letters, digits, or hyphens. IDs and labels that look like a name, a date, or
+a record number are rejected. Sessions recorded without `--patient` go to the built-in
+`unassigned` patient and can be reassigned later. Deleting a patient removes every session,
+event, and export file tied to it.
+
+### 5. Browsing and exporting
+
+```
+python interfaces/cli.py sessions list [--patient P-017] [--json]
+python interfaces/cli.py sessions show 3 [--json]
+python interfaces/cli.py export 3 --format all|pta_log|observation_json|csv_report|text_log [--out DIR]
+```
+
+Web app: new **Patients** and **Sessions** pages, a real patient selector in the sidebar,
+export download buttons on the session detail, and the Dashboard, Observation Logs,
+PT Summary, and Progress Report pages now read from the record. The file-based
+Session Logs page was removed. The `report` and `history` CLI commands were replaced by
+`sessions list` / `sessions show`.
+
+### 6. One-time import of old files
+
+```
+python interfaces/cli.py import-legacy [--sessions-dir sessions] [--obs-dir observation_logs] [--dry-run]
+```
+
+Reads the three legacy JSON shapes (per-session report, observation log, session-tracker
+record), skips CSV/text files, reports malformed files by name, and never creates
+duplicates: a SHA-256 ledger makes repeat runs no-ops, and the same session saved in both
+folders is imported once. Files are left in place.
+
+### 7. Tests
+
+`tests/test_ptlog_*.py`, `tests/test_cli_ptlog.py`, and `tests/test_app_pages.py` (headless
+Streamlit) cover the record, recorder, crash recovery (including a SIGKILL test), patients,
+views, exports, import, CLI, and web pages. Run `.venv/bin/python -m pytest tests`.
+
+---
+
 ## Update 2 — 2026-02-21
 
 ### 1. Timestamped Session Log Files (`analyze.py`)

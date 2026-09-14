@@ -8,7 +8,7 @@ anomalies) and aggregate metrics.
 
 Usage:
     from src.session_summary import generate_session_summary
-    from src.observation_logger import load_observation_log
+    from src.ptlog.exports import to_observation_dict  # feeds this module the legacy dict shape
 
     data = load_observation_log("observation_logs/session_2026-03-23_234321.json")
     summary = generate_session_summary(data)

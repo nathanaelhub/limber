@@ -56,20 +56,33 @@ ai-pt-assistant/
 │   ├── __init__.py
 │   ├── utils.py            # Angle calculation, keypoint extraction
 │   ├── form_assessment.py  # Biomechanical form checking
-│   └── session_tracker.py  # Progress tracking & persistence
+│   ├── session_tracker.py  # Trend analysis over recorded sessions
+│   ├── session_summary.py  # Clinical summary of one session
+│   └── ptlog/              # Canonical session record
+│       ├── models.py       # Entities with units and definitions
+│       ├── store.py        # SQLite store: single writer, reads, migrations, recovery
+│       ├── recorder.py     # The only engine-facing adapter
+│       ├── views.py        # Unit-labelled rendering for CLI and web
+│       ├── privacy.py      # Pseudonymous-ID rules
+│       ├── importer.py     # One-time legacy import
+│       └── exports/        # PTA-Log, observation JSON, CSV, text-log adapters
 │
 ├── interfaces/
 │   ├── cli.py              # Command-line interface
 │   └── app.py              # Streamlit web application
 │
+├── specs/                  # Spec-driven development artifacts (Spec Kit)
 ├── tests/
 │   ├── test_analysis.py
 │   ├── test_form_assessment.py
-│   └── fixtures/           # Test data
+│   ├── test_ptlog_*.py     # Record, recorder, recovery, exports, import
+│   ├── test_app_pages.py   # Headless Streamlit page tests
+│   └── fixtures/           # Golden legacy files and synthetic legacy inputs
 │
-├── sessions/               # Saved session data (JSON/CSV)
+├── data/                   # ptassist.db — the canonical record (git-ignored)
+├── exports/                # Session exports (git-ignored)
 ├── videos/                 # Sample input videos
-└── output_results/         # Processed videos & reports
+└── output/                 # Processed videos & screenshots
 ```
 
 ---
@@ -111,13 +124,22 @@ Biomechanically-informed analysis of exercise form:
 - `FormFeedback` - Structured feedback messages
 - `OverallFormAssessment` - Complete frame analysis
 
-### `src/session_tracker.py` (~500 lines)
-**Progress tracking across sessions**
+### `src/ptlog/` (~1,800 lines)
+**The canonical session record**
 
-Persistent storage and progress analysis:
-- JSON/CSV data persistence
+One local SQLite file holds patients, sessions, exercise sets, reps, partial reps, form
+events, and control events. `SessionStore` is the only writer; `SessionRecorder` is the only
+code that reads the engine's outputs; `exports/` reproduces the four legacy file formats
+from the record; `importer.py` brings pre-existing files in once. Every metric carries a
+unit and a plain-language definition.
+
+### `src/session_tracker.py` (~450 lines)
+**Trend analysis across sessions**
+
+Analysis over history built from the canonical record (no file persistence):
 - Session comparison
 - Trend calculation
+- Exercises needing attention
 - Progress visualization
 
 ### `config.yaml` (~400 lines)
@@ -164,7 +186,7 @@ Browser-based interface featuring:
 1. `analyze.py:ExerciseTracker` - Understand the state machine
 2. `src/form_assessment.py:FormAnalyzer` - See form checking logic
 3. `config.yaml` - Add new exercises
-4. `src/session_tracker.py` - Understand data persistence
+4. `src/ptlog/store.py` - Understand the canonical session record
 
 ### Key Concepts
 
@@ -255,7 +277,7 @@ Edit `config.yaml` to:
 1. **Trace the code flow** - Follow a frame from input to output
 2. **Add a new exercise** - Create entry in config.yaml
 3. **Customize form checks** - Modify form_assessment.py
-4. **Generate reports** - Explore session_tracker.py output
+4. **Export sessions** - `python interfaces/cli.py export <id> --format all`
 
 ### Advanced Level
 1. **Train custom model** - Use data.yaml for equipment detection

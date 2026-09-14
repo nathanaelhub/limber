@@ -7,6 +7,7 @@ An intelligent exercise monitoring system using YOLO11 pose estimation to provid
 - **Real-time pose detection** using YOLO11 pose estimation
 - **Rep counting** with state machine logic
 - **Form assessment** with biomechanical checks
+- **One canonical session record** (local SQLite) with pseudonymous patients, crash-safe logging, and exports in the legacy PTA-Log, JSON, CSV, and text formats
 - **Progress tracking** across multiple sessions
 - **Multiple interfaces**: CLI, Web (Streamlit), and programmatic API
 
@@ -58,18 +59,34 @@ for i in range(5):
 ## Quick Start
 
 ```bash
-# Analyze a video file
-python analyze.py video --input your_video.mp4 --exercise knee_extension
+# Register a patient (pseudonymous ID only: letters, digits, hyphens)
+python interfaces/cli.py patients add P-017 --label "Post-op knee"
 
-# Start webcam session (default camera 0)
-python analyze.py webcam --exercise shoulder_flexion
+# Analyze a video file for that patient
+python analyze.py video --input your_video.mp4 --exercise knee_extension --patient P-017
+
+# Start webcam session (default camera 0); without --patient it is recorded under "unassigned"
+python analyze.py webcam --exercise shoulder_flexion --patient P-017
 
 # Use a specific camera
 python analyze.py webcam --exercise squat --camera 2
 
+# Browse and export what was recorded
+python interfaces/cli.py sessions list --patient P-017
+python interfaces/cli.py sessions show 3
+python interfaces/cli.py export 3 --format all
+
+# Bring pre-existing files in sessions/ and observation_logs/ into the record (once)
+python interfaces/cli.py import-legacy --dry-run
+
 # Launch web interface
 streamlit run interfaces/app.py
 ```
+
+**Where data lives:** every session is written to one local SQLite file, `data/ptassist.db`
+(set `PTASSIST_DB=/path/to/file.db` to use another location). Exports default to `exports/`.
+Both folders are ignored by git. Patients are identified only by a pseudonymous ID; names,
+dates of birth, and record numbers are rejected.
 
 **Webcam Controls:**
 - `q` - Quit
@@ -97,17 +114,22 @@ streamlit run interfaces/app.py
 
 ```
 ai-pt-assistant/
-├── analyze.py              # Core analysis engine
+├── analyze.py              # Core analysis engine (pose, rep counting, runner loops)
 ├── config.yaml             # Exercise configurations
 ├── requirements.txt        # Dependencies
 ├── src/
 │   ├── utils.py            # Helper functions
 │   ├── form_assessment.py  # Form checking
-│   └── session_tracker.py  # Progress tracking
+│   ├── session_tracker.py  # Trend analysis over recorded sessions
+│   ├── session_summary.py  # Clinical summary of one session
+│   └── ptlog/              # Canonical session record: store, recorder, views, exports, importer
 ├── interfaces/
-│   ├── cli.py              # Command-line interface
+│   ├── cli.py              # Command-line interface (patients, sessions, export, import-legacy)
 │   └── app.py              # Streamlit web app
-└── tests/                  # Test suite
+├── specs/                  # Spec Kit feature specs, plans, and tasks
+├── data/                   # ptassist.db (created on first run, git-ignored)
+├── exports/                # Session exports (git-ignored)
+└── tests/                  # Test suite (pytest)
 ```
 
 ## Documentation
