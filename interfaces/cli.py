@@ -471,6 +471,15 @@ def cmd_import_legacy(args):
         return 2
 
 
+def _goal_text(g) -> str:
+    parts = []
+    if g.target_rom:
+        parts.append(f"ROM {g.target_rom:g}°")
+    if g.target_reps:
+        parts.append(f"reps {g.target_reps}")
+    return " | ".join(parts)
+
+
 def _print_trend(store, trend, patient_id, views):
     print(f"{'date':<17}{'session':>8}  {'reps/target':<12}{'avg form (0-100)':<18}{'avg ROM (°)':<13}"
           f"{'avg rep (s)':<13}{'tempo sd (s)':<14}{'partial (%)':<13}status")
@@ -566,8 +575,36 @@ def cmd_review(args):
                           f"{'change':<14}{'% change':<12}better when")
                     for r in views.comparison_rows(comp):
                         print(f"{r['measure']:<32}{r['a']:<18}{r['b']:<18}{r['change']:<14}{r['pct_change']:<12}{r['better']}")
+            elif sub == "goals":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                goals = store.list_goals(args.patient)
+                if args.json:
+                    print(json.dumps([asdict(g) for g in goals], indent=2))
+                elif not goals:
+                    print("No goals set.")
+                for g in ([] if args.json else goals):
+                    print(f"{g.exercise_name}: {_goal_text(g)}")
+            elif sub == "goal":
+                if args.goal_cmd == "set":
+                    g = store.set_goal(args.patient, args.exercise, target_rom=args.rom, target_reps=args.reps)
+                    print_success(f"Goal for {g.exercise_name}: {_goal_text(g)}")
+                elif args.goal_cmd == "clear":
+                    if store.clear_goal(args.patient, args.exercise):
+                        print_success(f"Cleared goal for {args.exercise}")
+                    else:
+                        print_error(f"No goal set for {args.exercise}")
+                        return 1
+                else:
+                    print_error("Usage: review goal {set,clear}")
+                    return 1
+            elif sub == "export":
+                from src.ptlog.exports import write_review_export
+                fmts = ["review_report", "review_csv"] if args.format == "all" else [{"report": "review_report", "csv": "review_csv"}[args.format]]
+                for fmt in fmts:
+                    print(write_review_export(store, args.patient, args.period, fmt, args.out))
             else:
-                print_error("Usage: review {trends,session,mark,pending,flags,settings,compare}")
+                print_error("Usage: review {trends,session,mark,pending,flags,settings,compare,goals,goal,export}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -877,6 +914,25 @@ Examples:
     rc.add_argument("session_b", type=int)
     rc.add_argument("--exercise", "-e", default=None, help="Needed when the sessions share several exercises")
     rc.add_argument("--json", action="store_true")
+
+    rgl = review_sub.add_parser("goals", help="List a patient's goals")
+    rgl.add_argument("patient")
+    rgl.add_argument("--json", action="store_true")
+    rgo = review_sub.add_parser("goal", help="Set or clear a goal for one exercise")
+    goal_sub = rgo.add_subparsers(dest="goal_cmd")
+    gs = goal_sub.add_parser("set")
+    gs.add_argument("patient")
+    gs.add_argument("--exercise", "-e", required=True)
+    gs.add_argument("--rom", type=float, default=None, help="Target range of motion in degrees (1-180)")
+    gs.add_argument("--reps", type=int, default=None, help="Target reps (at least 1)")
+    gc = goal_sub.add_parser("clear")
+    gc.add_argument("patient")
+    gc.add_argument("--exercise", "-e", required=True)
+    rx = review_sub.add_parser("export", help="Export a review summary as a text report and/or CSV")
+    rx.add_argument("patient")
+    rx.add_argument("--period", default="all", choices=["14d", "30d", "90d", "all"])
+    rx.add_argument("--format", "-f", required=True, choices=["report", "csv", "all"])
+    rx.add_argument("--out", "-o", default=None, help="Output directory (default: exports/)")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")

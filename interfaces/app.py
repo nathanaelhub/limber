@@ -1136,8 +1136,8 @@ def page_review():
         _review_compare(pid)
     elif section == "Goals & settings":
         _review_goals_settings(pid)
-    else:
-        st.info(f"{section}: coming in this feature.")
+    elif section == "Export":
+        _review_export(pid)
 
 
 def _period_selector(key):
@@ -1295,7 +1295,62 @@ def _review_goals_settings(pid):
         except PTLogError as exc:
             st.error(str(exc))
     st.markdown("### Goals")
-    st.info("Goals: coming in this feature.")
+    with _open_store() as store:
+        names = ptreview.exercise_names(store, pid)
+        goals = store.list_goals(pid)
+    if goals:
+        st.dataframe(pd.DataFrame([{"Exercise": g.exercise_name,
+                                    "Target ROM (degrees)": g.target_rom if g.target_rom else "",
+                                    "Target reps (count)": g.target_reps if g.target_reps else "",
+                                    "Set": ptviews.date_minute(g.set_at)} for g in goals]),
+                     use_container_width=True, hide_index=True)
+    else:
+        st.caption("No goals set.")
+    if not names:
+        st.info("Record a session before setting goals.")
+        return
+    exercise = st.selectbox("Exercise", names, key="review_goal_exercise")
+    current = next((g for g in goals if g.exercise_name == exercise), None)
+    c1, c2 = st.columns(2)
+    with c1:
+        rom = st.number_input("Target ROM (degrees, 1-180; 0 = none)", min_value=0, max_value=180,
+                              value=int(current.target_rom) if current and current.target_rom else 0, key="review_goal_rom")
+    with c2:
+        reps = st.number_input("Target reps (count; 0 = none)", min_value=0, max_value=200,
+                               value=int(current.target_reps) if current and current.target_reps else 0, key="review_goal_reps")
+    b1, b2 = st.columns(2)
+    with b1:
+        if st.button("Set goal", key="review_goal_set"):
+            try:
+                with _open_store() as store:
+                    g = store.set_goal(pid, exercise, target_rom=rom or None, target_reps=reps or None)
+                st.success(f"Goal for {g.exercise_name} saved")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+    with b2:
+        if st.button("Clear goal", key="review_goal_clear"):
+            with _open_store() as store:
+                cleared = store.clear_goal(pid, exercise)
+            st.success(f"Cleared goal for {exercise}") if cleared else st.info(f"No goal set for {exercise}")
+            if cleared:
+                st.rerun()
+
+
+def _review_export(pid):
+    from src.ptlog.exports import to_review_csv, to_review_report
+    period = _period_selector("review_export_period")
+    with _open_store() as store:
+        summary = ptreview.review_summary(store, pid, period)
+    stamp = datetime.fromisoformat(summary.generated_at).strftime("%Y%m%d_%H%M%S")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button("Review report (text)", to_review_report(summary),
+                           file_name=f"{pid}_review_{period}_{stamp}.txt", mime="text/plain", key="review_dl_txt")
+    with c2:
+        st.download_button("Review data (CSV)", to_review_csv(summary),
+                           file_name=f"{pid}_review_{period}_{stamp}.csv", mime="text/csv", key="review_dl_csv")
+    st.code(to_review_report(summary), language=None)
 
 
 # =============================================================================

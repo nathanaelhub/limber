@@ -281,3 +281,38 @@ class TestReviewCompare:
         assert any(row["name"] == "avg_rom" and row["change"] == 12.0 for row in rows)
         r = run_cli(cli_env, "review", "compare", str(ids[0]), "999")
         assert r.returncode == 1
+
+
+class TestReviewGoals:
+    def test_goal_set_update_clear_and_trend_line(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "goal", "set", "P-017", "--exercise", "Knee Extension", "--rom", "120", "--reps", "10")
+        assert r.returncode == 0 and "Goal for Knee Extension: ROM 120° | reps 10" in out(r)
+        r = run_cli(cli_env, "review", "goal", "set", "P-017", "--exercise", "Knee Extension", "--reps", "12")
+        assert r.returncode == 0
+        r = run_cli(cli_env, "review", "goals", "P-017")
+        assert "ROM 120°" in r.stdout and "reps 12" in r.stdout
+        rows = json.loads(run_cli(cli_env, "review", "goals", "P-017", "--json").stdout)
+        assert rows[0]["target_rom"] == 120.0 and rows[0]["target_reps"] == 12
+        r = run_cli(cli_env, "review", "goal", "set", "P-017", "--exercise", "Knee Extension", "--rom", "200")
+        assert r.returncode == 1 and "1–180" in out(r)
+        r = run_cli(cli_env, "review", "trends", "P-017", "--exercise", "Knee Extension")
+        assert "Goal: ROM 120° (77% of goal) | reps 12" in r.stdout
+        r = run_cli(cli_env, "review", "goal", "clear", "P-017", "--exercise", "Knee Extension")
+        assert r.returncode == 0 and "Cleared goal for Knee Extension" in out(r)
+        assert json.loads(run_cli(cli_env, "review", "goals", "P-017", "--json").stdout) == []
+
+
+class TestReviewExport:
+    def test_export_all_and_single(self, cli_env, tmp_db, tmp_path):
+        seed_review_history(tmp_db)
+        out_dir = tmp_path / "rev"
+        r = run_cli(cli_env, "review", "export", "P-017", "--format", "all", "--out", str(out_dir))
+        assert r.returncode == 0
+        names = sorted(p.name for p in out_dir.iterdir())
+        assert len(names) == 2 and names[0].startswith("P-017_review_all_") and names[0].endswith(".csv") and names[1].endswith(".txt")
+        assert all(str(out_dir / n) in r.stdout for n in names)
+        r = run_cli(cli_env, "review", "export", "P-017", "--format", "csv", "--period", "30d", "--out", str(out_dir))
+        assert r.returncode == 0 and r.stdout.count("\n") == 1 and "_review_30d_" in r.stdout
+        r = run_cli(cli_env, "review", "export", "ghost", "--format", "all", "--out", str(out_dir))
+        assert r.returncode == 1

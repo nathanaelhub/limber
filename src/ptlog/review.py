@@ -57,6 +57,10 @@ def trend(store: SessionStore, patient_id: str, exercise: str, period: str = "al
     """Per-session measures for one exercise over the period, oldest first (FR-004 … FR-007)."""
     now = _now(now)
     sessions = store.sessions_in_period(patient_id, period_start(period, now))
+    return _trend_from_sessions(store, patient_id, exercise, period, sessions)
+
+
+def _trend_from_sessions(store: SessionStore, patient_id: str, exercise: str, period: str, sessions) -> Trend:
     points = measure_series(sessions, exercise)
     t = Trend(exercise=exercise, period=period, points=points)
     if len(points) >= 2:
@@ -95,14 +99,23 @@ def pending(store: SessionStore, patient_id: str):
 
 def flags_for(store: SessionStore, patient_id: str, period: str = "all", now: Optional[datetime] = None):
     """Attention flags for a patient over a period, with evidence (FR-014 … FR-016)."""
-    from . import flags as rules
     now = _now(now)
     sessions = store.sessions_in_period(patient_id, period_start(period, now))
+    return _flags_from_sessions(store, patient_id, sessions, now)
+
+
+def _exercise_order(sessions) -> List[str]:
     names: List[str] = []
     for s in sessions:
         for es in s.sets:
             if es.exercise_name not in names:
                 names.append(es.exercise_name)
+    return names
+
+
+def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: datetime):
+    from . import flags as rules
+    names = _exercise_order(sessions)
     series_by_exercise = {name: measure_series(sessions, name) for name in names}
     goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
     starts = [(s.id, s.start_time) for s in sessions]
@@ -148,3 +161,37 @@ def compare(store: SessionStore, session_a: int, session_b: int, exercise: Optio
             pct = round((vb - va) / va * 100, 1)
         rows.append(ComparisonRow(name, METRIC_DEFINITIONS[name]["unit"], va, vb, change, pct, BETTER[name]))
     return Comparison(exercise=exercise, a=a, b=b, rows=rows)
+
+
+# ------------------------------------------------------------------ review summary (US6)
+
+def review_summary(store: SessionStore, patient_id: str, period: str = "all", now: Optional[datetime] = None):
+    """Everything the review exports need for a patient and period (FR-020, FR-021)."""
+    from .measures import measures_for_session
+    from .models import PatientNotFoundError, ReviewSummary
+
+    if store.get_patient(patient_id) is None:
+        raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+    now = _now(now)
+    since = period_start(period, now)
+    sessions = store.sessions_in_period(patient_id, since)
+    names = _exercise_order(sessions)
+    trends = {name: _trend_from_sessions(store, patient_id, name, period, sessions) for name in names}
+    goals = []
+    for g in store.list_goals(patient_id):
+        points = trends[g.exercise_name].points if g.exercise_name in trends else measure_series(sessions, g.exercise_name)
+        latest = points[-1] if points else None
+        goals.append({
+            "goal": g,
+            "latest_rom": latest.avg_rom if latest else None,
+            "progress_pct": rom_progress(g, points),
+            "latest_reps": latest.reps_completed if latest else None,
+            "latest_target": latest.target_reps if latest else None,
+        })
+    session_entries = [{"session": s, "measures": measures_for_session(s), "review": store.get_review(s.id)}
+                       for s in reversed(sessions)]
+    return ReviewSummary(
+        patient_id=patient_id, period=period, period_start=since.isoformat() if since else None,
+        generated_at=now.isoformat(), gap_days=store.get_gap_days(patient_id), trends=trends,
+        flags=_flags_from_sessions(store, patient_id, sessions, now), goals=goals, sessions=session_entries,
+    )

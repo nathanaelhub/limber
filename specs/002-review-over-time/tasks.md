@@ -152,13 +152,13 @@ is created from `main` before T001.
 
 ### Tests for User Story 5 (write first, MUST FAIL)
 
-- [ ] T041 [P] [US5] Extend `tests/test_cli_ptlog.py`: `review goal set P-017 --exercise "Knee Extension" --rom 120 --reps 10` prints `Goal for Knee Extension: ROM 120° | reps 10`; `--reps 12` alone keeps ROM 120 in `review goals P-017`; `--rom 200` → exit 1 with the range; `review goal clear` prints `Cleared goal for Knee Extension`; `review trends` after setting shows the goal line and progress percentage
-- [ ] T042 [P] [US5] Extend `tests/test_app_pages.py`: the Goals & settings tab renders the goal form (exercise selectbox, ROM and reps number inputs, set and clear buttons) without exception
+- [X] T041 [P] [US5] Extend `tests/test_cli_ptlog.py`: `review goal set P-017 --exercise "Knee Extension" --rom 120 --reps 10` prints `Goal for Knee Extension: ROM 120° | reps 10`; `--reps 12` alone keeps ROM 120 in `review goals P-017`; `--rom 200` → exit 1 with the range; `review goal clear` prints `Cleared goal for Knee Extension`; `review trends` after setting shows the goal line and progress percentage
+- [X] T042 [P] [US5] Extend `tests/test_app_pages.py`: the Goals & settings tab renders the goal form (exercise selectbox, ROM and reps number inputs, set and clear buttons) without exception
 
 ### Implementation for User Story 5
 
-- [ ] T043 [US5] `interfaces/cli.py` (depends on T041): add `review goals`, `review goal set`, `review goal clear` (store CRUD from T008)
-- [ ] T044 [US5] `interfaces/app.py` (depends on T042): implement the goal form in the Goals & settings tab with `st.error` on `GoalValidationError`
+- [X] T043 [US5] `interfaces/cli.py` (depends on T041): add `review goals`, `review goal set`, `review goal clear` (store CRUD from T008)
+- [X] T044 [US5] `interfaces/app.py` (depends on T042): implement the goal form in the Goals & settings tab with `st.error` on `GoalValidationError`
 
 **Checkpoint**: goals manageable from CLI and web
 
@@ -172,18 +172,18 @@ is created from `main` before T001.
 
 ### Tests for User Story 6 (write first, MUST FAIL)
 
-- [ ] T045 [P] [US6] Write `tests/test_ptlog_review_exports.py`: `review.review_summary(store, "P-017", "all", now)` has `trends` per exercise, `flags`, `goals` with progress, `sessions` newest first each with `measures` and `review`; `to_review_report(summary)` equals an expected string built in the test from the seeded values (header lines `PT REVIEW SUMMARY`, `Patient: P-017`, `Period: all time`, `Generated: <fixed clock>`, `TRENDS` table with the column header from `contracts/exports.md`, `FLAGS` lines, `GOALS`, `SESSIONS` with `reviewed …` and `pending review`); `to_review_csv(summary)` starts with the exact header row, uses `\r\n`, has one row per session per exercise newest first, empty cells for missing values, `interrupted` true/false, `review_status` reviewed/pending; `write_review_export(store, "P-017", "all", "review_report", tmp_path, now)` writes `P-017_review_all_<YYYYMMDD_HHMMSS>.txt`, records a `review_exports` row, and `delete_patient` removes the file; two exports with the same clock are identical
-- [ ] T046 [P] [US6] Extend `tests/test_cli_ptlog.py`: `review export P-017 --format all --out DIR` prints two paths; `--format csv` one; unknown patient → exit 1
-- [ ] T047 [P] [US6] Extend `tests/test_app_pages.py`: the Export tab renders two download buttons labelled `Review report (text)` and `Review data (CSV)`
+- [X] T045 [P] [US6] Write `tests/test_ptlog_review_exports.py`: `review.review_summary(store, "P-017", "all", now)` has `trends` per exercise, `flags`, `goals` with progress, `sessions` newest first each with `measures` and `review`; `to_review_report(summary)` equals an expected string built in the test from the seeded values (header lines `PT REVIEW SUMMARY`, `Patient: P-017`, `Period: all time`, `Generated: <fixed clock>`, `TRENDS` table with the column header from `contracts/exports.md`, `FLAGS` lines, `GOALS`, `SESSIONS` with `reviewed …` and `pending review`); `to_review_csv(summary)` starts with the exact header row, uses `\r\n`, has one row per session per exercise newest first, empty cells for missing values, `interrupted` true/false, `review_status` reviewed/pending; `write_review_export(store, "P-017", "all", "review_report", tmp_path, now)` writes `P-017_review_all_<YYYYMMDD_HHMMSS>.txt`, records a `review_exports` row, and `delete_patient` removes the file; two exports with the same clock are identical
+- [X] T046 [P] [US6] Extend `tests/test_cli_ptlog.py`: `review export P-017 --format all --out DIR` prints two paths; `--format csv` one; unknown patient → exit 1
+- [X] T047 [P] [US6] Extend `tests/test_app_pages.py`: the Export tab renders two download buttons labelled `Review report (text)` and `Review data (CSV)`
 
 ### Implementation for User Story 6
 
-- [ ] T048 [US6] Implement `review_summary(store, patient_id, period="all", now=None) -> ReviewSummary` in `src/ptlog/review.py` (depends on T045)
-- [ ] T049 [P] [US6] Implement `to_review_report` in `src/ptlog/exports/review_report.py` per `contracts/exports.md` (depends on T045)
-- [ ] T050 [P] [US6] Implement `to_review_csv` in `src/ptlog/exports/review_csv.py` per `contracts/exports.md` (depends on T045)
-- [ ] T051 [US6] Add `write_review_export(store, patient_id, period, fmt, out_dir=None, now=None) -> Path` and `REVIEW_FORMATS` to `src/ptlog/exports/__init__.py` (depends on T048–T050)
-- [ ] T052 [US6] `interfaces/cli.py` (depends on T046, T051): add `review export`
-- [ ] T053 [US6] `interfaces/app.py` (depends on T047, T051): implement the Export tab with period selector and two `st.download_button`s
+- [X] T048 [US6] Implement `review_summary(store, patient_id, period="all", now=None) -> ReviewSummary` in `src/ptlog/review.py` (depends on T045)
+- [X] T049 [P] [US6] Implement `to_review_report` in `src/ptlog/exports/review_report.py` per `contracts/exports.md` (depends on T045)
+- [X] T050 [P] [US6] Implement `to_review_csv` in `src/ptlog/exports/review_csv.py` per `contracts/exports.md` (depends on T045)
+- [X] T051 [US6] Add `write_review_export(store, patient_id, period, fmt, out_dir=None, now=None) -> Path` and `REVIEW_FORMATS` to `src/ptlog/exports/__init__.py` (depends on T048–T050)
+- [X] T052 [US6] `interfaces/cli.py` (depends on T046, T051): add `review export`
+- [X] T053 [US6] `interfaces/app.py` (depends on T047, T051): implement the Export tab with period selector and two `st.download_button`s
 
 **Checkpoint**: review summaries exportable; all six stories complete
 

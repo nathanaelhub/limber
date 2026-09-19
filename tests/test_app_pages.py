@@ -120,3 +120,17 @@ def test_review_page_compare_tab(seeded_env):
     session_selects = [s for s in at.selectbox if s.label.lower().startswith("session")]
     assert len(session_selects) >= 2
     assert at.dataframe
+
+
+def test_review_page_goal_form(seeded_env):
+    at = _review_page(seeded_env, "Goals & settings")
+    labels = [n.label.lower() for n in at.number_input]
+    assert any("rom" in l for l in labels) and any("reps" in l for l in labels)
+    buttons = {b.label for b in at.button}
+    assert "Set goal" in buttons and "Clear goal" in buttons
+
+
+def test_review_page_export_tab(seeded_env):
+    at = _review_page(seeded_env, "Export")
+    labels = {b.label for b in at.get("download_button")}
+    assert {"Review report (text)", "Review data (CSV)"} <= labels
