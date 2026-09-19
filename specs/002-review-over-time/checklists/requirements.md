@@ -44,3 +44,11 @@
   tab each run → Review page uses a section radio (T018, research D11); (L) same-day sessions and
   side-variant exercises edge cases added to T011; (L) `evaluate()` third parameter named
   `session_starts` in the contract; (L) modified test files added to the plan tree.
+- `/speckit-implement` completion (2026-09-19): T001–T058 done on branch `002-review-over-time`
+  (6 commits). Suite 328 passed, including the 200-session performance test and headless renders of
+  every Review section. Quickstart against a scratch database seeded from the legacy fixtures: step 3
+  trends with first→latest changes; step 4 goal set, gap threshold set, ROM 200 rejected; step 5 flags
+  with not-evaluated rules listed; step 6 pending list, session view with per-session summary flags,
+  review marked, name-like notes rejected, pending count reduced; step 7 comparison; step 8 both exports
+  written under pseudonymous names and removed with the patient. Final gate: engine files untouched
+  versus main, no `session_tracker` references outside the archived golden generator, no network imports.

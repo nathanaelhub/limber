@@ -2,6 +2,70 @@
 
 ---
 
+## Update 4 — 2026-09-19 — Review Over Time
+
+Feature spec: `specs/002-review-over-time/`. Everything reads from the canonical session record;
+nothing about recording changed.
+
+### 1. Per-session measures
+
+For every session and exercise: reps completed against target, average range of motion (°),
+average form score (0-100), average rep duration (s), tempo consistency (population standard
+deviation of rep durations, s), partial-rep share (%), safety stops, and an interrupted marker.
+Several sets of one exercise in a session combine into one point. Measures are derived on request
+and never stored.
+
+### 2. Trends, comparison, goals
+
+```
+python interfaces/cli.py review trends P-017 --exercise "Knee Extension" --period 30d
+python interfaces/cli.py review compare 12 15
+python interfaces/cli.py review goal set P-017 --exercise "Knee Extension" --rom 120 --reps 10
+python interfaces/cli.py review goals P-017 | review goal clear ...
+```
+
+Periods: `14d`, `30d`, `90d`, `all`. A trend shows first → latest → change per measure and the
+progress toward a range-of-motion goal (capped at 100%). A comparison shows both values, the change,
+the percentage change for reps, form, and ROM, and which direction counts as improvement.
+
+### 3. Attention flags with evidence
+
+`review flags P-017 [--period …]` evaluates seven explicit rules and shows the sessions and values
+behind each flag: form declining (over the last four sessions), range-of-motion regression (≥ 10°
+below the best of the previous three), range-of-motion plateau (< 3° change while below a goal),
+target reps not reached (three sessions in a row), rising partial reps (≥ 25% and ≥ 10 points above
+the previous three), safety stop (any stop-severity form event), and practice gap (more than the
+patient's threshold, `review settings P-017 --gap-days 7`). Rules without enough sessions are listed
+as "not evaluated yet".
+
+### 4. Session reviews
+
+```
+python interfaces/cli.py review pending P-017
+python interfaces/cli.py review session 12
+python interfaces/cli.py review mark 12 --next-step progress --notes "post-op week 3"
+```
+
+One review per session (edits replace it): reviewed time, free-text notes (names, dates of birth, and
+record numbers are rejected), and a next step of continue, progress, regress, or hold. The session view
+includes the per-session summary flags from the existing single-session analysis.
+
+### 5. Review summary exports
+
+`review export P-017 --period all --format all` writes a text report and a CSV named
+`{patient}_review_{period}_{time}` under `exports/`, covering trends per exercise, flags with evidence,
+goals with progress, and every session's review status, notes, and next step. Both are removed when the
+patient is deleted.
+
+### 6. Web app and retired code
+
+The Review page (Trends, Flags, Compare, Session review, Goals & settings, Export) replaces the
+Progress Report and PT Summary pages. The `progress` CLI command and `src/session_tracker.py` were
+retired; the schema moved to version 2 (`reviews`, `goals`, `review_settings`, `review_exports`),
+applied automatically on first open.
+
+---
+
 ## Update 3 — 2026-09-14 — Unified PT Session Log
 
 Feature spec: `specs/001-unified-session-log/` (built with GitHub Spec Kit under the project

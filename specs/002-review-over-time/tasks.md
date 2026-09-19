@@ -191,11 +191,11 @@ is created from `main` before T001.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T054 [P] Add "Update 4 — Review Over Time" to `docs/UPDATES.md` (measures, trends, flags with rules and thresholds, reviews, goals, gap threshold, comparison, exports, retired progress/PT Summary views and session tracker, review CLI group)
-- [ ] T055 [P] Update `README.md`: review commands in Quick Start, Project Structure (add `measures.py`, `flags.py`, `review.py`, review exports; remove `session_tracker.py`), feature bullet
-- [ ] T056 [P] Update `docs/PROJECT_OVERVIEW.md`: architecture tree and Key Files (remove `session_tracker.py`, add the review modules)
-- [ ] T057 Run `specs/002-review-over-time/quickstart.md` steps 1–8 against a scratch database (step 9 via `tests/test_app_pages.py`) and record outcomes under `## Notes` in `specs/002-review-over-time/checklists/requirements.md`
-- [ ] T058 Final gate: full suite green; `git diff --stat main -- analyze.py src/form_assessment.py src/utils.py config.yaml tests/test_analysis.py tests/test_form_assessment.py requirements.txt` empty; `grep -rn session_tracker --include='*.py' .` (outside `.venv`) empty; `grep -rnE '^(import|from) (socket|urllib|http|requests)' src/ptlog/` empty; performance test in `tests/test_ptlog_review.py` (200 sessions: trend, flags, pending each < 2 s) passing; then run `/speckit-analyze`
+- [X] T054 [P] Add "Update 4 — Review Over Time" to `docs/UPDATES.md` (measures, trends, flags with rules and thresholds, reviews, goals, gap threshold, comparison, exports, retired progress/PT Summary views and session tracker, review CLI group)
+- [X] T055 [P] Update `README.md`: review commands in Quick Start, Project Structure (add `measures.py`, `flags.py`, `review.py`, review exports; remove `session_tracker.py`), feature bullet
+- [X] T056 [P] Update `docs/PROJECT_OVERVIEW.md`: architecture tree and Key Files (remove `session_tracker.py`, add the review modules)
+- [X] T057 Run `specs/002-review-over-time/quickstart.md` steps 1–8 against a scratch database (step 9 via `tests/test_app_pages.py`) and record outcomes under `## Notes` in `specs/002-review-over-time/checklists/requirements.md`
+- [X] T058 Final gate: full suite green; `git diff --stat main -- analyze.py src/form_assessment.py src/utils.py config.yaml tests/test_analysis.py tests/test_form_assessment.py requirements.txt` empty; `grep -rn session_tracker --include='*.py' .` (outside `.venv`) empty; `grep -rnE '^(import|from) (socket|urllib|http|requests)' src/ptlog/` empty; performance test in `tests/test_ptlog_review.py` (200 sessions: trend, flags, pending each < 2 s) passing; then run `/speckit-analyze`
 
 ---
 

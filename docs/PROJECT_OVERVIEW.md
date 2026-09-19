@@ -56,16 +56,18 @@ ai-pt-assistant/
 │   ├── __init__.py
 │   ├── utils.py            # Angle calculation, keypoint extraction
 │   ├── form_assessment.py  # Biomechanical form checking
-│   ├── session_tracker.py  # Trend analysis over recorded sessions
 │   ├── session_summary.py  # Clinical summary of one session
-│   └── ptlog/              # Canonical session record
+│   └── ptlog/              # Canonical session record and review
 │       ├── models.py       # Entities with units and definitions
 │       ├── store.py        # SQLite store: single writer, reads, migrations, recovery
 │       ├── recorder.py     # The only engine-facing adapter
+│       ├── measures.py     # Per-session per-exercise measures (derived, never stored)
+│       ├── flags.py        # Seven attention rules with thresholds and evidence
+│       ├── review.py       # Trends, comparison, reviews, flags, review summary
 │       ├── views.py        # Unit-labelled rendering for CLI and web
-│       ├── privacy.py      # Pseudonymous-ID rules
+│       ├── privacy.py      # Pseudonymous-ID and notes rules
 │       ├── importer.py     # One-time legacy import
-│       └── exports/        # PTA-Log, observation JSON, CSV, text-log adapters
+│       └── exports/        # Legacy formats plus review report and CSV
 │
 ├── interfaces/
 │   ├── cli.py              # Command-line interface
@@ -133,14 +135,12 @@ code that reads the engine's outputs; `exports/` reproduces the four legacy file
 from the record; `importer.py` brings pre-existing files in once. Every metric carries a
 unit and a plain-language definition.
 
-### `src/session_tracker.py` (~450 lines)
-**Trend analysis across sessions**
+### `src/ptlog/review.py`, `measures.py`, `flags.py` (~900 lines)
+**Review over time**
 
-Analysis over history built from the canonical record (no file persistence):
-- Session comparison
-- Trend calculation
-- Exercises needing attention
-- Progress visualization
+Per-session measures derived from the record, trend series over a period, seven explicit
+attention rules that show their evidence, side-by-side comparison, one review per session with
+notes and a next step, goals, and the review summary that feeds the text and CSV exports.
 
 ### `config.yaml` (~400 lines)
 **Exercise configuration**
