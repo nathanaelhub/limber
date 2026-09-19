@@ -253,3 +253,19 @@ class TestReviewSessions:
         r = run_cli(cli_env, "review", "session", str(ids[0]), "--json")
         d = json.loads(r.stdout)
         assert d["review"]["next_step"] == "progress" and "key_flags" in d["summary"]
+
+
+class TestReviewFlags:
+    def test_flags_and_settings(self, cli_env, tmp_db):
+        ids = seed_review_history(tmp_db)   # reps 2/10 in the last three sessions -> target rule; 20/10/9-day gaps
+        r = run_cli(cli_env, "review", "flags", "P-017")
+        assert r.returncode == 0 and "target_reps_not_reached" in r.stdout and "practice_gap" in r.stdout
+        assert all(str(i) in r.stdout for i in ids[1:])
+        r = run_cli(cli_env, "review", "flags", "P-017", "--json")
+        assert any(f["rule"] == "target_reps_not_reached" for f in json.loads(r.stdout)["flags"])
+        r = run_cli(cli_env, "review", "settings", "P-017")
+        assert r.returncode == 0 and "Gap threshold: 7 days" in r.stdout
+        r = run_cli(cli_env, "review", "settings", "P-017", "--gap-days", "5")
+        assert r.returncode == 0 and "Gap threshold: 5 days" in r.stdout
+        r = run_cli(cli_env, "review", "settings", "P-017", "--gap-days", "0")
+        assert r.returncode == 1

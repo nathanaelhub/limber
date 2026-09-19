@@ -318,3 +318,18 @@ def review_lines(view: Dict[str, Any]) -> List[str]:
         if bullet.strip():
             lines.append(f"  {bullet.strip()}")
     return lines
+
+
+def flag_lines(result) -> List[str]:
+    """Flags with evidence, then the rules that could not be evaluated yet."""
+    lines: List[str] = []
+    if not result.flags:
+        lines.append("Nothing needs attention.")
+    for f in result.flags:
+        lines.append(f"- [{f.rule}] {f.message}")
+    if result.not_evaluated:
+        lines.append("Not evaluated yet:")
+        for n in result.not_evaluated:
+            where = f" for {n.exercise}" if n.exercise else ""
+            lines.append(f"  - {n.rule}{where} (needs {n.needed} sessions, has {n.have})")
+    return lines

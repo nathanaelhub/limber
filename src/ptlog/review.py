@@ -89,3 +89,21 @@ def session_review_view(store: SessionStore, session_id: int) -> Dict:
 def pending(store: SessionStore, patient_id: str):
     """Sessions of the patient without a review, newest first (FR-011)."""
     return store.pending_reviews(patient_id)
+
+
+# ------------------------------------------------------------------ flags (US3)
+
+def flags_for(store: SessionStore, patient_id: str, period: str = "all", now: Optional[datetime] = None):
+    """Attention flags for a patient over a period, with evidence (FR-014 … FR-016)."""
+    from . import flags as rules
+    now = _now(now)
+    sessions = store.sessions_in_period(patient_id, period_start(period, now))
+    names: List[str] = []
+    for s in sessions:
+        for es in s.sets:
+            if es.exercise_name not in names:
+                names.append(es.exercise_name)
+    series_by_exercise = {name: measure_series(sessions, name) for name in names}
+    goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
+    starts = [(s.id, s.start_time) for s in sessions]
+    return rules.evaluate(series_by_exercise, goals, starts, store.get_gap_days(patient_id), now)

@@ -103,3 +103,13 @@ def test_review_page_session_tab(seeded_env):
     options = [tuple(s.options) for s in at.selectbox]
     assert ("continue", "progress", "regress", "hold") in options
     assert any("REVIEW" in m.value for m in at.markdown)
+
+
+def test_review_page_flags_tab(seeded_env):
+    at = _review_page(seeded_env, "Flags")
+    assert at.warning or at.success
+
+
+def test_review_page_settings_gap_input(seeded_env):
+    at = _review_page(seeded_env, "Goals & settings")
+    assert any("gap" in n.label.lower() for n in at.number_input)

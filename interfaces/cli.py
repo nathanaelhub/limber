@@ -538,8 +538,25 @@ def cmd_review(args):
                               f"{(r.total_reps or 0):>5}  {r.status}")
                     if not rows:
                         print("No sessions pending review.")
+            elif sub == "flags":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                result = review.flags_for(store, args.patient, args.period)
+                if args.json:
+                    print(json.dumps({"flags": [asdict(f) for f in result.flags],
+                                      "not_evaluated": [asdict(n) for n in result.not_evaluated]}, indent=2))
+                else:
+                    print_header(f"Flags: {args.patient} · {views.PERIOD_LABELS[args.period]}")
+                    for line in views.flag_lines(result):
+                        print(line)
+            elif sub == "settings":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                if args.gap_days is not None:
+                    store.set_gap_days(args.patient, args.gap_days)
+                print(f"Gap threshold: {store.get_gap_days(args.patient)} days")
             else:
-                print_error("Usage: review {trends,session,mark,pending}")
+                print_error("Usage: review {trends,session,mark,pending,flags,settings}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -835,6 +852,14 @@ Examples:
     rp = review_sub.add_parser("pending", help="Sessions still waiting for a review")
     rp.add_argument("patient")
     rp.add_argument("--json", action="store_true")
+
+    rf = review_sub.add_parser("flags", help="Patterns that need attention, with evidence")
+    rf.add_argument("patient")
+    rf.add_argument("--period", default="all", choices=["14d", "30d", "90d", "all"])
+    rf.add_argument("--json", action="store_true")
+    rg = review_sub.add_parser("settings", help="Show or set the patient's practice-gap threshold")
+    rg.add_argument("patient")
+    rg.add_argument("--gap-days", type=int, default=None, help="Days without practice that raise a flag (1-90)")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")

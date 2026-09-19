@@ -1130,6 +1130,10 @@ def page_review():
         _review_trends(pid)
     elif section == "Session review":
         _review_session(pid)
+    elif section == "Flags":
+        _review_flags(pid)
+    elif section == "Goals & settings":
+        _review_goals_settings(pid)
     else:
         st.info(f"{section}: coming in this feature.")
 
@@ -1227,6 +1231,38 @@ def _review_session(pid):
                 st.rerun()
             except PTLogError as exc:
                 st.error(str(exc))
+
+
+def _review_flags(pid):
+    period = _period_selector("review_flags_period")
+    with _open_store() as store:
+        result = ptreview.flags_for(store, pid, period)
+    if not result.flags:
+        st.success("Nothing needs attention.")
+    for f in result.flags:
+        st.warning(f"**{f.rule}** — {f.message}")
+    if result.not_evaluated:
+        st.markdown("Not evaluated yet:")
+        for n in result.not_evaluated:
+            where = f" for {n.exercise}" if n.exercise else ""
+            st.info(f"{n.rule}{where}: needs {n.needed} sessions, has {n.have}")
+
+
+def _review_goals_settings(pid):
+    st.markdown("### Practice gap threshold")
+    with _open_store() as store:
+        current = store.get_gap_days(pid)
+    days = st.number_input("Practice gap threshold (days without a session that raises a flag)",
+                           min_value=1, max_value=90, value=int(current), key="review_gap_days")
+    if st.button("Save gap threshold", key="review_gap_save"):
+        try:
+            with _open_store() as store:
+                store.set_gap_days(pid, int(days))
+            st.success(f"Gap threshold: {int(days)} days")
+        except PTLogError as exc:
+            st.error(str(exc))
+    st.markdown("### Goals")
+    st.info("Goals: coming in this feature.")
 
 
 # =============================================================================

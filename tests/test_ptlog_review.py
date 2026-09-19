@@ -277,3 +277,53 @@ class TestReviews:
         store.set_review(sid, "progress", "good session")
         assert review.session_review_view(store, sid)["review"].next_step == "progress"
         assert [r.id for r in review.pending(store, "P-017")] == []
+
+
+# ======================================================================================
+# T028 — flags over the record, gap threshold, performance (User Story 3)
+# ======================================================================================
+
+import time  # noqa: E402
+
+
+class TestFlagsFor:
+    def _seed(self, store, clock, make_session, forms, days=(40, 34, 28, 22), target=2):
+        store.add_patient("P-017")
+        for d, form in zip(days, forms):
+            make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=d), [(form, 80.0, 2.4), (form, 80.0, 2.4)], target_reps=target)
+
+    def test_declining_history_and_gap(self, fixed_store, make_session):
+        store, clock = fixed_store
+        self._seed(store, clock, make_session, [90, 86, 81, 75])
+        result = review.flags_for(store, "P-017", "all", now=D0)
+        assert sorted(f.rule for f in result.flags) == ["form_declining", "practice_gap"]
+        gap = next(f for f in result.flags if f.rule == "practice_gap")
+        assert gap.values["days"] == 22
+        store.set_gap_days("P-017", 30)
+        assert [f.rule for f in review.flags_for(store, "P-017", "all", now=D0).flags] == ["form_declining"]
+
+    def test_clean_history(self, fixed_store, make_session):
+        store, clock = fixed_store
+        self._seed(store, clock, make_session, [85, 86, 88, 90])
+        store.set_gap_days("P-017", 30)
+        result = review.flags_for(store, "P-017", "all", now=D0)
+        assert result.flags == [] and result.not_evaluated == []
+
+    def test_short_history_lists_not_evaluated(self, fixed_store, make_session):
+        store, clock = fixed_store
+        self._seed(store, clock, make_session, [85, 86], days=(3, 1))
+        result = review.flags_for(store, "P-017", "all", now=D0)
+        assert result.flags == []
+        assert {(n.rule, n.needed, n.have) for n in result.not_evaluated} >= {("form_declining", 4, 2), ("target_reps_not_reached", 3, 2)}
+
+    def test_performance_200_sessions(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        store.conn.execute("PRAGMA synchronous=OFF")
+        for i in range(200):
+            make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=200 - i), [(85 + i % 10, 80.0 + i % 5, 2.4)] * 2)
+        for fn in (lambda: review.trend(store, "P-017", "Knee Extension", "all", now=D0),
+                   lambda: review.flags_for(store, "P-017", "all", now=D0),
+                   lambda: review.pending(store, "P-017")):
+            t0 = time.perf_counter(); fn(); elapsed = time.perf_counter() - t0
+            assert elapsed < 2.0, elapsed
