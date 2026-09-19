@@ -508,8 +508,38 @@ def cmd_review(args):
                 else:
                     print_header(f"Trends: {args.patient} · {t.exercise} · {views.PERIOD_LABELS[t.period]}")
                     _print_trend(store, t, args.patient, views)
+            elif sub == "session":
+                view = review.session_review_view(store, args.session_id)
+                if args.json:
+                    print(json.dumps({
+                        "session": {"id": view["session"].id, "patient_id": view["session"].patient_id,
+                                    "status": view["session"].status, "start_time": view["session"].start_time},
+                        "measures": {k: asdict(v) for k, v in view["measures"].items()},
+                        "summary": view["summary"],
+                        "review": asdict(view["review"]) if view["review"] else None}, indent=2, default=str))
+                else:
+                    for line in views.session_header_lines(view["session"]):
+                        print(line)
+                    print()
+                    for line in views.review_lines(view):
+                        print(line)
+            elif sub == "mark":
+                r = store.set_review(args.session_id, args.next_step, args.notes)
+                print_success(f"Reviewed session {r.session_id} (next step: {r.next_step})")
+            elif sub == "pending":
+                rows = review.pending(store, args.patient)
+                if args.json:
+                    print(json.dumps([{"id": r.id, "start_time": r.start_time, "exercises": r.exercises,
+                                       "total_reps": r.total_reps, "status": r.status} for r in rows], indent=2))
+                else:
+                    print(f"{'session':>7}  {'date':<17}{'exercises':<34}{'reps':>5}  status")
+                    for r in rows:
+                        print(f"{r.id:>7}  {views.date_minute(r.start_time):<17}{', '.join(r.exercises)[:34]:<34}"
+                              f"{(r.total_reps or 0):>5}  {r.status}")
+                    if not rows:
+                        print("No sessions pending review.")
             else:
-                print_error("Usage: review {trends}")
+                print_error("Usage: review {trends,session,mark,pending}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -795,6 +825,16 @@ Examples:
     rt.add_argument("--exercise", "-e", required=True, help="Exercise name as recorded")
     rt.add_argument("--period", default="all", choices=["14d", "30d", "90d", "all"])
     rt.add_argument("--json", action="store_true")
+    rs = review_sub.add_parser("session", help="A session's measures, per-session summary, and review")
+    rs.add_argument("session_id", type=int)
+    rs.add_argument("--json", action="store_true")
+    rm = review_sub.add_parser("mark", help="Record the review of a session")
+    rm.add_argument("session_id", type=int)
+    rm.add_argument("--next-step", required=True, choices=["continue", "progress", "regress", "hold"])
+    rm.add_argument("--notes", default=None, help="Clinical notes (no names, dates of birth, or record numbers)")
+    rp = review_sub.add_parser("pending", help="Sessions still waiting for a review")
+    rp.add_argument("patient")
+    rp.add_argument("--json", action="store_true")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")

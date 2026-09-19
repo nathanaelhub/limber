@@ -286,3 +286,35 @@ def trend_summary_lines(trend) -> List[str]:
     if g:
         lines.append(g)
     return lines
+
+
+def measure_line(name: str, m) -> str:
+    return (f"{name}: {fmt_measure('reps_completed', m.reps_completed, m.target_reps)} reps | "
+            f"avg form {fmt_measure('avg_form', m.avg_form)} | avg ROM {fmt_measure('avg_rom', m.avg_rom)} | "
+            f"avg rep {fmt_measure('avg_duration', m.avg_duration)} | tempo sd {fmt_measure('tempo_sd', m.tempo_sd)} | "
+            f"partial {fmt_measure('partial_share', m.partial_share)}")
+
+
+def review_status_line(review) -> str:
+    if review is None:
+        return "REVIEW: pending"
+    return (f"REVIEW: reviewed {date_minute(review.reviewed_at)} | next step: {review.next_step} | "
+            f"notes: {review.notes or ''}")
+
+
+def review_lines(view: Dict[str, Any]) -> List[str]:
+    """Review status, one measure line per exercise, and the per-session summary flags."""
+    lines = [review_status_line(view.get("review"))]
+    for name, m in view["measures"].items():
+        lines.append(measure_line(name, m))
+    summary = view.get("summary") or {}
+    lines.append("Per-session summary:")
+    flags = summary.get("key_flags") or []
+    if not flags:
+        lines.append("- no flags")
+    for f in flags:
+        lines.append(f"- [{f.get('severity', 'info')}] {f.get('message', '')}")
+    for bullet in (summary.get("summary_text") or "").splitlines():
+        if bullet.strip():
+            lines.append(f"  {bullet.strip()}")
+    return lines

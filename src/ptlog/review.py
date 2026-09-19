@@ -67,3 +67,25 @@ def trend(store: SessionStore, patient_id: str, exercise: str, period: str = "al
     t.goal = store.get_goal(patient_id, exercise)
     t.rom_progress_pct = rom_progress(t.goal, points)
     return t
+
+
+# ------------------------------------------------------------------ session reviews (US2)
+
+def session_review_view(store: SessionStore, session_id: int) -> Dict:
+    """Everything the session review shows: session, measures, per-session summary, review."""
+    from src.session_summary import generate_session_summary  # existing single-session analysis, unchanged
+    from .exports.observation_json import to_observation_dict
+    from .measures import measures_for_session
+
+    session = store.load_session(session_id)
+    return {
+        "session": session,
+        "measures": measures_for_session(session),
+        "summary": generate_session_summary(to_observation_dict(session)),
+        "review": store.get_review(session_id),
+    }
+
+
+def pending(store: SessionStore, patient_id: str):
+    """Sessions of the patient without a review, newest first (FR-011)."""
+    return store.pending_reviews(patient_id)

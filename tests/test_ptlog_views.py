@@ -118,3 +118,19 @@ class TestTrendRendering:
         make_session(store, clock, "P-017", "Knee Extension", datetime(2026, 3, 23, 9, 15), [(85, 80.0, 2.4)])
         lines = views.trend_summary_lines(review.trend(store, "P-017", "Knee Extension", "all"))
         assert "A trend needs at least two sessions." in lines
+
+
+class TestReviewLines:
+    def test_pending_and_reviewed(self, fixed_store, make_session):
+        from datetime import datetime
+        from src.ptlog import review
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        sid = make_session(store, clock, "P-017", "Knee Extension", datetime(2026, 3, 23, 9, 15), [(90, 78.0, 3.0)])
+        lines = views.review_lines(review.session_review_view(store, sid))
+        assert lines[0] == "REVIEW: pending"
+        assert any(l.startswith("Knee Extension: 1/10 reps | avg form 90.0/100 | avg ROM 78.0°") for l in lines)
+        clock.set(datetime(2026, 3, 24, 10, 12))
+        store.set_review(sid, "progress", "post-op week 3")
+        lines = views.review_lines(review.session_review_view(store, sid))
+        assert lines[0] == "REVIEW: reviewed 2026-03-24 10:12 | next step: progress | notes: post-op week 3"

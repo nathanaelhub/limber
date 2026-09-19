@@ -70,7 +70,6 @@ def load_observation_log(ref):
         return to_observation_dict(store.load_session(int(str(ref))))
 
 # Import Smart PT Summary generator
-from src.session_summary import generate_session_summary
 
 # Exercise name → config key mapping
 EXERCISE_KEY_MAP = {
@@ -714,369 +713,6 @@ def page_video_analysis():
 
 
 # =============================================================================
-# PAGE: PT SUMMARY (clinical smart summary of a session log)
-# =============================================================================
-
-def page_pt_summary():
-    """Render the Smart PT Summary clinical dashboard."""
-
-    # ── CSS ──────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <style>
-    .pts-header-card {
-        background: linear-gradient(135deg, #0d2137 0%, #102a47 100%);
-        border: 1px solid #1e4a7a;
-        border-radius: 14px;
-        padding: 1.4rem 1.6rem;
-        margin-bottom: 1.2rem;
-    }
-    .pts-metric-row {
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-top: 0.8rem;
-    }
-    .pts-metric-box {
-        background: rgba(255,255,255,0.06);
-        border-radius: 10px;
-        padding: 0.6rem 1rem;
-        min-width: 120px;
-        text-align: center;
-    }
-    .pts-metric-label {
-        font-size: 0.7rem;
-        color: #8aa4c0;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    .pts-metric-value {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #e8f4ff;
-    }
-    .pts-section-title {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #8aa4c0;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin: 1.2rem 0 0.5rem 0;
-    }
-    .rep-table th {
-        background: #1a2a3a !important;
-        color: #8aa4c0 !important;
-        font-size: 0.75rem !important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("## 🩺 PT Summary")
-    st.caption("Clinical smart summary — select a session log and generate an instant report.")
-
-    # ── Session selector ──────────────────────────────────────────────────────
-    log_files = list_observation_logs()
-
-    if not log_files:
-        st.warning("No observation logs found. Run a video or live session analysis first.")
-        return
-
-    # Build display labels: "session_2026-03-23_234320 (2026-03-23)"
-    def _label(f):
-        try:
-            d = load_observation_log(str(f))
-            src = d.get("source", "")
-            ex = d.get("initial_exercise", "")
-            start = d.get("start_time", "")[:16].replace("T", " ")
-            return f"{f.stem}  |  {src}  |  {ex}  |  {start}"
-        except Exception:
-            return f.name
-
-    labels = [_label(f) for f in log_files]
-    file_map = {label: f for label, f in zip(labels, log_files)}
-
-    selected_label = st.selectbox(
-        "Select session log",
-        options=labels,
-        index=0,
-        key="pts_file_select",
-    )
-    selected_file = file_map[selected_label]
-
-    generate_btn = st.button("🔍 Generate PT Summary", type="primary", use_container_width=True)
-
-    if not generate_btn and "pts_summary_data" not in st.session_state:
-        st.info("Select a session log above and click **Generate PT Summary** to begin.")
-        return
-
-    # ── Load & analyse ────────────────────────────────────────────────────────
-    if generate_btn:
-        with st.spinner("Analysing session…"):
-            try:
-                data = load_observation_log(str(selected_file))
-                summary = generate_session_summary(data)
-                st.session_state["pts_summary_data"] = summary
-                st.session_state["pts_log_data"] = data
-                st.session_state["pts_selected_file"] = selected_file.name
-            except Exception as exc:
-                st.error(f"Failed to load or analyse log: {exc}")
-                return
-    else:
-        summary = st.session_state.get("pts_summary_data")
-        data = st.session_state.get("pts_log_data")
-        if not summary or not data:
-            st.info("Select a session log above and click **Generate PT Summary** to begin.")
-            return
-
-    metrics = summary["metrics"]
-    flags = summary["key_flags"]
-
-    # ── Header card ───────────────────────────────────────────────────────────
-    start_raw = metrics.get("start_time", "")
-    start_display = start_raw[:16].replace("T", "  ") if start_raw else "—"
-    source = metrics.get("source", "—").capitalize()
-    dur_sec = metrics.get("session_duration_seconds", 0)
-    dur_min, dur_s = divmod(int(dur_sec), 60)
-    dur_label = f"{dur_min}:{dur_s:02d}" if dur_min else f"{dur_s}s"
-    exercises = metrics.get("exercises_performed", [])
-    ex_label = " → ".join(exercises) if exercises else "—"
-
-    st.markdown(f"""
-    <div class="pts-header-card">
-        <div style="font-size:1.1rem; font-weight:700; color:#e8f4ff; margin-bottom:0.2rem;">
-            📋 Session Report — {st.session_state.get('pts_selected_file', '')}
-        </div>
-        <div style="font-size:0.82rem; color:#8aa4c0;">
-            {start_display} &nbsp;·&nbsp; {source} &nbsp;·&nbsp; {ex_label}
-        </div>
-        <div class="pts-metric-row">
-            <div class="pts-metric-box">
-                <div class="pts-metric-label">Total Reps</div>
-                <div class="pts-metric-value">{metrics.get('total_reps', 0)}</div>
-            </div>
-            <div class="pts-metric-box">
-                <div class="pts-metric-label">Duration</div>
-                <div class="pts-metric-value">{dur_label}</div>
-            </div>
-            <div class="pts-metric-box">
-                <div class="pts-metric-label">Avg Form</div>
-                <div class="pts-metric-value">{metrics.get('avg_form_score', 0):.0f}%</div>
-            </div>
-            <div class="pts-metric-box">
-                <div class="pts-metric-label">Avg ROM</div>
-                <div class="pts-metric-value">{metrics.get('avg_rom', 0):.1f}°</div>
-            </div>
-            <div class="pts-metric-box">
-                <div class="pts-metric-label">Rest Periods</div>
-                <div class="pts-metric-value">{metrics.get('rest_period_count', 0)}</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── Reps per exercise breakdown ───────────────────────────────────────────
-    rpe = metrics.get("reps_per_exercise", {})
-    if rpe:
-        cols = st.columns(len(rpe))
-        for col, (ex, cnt) in zip(cols, rpe.items()):
-            col.metric(ex, f"{cnt} reps")
-
-    st.markdown("---")
-
-    # ── Key Observations ──────────────────────────────────────────────────────
-    st.markdown('<div class="pts-section-title">🔎 Key Observations</div>', unsafe_allow_html=True)
-
-    if not flags:
-        st.success("No significant observations — session within normal parameters.")
-    else:
-        for flag in flags:
-            sev = flag.get("severity", "info")
-            msg = flag.get("message", "")
-            cat = flag.get("category", "")
-            # Skip rest_period flags here — they are minor and clutter the view
-            if cat == "rest_period":
-                continue
-            if sev == "warning":
-                st.warning(msg)
-            elif sev == "success":
-                st.success(msg)
-            elif sev == "error":
-                st.error(msg)
-            else:
-                st.info(msg)
-
-    st.markdown("---")
-
-    # ── Timeline chart: form score over reps ─────────────────────────────────
-    events = data.get("events", [])
-    rep_events = [e for e in events if e.get("type") == "rep"]
-
-    if rep_events:
-        import pandas as pd
-
-        chart_rows = []
-        for i, rep in enumerate(rep_events):
-            chart_rows.append({
-                "Rep #": i + 1,
-                "Exercise": rep.get("exercise", "?"),
-                "Form Score (%)": rep.get("form_score", 0),
-                "ROM (°)": rep.get("rom", 0),
-                "Duration (s)": rep.get("duration_seconds", 0),
-                "rep_number": rep.get("rep_number", i + 1),
-                "timestamp": rep.get("timestamp", ""),
-            })
-        df_chart = pd.DataFrame(chart_rows)
-
-        st.markdown('<div class="pts-section-title">📈 Form Score Timeline</div>', unsafe_allow_html=True)
-
-        try:
-            import plotly.graph_objects as go
-
-            fig = go.Figure()
-
-            # One trace per exercise with distinct colours
-            colours = ["#4fc3f7", "#81c784", "#ffb74d", "#e57373", "#ce93d8"]
-            ex_list = df_chart["Exercise"].unique().tolist()
-            colour_map = {ex: colours[i % len(colours)] for i, ex in enumerate(ex_list)}
-
-            for ex in ex_list:
-                ex_df = df_chart[df_chart["Exercise"] == ex]
-                fig.add_trace(go.Scatter(
-                    x=ex_df["Rep #"],
-                    y=ex_df["Form Score (%)"],
-                    mode="lines+markers",
-                    name=ex,
-                    line=dict(color=colour_map[ex], width=2.5),
-                    marker=dict(size=8, color=colour_map[ex]),
-                    hovertemplate=(
-                        "<b>%{text}</b><br>"
-                        "Rep %{x}<br>"
-                        "Form: %{y:.0f}%<extra></extra>"
-                    ),
-                    text=[ex] * len(ex_df),
-                ))
-
-            # Vertical lines at exercise switches
-            ex_changes = [e for e in events if e.get("type") == "exercise_change"]
-            for chg in ex_changes:
-                # Find the rep index just before this change
-                chg_ts = chg.get("timestamp", "")
-                switch_rep_idx = None
-                for j, row in enumerate(chart_rows):
-                    if row["timestamp"] <= chg_ts:
-                        switch_rep_idx = row["Rep #"]
-                if switch_rep_idx is not None:
-                    fig.add_vline(
-                        x=switch_rep_idx + 0.5,
-                        line_dash="dash",
-                        line_color="#ffb74d",
-                        annotation_text=f"→ {chg.get('to_exercise','?')}",
-                        annotation_font_color="#ffb74d",
-                        annotation_position="top right",
-                    )
-
-            # Threshold line at 80%
-            fig.add_hline(
-                y=80,
-                line_dash="dot",
-                line_color="#e57373",
-                annotation_text="80% threshold",
-                annotation_font_color="#e57373",
-                annotation_position="bottom right",
-            )
-
-            fig.update_layout(
-                plot_bgcolor="#0d1117",
-                paper_bgcolor="#0d1117",
-                font_color="#c9d1d9",
-                xaxis=dict(
-                    title="Rep Number",
-                    gridcolor="#21262d",
-                    tickmode="linear",
-                    tick0=1,
-                    dtick=1,
-                ),
-                yaxis=dict(
-                    title="Form Score (%)",
-                    gridcolor="#21262d",
-                    range=[50, 105],
-                ),
-                legend=dict(
-                    bgcolor="rgba(0,0,0,0)",
-                    bordercolor="#21262d",
-                ),
-                margin=dict(l=40, r=20, t=20, b=40),
-                height=320,
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-
-        except ImportError:
-            # Fallback to Streamlit's built-in line chart if plotly not available
-            st.line_chart(df_chart.set_index("Rep #")[["Form Score (%)"]])
-
-        # ── ROM chart ─────────────────────────────────────────────────────────
-        st.markdown('<div class="pts-section-title">📐 ROM by Rep</div>', unsafe_allow_html=True)
-        try:
-            fig2 = go.Figure()
-            for ex in ex_list:
-                ex_df = df_chart[df_chart["Exercise"] == ex]
-                fig2.add_trace(go.Bar(
-                    x=ex_df["Rep #"],
-                    y=ex_df["ROM (°)"],
-                    name=ex,
-                    marker_color=colour_map[ex],
-                    opacity=0.85,
-                ))
-            avg_rom = metrics.get("avg_rom", 0)
-            fig2.add_hline(
-                y=avg_rom,
-                line_dash="dot",
-                line_color="#ffffff",
-                annotation_text=f"avg {avg_rom:.1f}°",
-                annotation_font_color="#ffffff",
-                annotation_position="top right",
-            )
-            fig2.update_layout(
-                plot_bgcolor="#0d1117",
-                paper_bgcolor="#0d1117",
-                font_color="#c9d1d9",
-                barmode="overlay",
-                xaxis=dict(title="Rep Number", gridcolor="#21262d", tickmode="linear", tick0=1, dtick=1),
-                yaxis=dict(title="ROM (°)", gridcolor="#21262d"),
-                legend=dict(bgcolor="rgba(0,0,0,0)"),
-                margin=dict(l=40, r=20, t=10, b=40),
-                height=260,
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-        except Exception:
-            st.bar_chart(df_chart.set_index("Rep #")[["ROM (°)"]])
-
-        # ── Rep-by-rep table ──────────────────────────────────────────────────
-        st.markdown('<div class="pts-section-title">📋 Rep-by-Rep Breakdown</div>', unsafe_allow_html=True)
-
-        display_df = df_chart[["Rep #", "Exercise", "Form Score (%)", "ROM (°)", "Duration (s)"]].copy()
-
-        def _color_form(val):
-            if val >= 90:
-                return "background-color: #1b3a1b; color: #81c784"
-            elif val >= 80:
-                return "background-color: #1b2d1b; color: #a5d6a7"
-            elif val >= 70:
-                return "background-color: #3a2e10; color: #ffcc80"
-            else:
-                return "background-color: #3a1010; color: #ef9a9a"
-
-        styled = display_df.style.map(_color_form, subset=["Form Score (%)"])
-        st.dataframe(styled, use_container_width=True, hide_index=True)
-
-    # ── Summary text (collapsible) ────────────────────────────────────────────
-    with st.expander("📝 Full Summary Text", expanded=False):
-        st.text(summary.get("summary_text", ""))
-
-
-# =============================================================================
 # PAGE: OBSERVATION LOGS (structured per-rep event logs)
 # =============================================================================
 
@@ -1492,6 +1128,8 @@ def page_review():
     section = st.radio("Section", REVIEW_SECTIONS, horizontal=True, key="review_tab", label_visibility="collapsed")
     if section == "Trends":
         _review_trends(pid)
+    elif section == "Session review":
+        _review_session(pid)
     else:
         st.info(f"{section}: coming in this feature.")
 
@@ -1541,6 +1179,54 @@ def _review_trends(pid):
     st.markdown("### First → latest")
     for line in ptviews.trend_summary_lines(t):
         st.write(line)
+
+
+def _review_session(pid):
+    with _open_store() as store:
+        rows = ptviews.session_table_rows(store, pid)
+    if not rows:
+        st.info(f"No sessions recorded for patient {pid} yet.")
+        return
+    by_id = {r["id"]: r for r in rows}
+    sid = st.selectbox("Session", [r["id"] for r in rows], key="review_session_id",
+                       format_func=lambda i: f"#{i} · {by_id[i]['date']} · {by_id[i]['exercises']} · "
+                                             f"{by_id[i]['total_reps']} reps · {by_id[i]['status']}")
+    with _open_store() as store:
+        view = ptreview.session_review_view(store, sid)
+    st.markdown("  \n".join(ptviews.session_header_lines(view["session"])))
+    st.markdown("### Measures")
+    measure_rows = [{"Exercise": name, ptviews.metric_label("reps_completed"): ptviews.fmt_measure("reps_completed", m.reps_completed, m.target_reps),
+                     ptviews.metric_label("avg_form"): ptviews.fmt_measure("avg_form", m.avg_form),
+                     ptviews.metric_label("avg_rom"): ptviews.fmt_measure("avg_rom", m.avg_rom),
+                     ptviews.metric_label("avg_duration"): ptviews.fmt_measure("avg_duration", m.avg_duration),
+                     ptviews.metric_label("tempo_sd"): ptviews.fmt_measure("tempo_sd", m.tempo_sd),
+                     ptviews.metric_label("partial_share"): ptviews.fmt_measure("partial_share", m.partial_share)}
+                    for name, m in view["measures"].items()]
+    st.dataframe(pd.DataFrame(measure_rows), use_container_width=True, hide_index=True)
+    st.markdown("### Per-session summary")
+    flags = view["summary"].get("key_flags") or []
+    if not flags:
+        st.success("No flags within this session.")
+    for f in flags:
+        text = f"[{f.get('severity', 'info')}] {f.get('message', '')}"
+        (st.warning if str(f.get("severity", "")).lower() in ("warning", "high", "critical", "stop") else st.info)(text)
+    if view["summary"].get("summary_text"):
+        st.text(view["summary"]["summary_text"])
+    review = view["review"]
+    st.markdown("**" + ptviews.review_status_line(review).replace("REVIEW:", "REVIEW:**"))
+    with st.form("review_form"):
+        next_step = st.selectbox("Next step", list(NEXT_STEPS),
+                                 index=list(NEXT_STEPS).index(review.next_step) if review else 0, key="review_next_step")
+        notes = st.text_area("Clinical notes (no names, dates of birth, or record numbers)",
+                             value=(review.notes or "") if review else "", key="review_notes")
+        if st.form_submit_button("Mark reviewed" if review is None else "Update review"):
+            try:
+                with _open_store() as store:
+                    store.set_review(sid, next_step, notes)
+                st.success(f"Reviewed session {sid} (next step: {next_step})")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
 
 
 # =============================================================================
@@ -1785,8 +1471,6 @@ def main():
         page_patients()
     elif page == 'sessions':
         page_sessions()
-    elif page == 'pt_summary':
-        page_pt_summary()
     elif page == 'obs_logs':
         page_observation_logs()
     elif page == 'review':

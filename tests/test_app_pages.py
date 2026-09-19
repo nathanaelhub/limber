@@ -96,3 +96,10 @@ def test_review_page_trends_tab(seeded_env):
     at = _review_page(seeded_env, "Trends")
     frames = at.dataframe
     assert frames and "avg ROM (degrees)" in list(frames[0].value.columns)
+
+
+def test_review_page_session_tab(seeded_env):
+    at = _review_page(seeded_env, "Session review")
+    options = [tuple(s.options) for s in at.selectbox]
+    assert ("continue", "progress", "regress", "hold") in options
+    assert any("REVIEW" in m.value for m in at.markdown)

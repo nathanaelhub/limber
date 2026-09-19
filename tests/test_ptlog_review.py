@@ -216,3 +216,64 @@ class TestTrend:
         assert review.period_start("all", D0) is None
         with pytest.raises(ValueError):
             review.period_start("2w", D0)
+
+
+# ======================================================================================
+# T020 — reviews (User Story 2)
+# ======================================================================================
+
+from src.ptlog.models import SessionNotFoundError  # noqa: E402
+
+
+class TestReviews:
+    def test_set_get_replace(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        sid = make_session(store, clock, "P-017", "Knee Extension", D0, [(90, 78.0, 3.0)])
+        clock.set(D0 + timedelta(days=1))
+        r = store.set_review(sid, "progress", "post-op week 3")
+        assert (r.session_id, r.next_step, r.notes, r.reviewed_at) == (sid, "progress", "post-op week 3", (D0 + timedelta(days=1)).isoformat())
+        assert store.get_review(sid) == r
+        clock.set(D0 + timedelta(days=2))
+        r2 = store.set_review(sid, "hold", "pain reported")
+        assert (r2.next_step, r2.notes, r2.reviewed_at) == ("hold", "pain reported", (D0 + timedelta(days=2)).isoformat())
+        assert store.conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
+
+    def test_validation(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        sid = make_session(store, clock, "P-017", "Knee Extension", D0, [(90, 78.0, 3.0)])
+        with pytest.raises(ReviewValidationError):
+            store.set_review(sid, "stop")
+        with pytest.raises(ReviewValidationError) as exc:
+            store.set_review(sid, "hold", "seen by Jane Doe")
+        assert "name" in str(exc.value) and store.get_review(sid) is None
+        with pytest.raises(SessionNotFoundError):
+            store.set_review(999, "hold")
+        assert store.set_review(sid, "continue").notes is None
+
+    def test_pending_newest_first_and_reassign_and_delete(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017"); store.add_patient("P-018")
+        a = make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=1), [(90, 78.0, 3.0)])
+        b = make_session(store, clock, "P-017", "Knee Extension", D0, [(90, 78.0, 3.0)])
+        assert [r.id for r in store.pending_reviews("P-017")] == [b, a]
+        store.set_review(a, "continue")
+        assert [r.id for r in store.pending_reviews("P-017")] == [b]
+        store.reassign_session(a, "P-018")
+        assert store.get_review(a) is not None and store.pending_reviews("P-018") == []
+        store.delete_patient("P-018")
+        assert store.get_review(a) is None
+
+    def test_session_review_view(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        sid = make_session(store, clock, "P-017", "Knee Extension", D0, [(90, 78.0, 3.0), (88, 77.0, 3.1)])
+        view = review.session_review_view(store, sid)
+        assert view["session"].id == sid and view["review"] is None
+        assert view["measures"]["Knee Extension"].reps_completed == 2
+        assert {"key_flags", "summary_text", "metrics"} <= set(view["summary"])
+        assert view["summary"]["metrics"]["total_reps"] == 2
+        store.set_review(sid, "progress", "good session")
+        assert review.session_review_view(store, sid)["review"].next_step == "progress"
+        assert [r.id for r in review.pending(store, "P-017")] == []

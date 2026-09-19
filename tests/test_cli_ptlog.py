@@ -229,3 +229,27 @@ class TestReviewTrends:
     def test_progress_command_removed(self, cli_env):
         r = run_cli(cli_env, "progress", "--exercise", "Knee Extension")
         assert r.returncode == 2
+
+
+class TestReviewSessions:
+    def test_pending_mark_session(self, cli_env, tmp_db):
+        ids = seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "pending", "P-017")
+        assert r.returncode == 0
+        listed = [line.split()[0] for line in r.stdout.strip().splitlines()[1:]]
+        assert listed == [str(i) for i in reversed(ids)]
+        r = run_cli(cli_env, "review", "mark", str(ids[0]), "--next-step", "progress", "--notes", "post-op week 3")
+        assert r.returncode == 0 and f"Reviewed session {ids[0]} (next step: progress)" in out(r)
+        r = run_cli(cli_env, "review", "mark", str(ids[0]), "--next-step", "hold", "--notes", "seen by Jane Doe")
+        assert r.returncode == 1 and "name" in out(r)
+        r = run_cli(cli_env, "review", "mark", str(ids[0]), "--next-step", "stop")
+        assert r.returncode == 2
+        r = run_cli(cli_env, "review", "session", str(ids[0]))
+        assert r.returncode == 0 and "REVIEW: reviewed" in r.stdout and "post-op week 3" in r.stdout and "Per-session summary" in r.stdout
+        r = run_cli(cli_env, "review", "session", str(ids[1]))
+        assert "REVIEW: pending" in r.stdout
+        r = run_cli(cli_env, "review", "pending", "P-017")
+        assert str(ids[0]) not in [line.split()[0] for line in r.stdout.strip().splitlines()[1:]]
+        r = run_cli(cli_env, "review", "session", str(ids[0]), "--json")
+        d = json.loads(r.stdout)
+        assert d["review"]["next_step"] == "progress" and "key_flags" in d["summary"]
