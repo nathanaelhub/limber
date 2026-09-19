@@ -130,15 +130,15 @@ is created from `main` before T001.
 
 ### Tests for User Story 4 (write first, MUST FAIL)
 
-- [ ] T035 [P] [US4] Add the comparison section to `tests/test_ptlog_review.py`: session A (avg ROM 80, form 85, 8/10, 2.40 s, partial 0%) vs B (92, 88, 10/10, 2.10 s, 10%): rows for `reps_completed, avg_form, avg_rom, avg_duration, tempo_sd, partial_share` with `change` (+2, +3.0, +12.0, −0.30, …, +10.0), `pct_change` for reps/form/rom only (25.0, 3.5, 15.0) and None elsewhere, `better` higher/higher/higher/informational/lower/lower; different exercises → `ComparisonError` mentioning "within one exercise"; two shared exercises without `exercise=` → `ComparisonError` listing them; a zero-rep session gives `a`/`b` None for rep-based measures and `change` None; `pct_change` None when the base is 0
-- [ ] T036 [P] [US4] Extend `tests/test_cli_ptlog.py`: `review compare <a> <b>` prints a table with a `better when` column; different exercises → exit 1; `--json` parses `rows`
-- [ ] T037 [P] [US4] Extend `tests/test_app_pages.py`: the Compare tab renders with two session selectboxes and a comparison dataframe without exception
+- [X] T035 [P] [US4] Add the comparison section to `tests/test_ptlog_review.py`: session A (avg ROM 80, form 85, 8/10, 2.40 s, partial 0%) vs B (92, 88, 10/10, 2.10 s, 10%): rows for `reps_completed, avg_form, avg_rom, avg_duration, tempo_sd, partial_share` with `change` (+2, +3.0, +12.0, −0.30, …, +10.0), `pct_change` for reps/form/rom only (25.0, 3.5, 15.0) and None elsewhere, `better` higher/higher/higher/informational/lower/lower; different exercises → `ComparisonError` mentioning "within one exercise"; two shared exercises without `exercise=` → `ComparisonError` listing them; a zero-rep session gives `a`/`b` None for rep-based measures and `change` None; `pct_change` None when the base is 0
+- [X] T036 [P] [US4] Extend `tests/test_cli_ptlog.py`: `review compare <a> <b>` prints a table with a `better when` column; different exercises → exit 1; `--json` parses `rows`
+- [X] T037 [P] [US4] Extend `tests/test_app_pages.py`: the Compare tab renders with two session selectboxes and a comparison dataframe without exception
 
 ### Implementation for User Story 4
 
-- [ ] T038 [US4] Implement `compare(store, session_a, session_b, exercise=None) -> Comparison` in `src/ptlog/review.py` (depends on T035) with `BETTER = {"reps_completed": "higher", "avg_form": "higher", "avg_rom": "higher", "avg_duration": "informational", "tempo_sd": "lower", "partial_share": "lower"}`; add `views.comparison_rows(comparison)` with unit-formatted cells
-- [ ] T039 [US4] `interfaces/cli.py` (depends on T036, T038): add `review compare`
-- [ ] T040 [US4] `interfaces/app.py` (depends on T037, T038): implement the Compare tab
+- [X] T038 [US4] Implement `compare(store, session_a, session_b, exercise=None) -> Comparison` in `src/ptlog/review.py` (depends on T035) with `BETTER = {"reps_completed": "higher", "avg_form": "higher", "avg_rom": "higher", "avg_duration": "informational", "tempo_sd": "lower", "partial_share": "lower"}`; add `views.comparison_rows(comparison)` with unit-formatted cells
+- [X] T039 [US4] `interfaces/cli.py` (depends on T036, T038): add `review compare`
+- [X] T040 [US4] `interfaces/app.py` (depends on T037, T038): implement the Compare tab
 
 **Checkpoint**: comparisons available
 

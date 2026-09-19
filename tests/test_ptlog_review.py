@@ -327,3 +327,60 @@ class TestFlagsFor:
                    lambda: review.pending(store, "P-017")):
             t0 = time.perf_counter(); fn(); elapsed = time.perf_counter() - t0
             assert elapsed < 2.0, elapsed
+
+
+# ======================================================================================
+# T035 — comparison (User Story 4)
+# ======================================================================================
+
+class TestCompare:
+    def _pair(self, store, clock, make_session):
+        store.add_patient("P-017")
+        a = make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=7), [(85, 80.0, 2.4)] * 8)
+        b = make_session(store, clock, "P-017", "Knee Extension", D0, [(88, 92.0, 2.1)] * 9, partials=1)
+        return a, b
+
+    def test_rows_changes_and_direction(self, fixed_store, make_session):
+        store, clock = fixed_store
+        a, b = self._pair(store, clock, make_session)
+        c = review.compare(store, a, b)
+        assert c.exercise == "Knee Extension" and c.a.session_id == a and c.b.session_id == b
+        rows = {r.name: r for r in c.rows}
+        assert (rows["reps_completed"].a, rows["reps_completed"].b, rows["reps_completed"].change, rows["reps_completed"].pct_change) == (8, 9, 1, 12.5)
+        assert (rows["avg_form"].change, rows["avg_form"].pct_change) == (3.0, 3.5)
+        assert (rows["avg_rom"].change, rows["avg_rom"].pct_change) == (12.0, 15.0)
+        assert rows["avg_duration"].change == -0.3 and rows["avg_duration"].pct_change is None
+        assert rows["tempo_sd"].change == 0.0
+        assert rows["partial_share"].change == 10.0 and rows["partial_share"].pct_change is None
+        assert {r.name: r.better for r in c.rows} == {
+            "reps_completed": "higher", "avg_form": "higher", "avg_rom": "higher",
+            "avg_duration": "informational", "tempo_sd": "lower", "partial_share": "lower"}
+        assert rows["avg_rom"].unit == "degrees"
+
+    def test_refuses_different_or_ambiguous_exercises(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        a = make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=1), [(85, 80.0, 2.4)])
+        b = make_session(store, clock, "P-017", "Squat", D0, [(88, 92.0, 2.1)])
+        with pytest.raises(ComparisonError) as exc:
+            review.compare(store, a, b)
+        assert "within one exercise" in str(exc.value)
+        c = make_session(store, clock, "P-017", "Knee Extension", D0 + timedelta(days=1), [(90, 85.0, 2.2)],
+                         extra_sets=[{"exercise": "Squat", "reps": [(80, 90.0, 2.5)]}])
+        d = make_session(store, clock, "P-017", "Knee Extension", D0 + timedelta(days=2), [(91, 86.0, 2.2)],
+                         extra_sets=[{"exercise": "Squat", "reps": [(81, 91.0, 2.5)]}])
+        with pytest.raises(ComparisonError) as exc:
+            review.compare(store, c, d)
+        assert "Knee Extension" in str(exc.value) and "Squat" in str(exc.value)
+        assert review.compare(store, c, d, exercise="Squat").exercise == "Squat"
+        with pytest.raises(ComparisonError):
+            review.compare(store, c, d, exercise="Push-Up")
+
+    def test_zero_rep_session_gives_not_available(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        a = make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=1), [])
+        b = make_session(store, clock, "P-017", "Knee Extension", D0, [(88, 92.0, 2.1)])
+        rows = {r.name: r for r in review.compare(store, a, b).rows}
+        assert rows["avg_rom"].a is None and rows["avg_rom"].change is None and rows["avg_rom"].pct_change is None
+        assert rows["reps_completed"].a == 0 and rows["reps_completed"].change == 1 and rows["reps_completed"].pct_change is None

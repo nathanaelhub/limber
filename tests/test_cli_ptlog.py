@@ -269,3 +269,15 @@ class TestReviewFlags:
         assert r.returncode == 0 and "Gap threshold: 5 days" in r.stdout
         r = run_cli(cli_env, "review", "settings", "P-017", "--gap-days", "0")
         assert r.returncode == 1
+
+
+class TestReviewCompare:
+    def test_compare_table_and_refusal(self, cli_env, tmp_db):
+        ids = seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "compare", str(ids[0]), str(ids[-1]))
+        assert r.returncode == 0 and "better when" in r.stdout and "avg ROM" in r.stdout and "+12.0°" in r.stdout
+        r = run_cli(cli_env, "review", "compare", str(ids[0]), str(ids[-1]), "--json")
+        rows = json.loads(r.stdout)["rows"]
+        assert any(row["name"] == "avg_rom" and row["change"] == 12.0 for row in rows)
+        r = run_cli(cli_env, "review", "compare", str(ids[0]), "999")
+        assert r.returncode == 1

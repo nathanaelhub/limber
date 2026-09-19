@@ -1132,6 +1132,8 @@ def page_review():
         _review_session(pid)
     elif section == "Flags":
         _review_flags(pid)
+    elif section == "Compare":
+        _review_compare(pid)
     elif section == "Goals & settings":
         _review_goals_settings(pid)
     else:
@@ -1246,6 +1248,37 @@ def _review_flags(pid):
         for n in result.not_evaluated:
             where = f" for {n.exercise}" if n.exercise else ""
             st.info(f"{n.rule}{where}: needs {n.needed} sessions, has {n.have}")
+
+
+def _review_compare(pid):
+    with _open_store() as store:
+        rows = ptviews.session_table_rows(store, pid)
+    if len(rows) < 2:
+        st.info("Two recorded sessions are needed for a comparison.")
+        return
+    by_id = {r["id"]: r for r in rows}
+    ids = [r["id"] for r in rows]
+    label = lambda i: f"#{i} · {by_id[i]['date']} · {by_id[i]['exercises']} · {by_id[i]['total_reps']} reps"
+    c1, c2 = st.columns(2)
+    with c1:
+        a = st.selectbox("Session A (earlier)", ids, index=min(1, len(ids) - 1), key="review_compare_a", format_func=label)
+    with c2:
+        b = st.selectbox("Session B (later)", ids, index=0, key="review_compare_b", format_func=label)
+    shared = [x for x in by_id[a]["exercises"].split(", ") if x in by_id[b]["exercises"].split(", ")]
+    exercise = None
+    if len(shared) > 1:
+        exercise = st.selectbox("Exercise", shared, key="review_compare_exercise")
+    try:
+        with _open_store() as store:
+            comp = ptreview.compare(store, a, b, exercise)
+    except PTLogError as exc:
+        st.error(str(exc))
+        return
+    st.markdown(f"**{comp.exercise}** — session {a} → session {b}")
+    table = pd.DataFrame(ptviews.comparison_rows(comp)).rename(columns={
+        "measure": "Measure", "a": f"Session {a}", "b": f"Session {b}", "change": "Change",
+        "pct_change": "% change", "better": "Better when"})
+    st.dataframe(table, use_container_width=True, hide_index=True)
 
 
 def _review_goals_settings(pid):

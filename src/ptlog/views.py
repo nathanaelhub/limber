@@ -333,3 +333,23 @@ def flag_lines(result) -> List[str]:
             where = f" for {n.exercise}" if n.exercise else ""
             lines.append(f"  - {n.rule}{where} (needs {n.needed} sessions, has {n.have})")
     return lines
+
+
+BETTER_TEXT = {"higher": "higher is better", "lower": "lower is better", "informational": "informational"}
+
+
+def comparison_rows(comparison) -> List[Dict[str, Any]]:
+    """One dict per measure with unit-formatted values, change, % change, and the better direction."""
+    rows = []
+    for r in comparison.rows:
+        ta = comparison.a.target_reps if r.name == "reps_completed" else None
+        tb = comparison.b.target_reps if r.name == "reps_completed" else None
+        rows.append({
+            "measure": metric_label(r.name),
+            "a": fmt_measure(r.name, r.a, ta),
+            "b": fmt_measure(r.name, r.b, tb),
+            "change": fmt_change(r.name, r.change),
+            "pct_change": NOT_AVAILABLE if r.pct_change is None else f"{r.pct_change:+.1f}%",
+            "better": BETTER_TEXT[r.better],
+        })
+    return rows

@@ -555,8 +555,19 @@ def cmd_review(args):
                 if args.gap_days is not None:
                     store.set_gap_days(args.patient, args.gap_days)
                 print(f"Gap threshold: {store.get_gap_days(args.patient)} days")
+            elif sub == "compare":
+                comp = review.compare(store, args.session_a, args.session_b, args.exercise)
+                if args.json:
+                    print(json.dumps({"exercise": comp.exercise, "a": comp.a.session_id, "b": comp.b.session_id,
+                                      "rows": [asdict(r) for r in comp.rows]}, indent=2))
+                else:
+                    print_header(f"Compare: {comp.exercise} · session {comp.a.session_id} → session {comp.b.session_id}")
+                    print(f"{'measure':<32}{'session ' + str(comp.a.session_id):<18}{'session ' + str(comp.b.session_id):<18}"
+                          f"{'change':<14}{'% change':<12}better when")
+                    for r in views.comparison_rows(comp):
+                        print(f"{r['measure']:<32}{r['a']:<18}{r['b']:<18}{r['change']:<14}{r['pct_change']:<12}{r['better']}")
             else:
-                print_error("Usage: review {trends,session,mark,pending,flags,settings}")
+                print_error("Usage: review {trends,session,mark,pending,flags,settings,compare}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -860,6 +871,12 @@ Examples:
     rg = review_sub.add_parser("settings", help="Show or set the patient's practice-gap threshold")
     rg.add_argument("patient")
     rg.add_argument("--gap-days", type=int, default=None, help="Days without practice that raise a flag (1-90)")
+
+    rc = review_sub.add_parser("compare", help="Compare two sessions of one exercise side by side")
+    rc.add_argument("session_a", type=int)
+    rc.add_argument("session_b", type=int)
+    rc.add_argument("--exercise", "-e", default=None, help="Needed when the sessions share several exercises")
+    rc.add_argument("--json", action="store_true")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")

@@ -113,3 +113,10 @@ def test_review_page_flags_tab(seeded_env):
 def test_review_page_settings_gap_input(seeded_env):
     at = _review_page(seeded_env, "Goals & settings")
     assert any("gap" in n.label.lower() for n in at.number_input)
+
+
+def test_review_page_compare_tab(seeded_env):
+    at = _review_page(seeded_env, "Compare")
+    session_selects = [s for s in at.selectbox if s.label.lower().startswith("session")]
+    assert len(session_selects) >= 2
+    assert at.dataframe

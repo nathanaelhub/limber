@@ -107,3 +107,44 @@ def flags_for(store: SessionStore, patient_id: str, period: str = "all", now: Op
     goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
     starts = [(s.id, s.start_time) for s in sessions]
     return rules.evaluate(series_by_exercise, goals, starts, store.get_gap_days(patient_id), now)
+
+
+# ------------------------------------------------------------------ comparison (US4)
+
+BETTER = {"reps_completed": "higher", "avg_form": "higher", "avg_rom": "higher",
+          "avg_duration": "informational", "tempo_sd": "lower", "partial_share": "lower"}
+PCT_MEASURES = ("reps_completed", "avg_form", "avg_rom")
+
+
+def compare(store: SessionStore, session_a: int, session_b: int, exercise: Optional[str] = None):
+    """Side-by-side measures of two sessions of one exercise (FR-017, FR-018)."""
+    from .measures import measures_for_session
+    from .models import METRIC_DEFINITIONS, Comparison, ComparisonError, ComparisonRow
+
+    ma = measures_for_session(store.load_session(session_a))
+    mb = measures_for_session(store.load_session(session_b))
+    common = [name for name in ma if name in mb]
+    if exercise is None:
+        if len(common) == 1:
+            exercise = common[0]
+        elif not common:
+            raise ComparisonError(
+                f"Comparisons are within one exercise; sessions {session_a} ({', '.join(ma) or 'none'}) and "
+                f"{session_b} ({', '.join(mb) or 'none'}) share no exercise.")
+        else:
+            raise ComparisonError(
+                f"Sessions {session_a} and {session_b} share several exercises ({', '.join(common)}); name one to compare.")
+    elif exercise not in common:
+        raise ComparisonError(
+            f"Comparisons are within one exercise; '{exercise}' is not recorded in both sessions "
+            f"(shared: {', '.join(common) or 'none'}).")
+    a, b = ma[exercise], mb[exercise]
+    rows = []
+    for name in MEASURES:
+        va, vb = getattr(a, name), getattr(b, name)
+        change = _change(name, va, vb)
+        pct = None
+        if name in PCT_MEASURES and va is not None and vb is not None and va != 0:
+            pct = round((vb - va) / va * 100, 1)
+        rows.append(ComparisonRow(name, METRIC_DEFINITIONS[name]["unit"], va, vb, change, pct, BETTER[name]))
+    return Comparison(exercise=exercise, a=a, b=b, rows=rows)
