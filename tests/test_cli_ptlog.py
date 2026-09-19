@@ -7,6 +7,7 @@ None of these commands load the pose model.
 import json
 import subprocess
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -177,3 +178,54 @@ class TestImportLegacyCommand:
         assert "imported 4" in r.stdout and "duplicate 1" in r.stdout and "malformed 1" in r.stdout
         r = run_cli(cli_env, *args)
         assert r.stdout.count("duplicate (already imported)") == 5 and "imported 0" in r.stdout
+
+
+def seed_review_history(tmp_db, patient="P-017"):
+    """Four Knee Extension sessions (40, 20, 10, 1 days ago) written in-process with the real clock offsets."""
+    from src.ptlog.store import SessionStore
+    from src.ptlog.models import ExerciseSetInfo, RepEvent
+    from tests.fixtures.golden.sequence import FixedClock
+    values = [(85, 80.0, 2.4), (86, 84.0, 2.3), (88, 88.0, 2.2), (90, 92.0, 2.1)]
+    clock = FixedClock(datetime.now())
+    ids = []
+    with SessionStore(tmp_db, clock=clock).open() as s:
+        if s.get_patient(patient) is None:
+            s.add_patient(patient)
+        for days, (form, rom, dur) in zip((40, 20, 10, 1), values):
+            start = datetime.now() - timedelta(days=days)
+            clock.set(start)
+            sid = s.start_session(patient, "video", "clip.mp4")
+            set_id = s.open_set(sid, ExerciseSetInfo("knee_extension", "Knee Extension", "left", 10, 170.0, 90.0))
+            for n in range(1, 3):
+                s.add_rep(set_id, RepEvent(n, 10.0, 10.0 + rom, rom, dur, form, (start + timedelta(seconds=5 * n)).isoformat(), 60 * n))
+            clock.set(start + timedelta(seconds=30))
+            s.end_session(sid)
+            ids.append(sid)
+    return ids
+
+
+class TestReviewTrends:
+    def test_trends_table_and_summary(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "trends", "P-017", "--exercise", "Knee Extension", "--period", "all")
+        assert r.returncode == 0, out(r)
+        assert "avg ROM (°)" in r.stdout and "tempo sd (s)" in r.stdout
+        assert r.stdout.count("completed") == 4
+        assert "avg ROM: 80.0° → 92.0° (+12.0°)" in r.stdout
+        r = run_cli(cli_env, "review", "trends", "P-017", "--exercise", "Knee Extension", "--period", "14d")
+        assert r.stdout.count("completed") == 2
+
+    def test_trends_json(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "trends", "P-017", "--exercise", "Knee Extension", "--json")
+        d = json.loads(r.stdout)
+        assert len(d["points"]) == 4 and d["summary"]["avg_rom"]["change"] == 12.0
+
+    def test_unknown_exercise_lists_available(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "trends", "P-017", "--exercise", "Squat")
+        assert r.returncode == 1 and "Knee Extension" in out(r)
+
+    def test_progress_command_removed(self, cli_env):
+        r = run_cli(cli_env, "progress", "--exercise", "Knee Extension")
+        assert r.returncode == 2

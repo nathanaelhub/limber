@@ -82,23 +82,39 @@ class TestHeaderAndTable:
         assert METRIC_DEFINITIONS[field]["unit"] in label
 
 
-class TestTrendLoader:
-    def test_builds_session_data_for_legacy_trend_math(self, store):
-        from src.session_tracker import SessionTracker
+class TestTrendRendering:
+    def _trend(self, store, clock, make_session, goal=False):
+        from datetime import datetime, timedelta
+        from src.ptlog import review
+        d0 = datetime(2026, 3, 23, 9, 15, 0)
         store.add_patient("P-017")
-        sid = seed(store, "P-017")
-        store.end_session(sid)
-        history = views.load_session_data_for_trends(store, "P-017")
-        assert len(history) == 1
-        sd = history[0]
-        assert sd.patient_id == "P-017" and sd.date == "2026-03-23" and sd.session_id == "P-017_20260323_091500"
-        assert [e.exercise_name for e in sd.exercises] == ["Knee Extension", "Squat"]
-        knee = sd.exercises[0]
-        assert (knee.reps_completed, knee.target_reps, knee.avg_form_score, knee.min_rom, knee.max_rom, knee.rom_range, knee.avg_rep_duration) == \
-               (1, 10, 95.0, 10.2, 88.6, 78.4, 3.1)
-        assert "Knee Extension: Completed only 1/10 reps" in sd.flags_for_review
-        assert sd.overall_form_score == 91.5
-        # the legacy trend math consumes it unchanged (two sessions needed for a trend)
-        tracker = SessionTracker.__new__(SessionTracker)
-        tracker.session_history = history + history
-        assert tracker.calculate_progress("Knee Extension", days_back=36500) is not None
+        make_session(store, clock, "P-017", "Knee Extension", d0 - timedelta(days=10), [(85, 80.0, 2.4), (85, 80.0, 2.4)], target_reps=10)
+        make_session(store, clock, "P-017", "Knee Extension", d0, [(88, 92.0, 2.1), (88, 92.0, 2.1)], target_reps=10)
+        if goal:
+            store.set_goal("P-017", "Knee Extension", target_rom=120, target_reps=10)
+        return review.trend(store, "P-017", "Knee Extension", "all", now=d0)
+
+    def test_table_rows_carry_units(self, fixed_store, make_session):
+        store, clock = fixed_store
+        rows = views.trend_table_rows(self._trend(store, clock, make_session))
+        assert rows[0]["date"] == "2026-03-13 09:15" and rows[0]["reps"] == "2/10"
+        assert rows[0]["avg_form"] == "85.0/100" and rows[0]["avg_rom"] == "80.0°"
+        assert rows[0]["avg_duration"] == "2.40 s" and rows[0]["tempo_sd"] == "0.00 s"
+        assert rows[0]["partial_share"] == "0.0%" and rows[0]["status"] == "completed"
+        assert views.fmt_measure("avg_rom", None) == "not available"
+
+    def test_summary_lines(self, fixed_store, make_session):
+        store, clock = fixed_store
+        lines = views.trend_summary_lines(self._trend(store, clock, make_session, goal=True))
+        assert "avg ROM: 80.0° → 92.0° (+12.0°)" in lines
+        assert "avg form: 85.0/100 → 88.0/100 (+3.0)" in lines
+        assert "Goal: ROM 120° (77% of goal) | reps 10" in lines
+
+    def test_single_session_message(self, fixed_store, make_session):
+        from datetime import datetime
+        from src.ptlog import review
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        make_session(store, clock, "P-017", "Knee Extension", datetime(2026, 3, 23, 9, 15), [(85, 80.0, 2.4)])
+        lines = views.trend_summary_lines(review.trend(store, "P-017", "Knee Extension", "all"))
+        assert "A trend needs at least two sessions." in lines

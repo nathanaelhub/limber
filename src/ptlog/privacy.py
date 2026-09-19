@@ -55,3 +55,17 @@ def validate_label(value: Optional[str]) -> Optional[str]:
         raise PatientValidationError(f"Label must be at most {LABEL_MAX} characters")
     _check_phi(value, "Label")
     return value
+
+
+def validate_notes(value: Optional[str]) -> Optional[str]:
+    """Return normalized clinical notes (None when empty) or raise on identifying text.
+
+    Same three patterns as labels; no length cap, since chart notes can be long.
+    """
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    _check_phi(value, "Notes")
+    return value

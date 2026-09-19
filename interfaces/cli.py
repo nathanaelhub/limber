@@ -13,7 +13,7 @@ Commands:
     list        List available exercises
     export      Export a session in a legacy file format
     import-legacy  Import pre-existing session files once
-    progress    Show progress charts for an exercise
+    review      Trends, flags, comparisons, session reviews, goals, and review exports
     calibrate   Help set up optimal camera positioning
 
 Usage Examples:
@@ -22,7 +22,7 @@ Usage Examples:
     python cli.py patients add P-017 --label "Post-op knee"
     python cli.py sessions list --patient P-017
     python cli.py list-exercises
-    python cli.py progress --exercise "Knee Extension" --days 30
+    python cli.py review trends P-017 --exercise "Knee Extension"
 
 Author: AI PT Assistant
 """
@@ -326,63 +326,6 @@ def cmd_list_exercises(args):
         return 1
 
 
-def cmd_progress(args):
-    """Handle the progress command."""
-    print_header(f"Progress Report: {args.exercise}")
-
-    try:
-        from src.session_tracker import SessionTracker
-        from src.ptlog import views
-        patient_id = args.patient or "unassigned"
-        with SessionStore(default_db_path()).open() as store:
-            history = views.load_session_data_for_trends(store, patient_id)
-        tracker = SessionTracker.from_history(history, patient_id)
-        progress = tracker.calculate_progress(args.exercise, days_back=args.days)
-
-        if progress is None:
-            print_warning(f"Insufficient data for {args.exercise}")
-            print_info("Need at least 2 sessions to calculate progress")
-            return 0
-
-        print(f"  Sessions Analyzed: {progress.sessions_count}")
-        print(f"  Time Period: Last {args.days} days")
-        print()
-
-        # ROM Progress
-        rom_color = Colors.GREEN if progress.rom_trend == "improving" else (
-            Colors.RED if progress.rom_trend == "declining" else Colors.YELLOW
-        )
-        print(f"  Range of Motion: {color_text(progress.rom_trend.upper(), rom_color)}")
-        print(f"    Change: {progress.rom_change_percent:+.1f}%")
-        if progress.rom_values:
-            print(f"    Current: {progress.rom_values[-1]:.1f}°")
-        print()
-
-        # Form Progress
-        form_color = Colors.GREEN if progress.form_score_trend == "improving" else (
-            Colors.RED if progress.form_score_trend == "declining" else Colors.YELLOW
-        )
-        print(f"  Form Score: {color_text(progress.form_score_trend.upper(), form_color)}")
-        print(f"    Change: {progress.form_score_change:+.1f}%")
-        if progress.form_scores:
-            print(f"    Current: {progress.form_scores[-1]:.1f}%")
-
-        # Generate chart if requested
-        if args.chart:
-            print()
-            print_info("Generating progress chart...")
-            chart_path = f"progress_{args.exercise.lower().replace(' ', '_')}.png"
-            tracker.plot_progress(args.exercise, save_path=chart_path)
-            if os.path.exists(chart_path):
-                print_success(f"Chart saved: {chart_path}")
-
-        return 0
-
-    except Exception as e:
-        print_error(f"Could not generate progress report: {e}")
-        return 1
-
-
 def _patient_dict(p) -> dict:
     return {"id": p.id, "label": p.label, "notes": p.notes, "created_at": p.created_at,
             "is_builtin": p.is_builtin, "session_count": p.session_count,
@@ -525,6 +468,55 @@ def cmd_import_legacy(args):
         return 0
     except (OSError, sqlite3.OperationalError) as e:
         print_error(f"Import failed: {e}")
+        return 2
+
+
+def _print_trend(store, trend, patient_id, views):
+    print(f"{'date':<17}{'session':>8}  {'reps/target':<12}{'avg form (0-100)':<18}{'avg ROM (°)':<13}"
+          f"{'avg rep (s)':<13}{'tempo sd (s)':<14}{'partial (%)':<13}status")
+    for r in views.trend_table_rows(trend):
+        print(f"{r['date']:<17}{r['session_id']:>8}  {r['reps']:<12}{r['avg_form']:<18}{r['avg_rom']:<13}"
+              f"{r['avg_duration']:<13}{r['tempo_sd']:<14}{r['partial_share']:<13}{r['status']}")
+    print()
+    print("change first→latest:" if trend.enough_for_trend else "")
+    for line in views.trend_summary_lines(trend):
+        print(f"  {line}")
+
+
+def cmd_review(args):
+    """Handle the review command group."""
+    from dataclasses import asdict
+    from src.ptlog import review, views
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            sub = args.review_cmd
+            if sub == "trends":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                t = review.trend(store, args.patient, args.exercise, args.period)
+                if not t.points:
+                    names = review.exercise_names(store, args.patient)
+                    print_error(f"No sessions of '{args.exercise}' for {args.patient}. Recorded exercises: "
+                                f"{', '.join(names) if names else 'none'}")
+                    return 1
+                if args.json:
+                    print(json.dumps({"exercise": t.exercise, "period": t.period,
+                                      "points": [asdict(p) for p in t.points], "summary": t.summary,
+                                      "goal": asdict(t.goal) if t.goal else None,
+                                      "rom_progress_pct": t.rom_progress_pct,
+                                      "enough_for_trend": t.enough_for_trend}, indent=2))
+                else:
+                    print_header(f"Trends: {args.patient} · {t.exercise} · {views.PERIOD_LABELS[t.period]}")
+                    _print_trend(store, t, args.patient, views)
+            else:
+                print_error("Usage: review {trends}")
+                return 1
+        return 0
+    except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
+        print_error(str(e))
+        return 1
+    except sqlite3.OperationalError as e:
+        print_error(f"Database error: {e}")
         return 2
 
 
@@ -716,7 +708,7 @@ Examples:
   %(prog)s sessions list --patient P-017
   %(prog)s sessions show 3
   %(prog)s list-exercises --verbose
-  %(prog)s progress --exercise "Knee Extension" --days 30 --chart
+  %(prog)s review trends P-017 --exercise "Knee Extension" --period 30d
   %(prog)s calibrate
   %(prog)s interactive
         """
@@ -751,16 +743,6 @@ Examples:
     list_parser = subparsers.add_parser("list-exercises", help="List available exercises")
     list_parser.add_argument("--verbose", "-v", action="store_true",
                              help="Show keypoint reference")
-
-    # Progress command
-    progress_parser = subparsers.add_parser("progress", help="Show progress report")
-    progress_parser.add_argument("--exercise", "-e", required=True,
-                                 help="Exercise name")
-    progress_parser.add_argument("--days", "-d", type=int, default=30,
-                                 help="Days of history to analyze")
-    progress_parser.add_argument("--chart", "-c", action="store_true",
-                                 help="Generate progress chart")
-    progress_parser.add_argument("--patient", "-p", help="Patient ID")
 
     # Patients command group
     patients_parser = subparsers.add_parser("patients", help="Manage pseudonymous patients")
@@ -805,6 +787,15 @@ Examples:
     import_parser.add_argument("--obs-dir", default="observation_logs", help="Folder of legacy observation logs")
     import_parser.add_argument("--dry-run", action="store_true", help="Report what would be imported without writing")
 
+    # Review command group
+    review_parser = subparsers.add_parser("review", help="Review a patient's sessions over time")
+    review_sub = review_parser.add_subparsers(dest="review_cmd")
+    rt = review_sub.add_parser("trends", help="Per-session measures for one exercise over a period")
+    rt.add_argument("patient")
+    rt.add_argument("--exercise", "-e", required=True, help="Exercise name as recorded")
+    rt.add_argument("--period", default="all", choices=["14d", "30d", "90d", "all"])
+    rt.add_argument("--json", action="store_true")
+
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")
     calibrate_parser.add_argument("--camera", "-c", type=int, default=0,
@@ -822,8 +813,6 @@ Examples:
         return cmd_webcam(args)
     elif args.command == "list-exercises":
         return cmd_list_exercises(args)
-    elif args.command == "progress":
-        return cmd_progress(args)
     elif args.command == "patients":
         return cmd_patients(args)
     elif args.command == "sessions":
@@ -832,6 +821,8 @@ Examples:
         return cmd_export(args)
     elif args.command == "import-legacy":
         return cmd_import_legacy(args)
+    elif args.command == "review":
+        return cmd_review(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":

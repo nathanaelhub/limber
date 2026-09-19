@@ -2,8 +2,7 @@
 Presentation helpers shared by the CLI and the web app.
 
 Every number shown to a clinician carries its unit (constitution V, FR-012). Interface
-files call these functions and only render what they return. This module also feeds the
-legacy trend math in src/session_tracker.py from the canonical record (research D13).
+files call these functions and only render what they return.
 """
 
 from __future__ import annotations
@@ -153,47 +152,6 @@ def session_table_rows(store: SessionStore, patient_id: Optional[str] = None) ->
     ]
 
 
-# ------------------------------------------------------------------ legacy trend math bridge
-
-def load_session_data_for_trends(store: SessionStore, patient_id: str) -> list:
-    """Build the SessionData/ExerciseRecord objects src.session_tracker's trend math expects."""
-    from src.session_tracker import ExerciseRecord, SessionData  # local import keeps ptlog free of matplotlib
-
-    history = []
-    for row in reversed(store.list_sessions(patient_id)):   # oldest first, as the tracker's history was
-        session = store.load_session(row.id)
-        start = datetime.fromisoformat(session.start_time)
-        end = datetime.fromisoformat(session.end_time) if session.end_time else start
-        records = []
-        for es in session.sets:
-            st = set_summary(es)
-            records.append(ExerciseRecord(
-                exercise_name=es.exercise_name,
-                reps_completed=st["reps"],
-                target_reps=st["target_reps"],
-                avg_form_score=round(st["avg_form_score"], 1),
-                min_rom=round(st["min_angle"], 1),
-                max_rom=round(st["max_angle"], 1),
-                rom_range=round(st["rom_range"], 1),
-                avg_rep_duration=round(st["avg_duration"], 2),
-                form_warnings=[f.message for f in es.form_events],
-            ))
-        overall = round(sum(r.avg_form_score for r in records) / len(records), 1) if records else 0.0
-        history.append(SessionData(
-            session_id=f"{session.patient_id}_{start.strftime('%Y%m%d_%H%M%S')}",
-            patient_id=session.patient_id,
-            date=start.strftime("%Y-%m-%d"),
-            start_time=start.strftime("%H:%M:%S"),
-            end_time=end.strftime("%H:%M:%S"),
-            duration_minutes=(end - start).total_seconds() / 60,
-            exercises=records,
-            overall_form_score=overall,
-            flags_for_review=legacy_flags(session),
-            metadata={"canonical_session_id": session.id, "source": session.source, "status": session.status},
-        ))
-    return history
-
-
 # ------------------------------------------------------------------ web-app adapters
 
 from dataclasses import dataclass  # noqa: E402
@@ -233,3 +191,98 @@ def observation_dict(store: SessionStore, session_id: int) -> Dict[str, Any]:
     """The legacy observation-log dict for a session (feeds session_summary and the pages)."""
     from .exports.observation_json import to_observation_dict  # local import avoids a module cycle
     return to_observation_dict(store.load_session(session_id))
+
+
+# ------------------------------------------------------------------ review over time (feature 002)
+
+MEASURE_ORDER = ("reps_completed", "avg_form", "avg_rom", "avg_duration", "tempo_sd", "partial_share")
+MEASURE_SHORT = {"reps_completed": "reps", "avg_form": "avg form", "avg_rom": "avg ROM",
+                 "avg_duration": "avg rep", "tempo_sd": "tempo sd", "partial_share": "partial"}
+PERIOD_LABELS = {"14d": "last 2 weeks", "30d": "last month", "90d": "last 3 months", "all": "all time"}
+
+
+def fmt_measure(name: str, value, target=None) -> str:
+    """Format one measure with its unit; None becomes 'not available'."""
+    if value is None:
+        return NOT_AVAILABLE
+    if name == "reps_completed":
+        return f"{int(value)}/{int(target)}" if target is not None else str(int(value))
+    if name == "avg_form":
+        return f"{value:.1f}/100"
+    if name == "avg_rom":
+        return f"{value:.1f}°"
+    if name in ("avg_duration", "tempo_sd"):
+        return f"{value:.2f} s"
+    if name == "partial_share":
+        return f"{value:.1f}%"
+    return str(value)
+
+
+def fmt_change(name: str, change) -> str:
+    if change is None:
+        return NOT_AVAILABLE
+    if name == "reps_completed":
+        return f"{int(change):+d}"
+    if name == "avg_form":
+        return f"{change:+.1f}"
+    if name == "avg_rom":
+        return f"{change:+.1f}°"
+    if name in ("avg_duration", "tempo_sd"):
+        return f"{change:+.2f} s"
+    if name == "partial_share":
+        return f"{change:+.1f} pts"
+    return str(change)
+
+
+def trend_table_rows(trend) -> List[Dict[str, Any]]:
+    """One dict per session point, values formatted with units."""
+    return [
+        {
+            "date": date_minute(m.start_time),
+            "session_id": m.session_id,
+            "reps": fmt_measure("reps_completed", m.reps_completed, m.target_reps),
+            "avg_form": fmt_measure("avg_form", m.avg_form),
+            "avg_rom": fmt_measure("avg_rom", m.avg_rom),
+            "avg_duration": fmt_measure("avg_duration", m.avg_duration),
+            "tempo_sd": fmt_measure("tempo_sd", m.tempo_sd),
+            "partial_share": fmt_measure("partial_share", m.partial_share),
+            "status": m.status,
+        }
+        for m in trend.points
+    ]
+
+
+def goal_line(goal, rom_progress_pct) -> Optional[str]:
+    if goal is None:
+        return None
+    parts = []
+    if goal.target_rom:
+        pct = f" ({rom_progress_pct}% of goal)" if rom_progress_pct is not None else ""
+        parts.append(f"ROM {goal.target_rom:g}°{pct}")
+    if goal.target_reps:
+        parts.append(f"reps {goal.target_reps}")
+    return "Goal: " + " | ".join(parts)
+
+
+def trend_summary_lines(trend) -> List[str]:
+    """First → latest (change) per measure, plus the goal line when a goal exists."""
+    lines: List[str] = []
+    if not trend.enough_for_trend:
+        lines.append("A trend needs at least two sessions.")
+    else:
+        first_target = trend.points[0].target_reps
+        latest_target = trend.points[-1].target_reps
+        for name in MEASURE_ORDER:
+            s = trend.summary.get(name)
+            if not s:
+                continue
+            if name == "reps_completed":
+                first = fmt_measure(name, s["first"], first_target)
+                latest = fmt_measure(name, s["latest"], latest_target)
+            else:
+                first, latest = fmt_measure(name, s["first"]), fmt_measure(name, s["latest"])
+            lines.append(f"{MEASURE_SHORT[name]}: {first} → {latest} ({fmt_change(name, s['change'])})")
+    g = goal_line(trend.goal, trend.rom_progress_pct)
+    if g:
+        lines.append(g)
+    return lines

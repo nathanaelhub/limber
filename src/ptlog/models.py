@@ -314,3 +314,159 @@ class LedgerRow:
     outcome: str               # imported | duplicate | malformed
     imported_at: str = ""
     reason: Optional[str] = None
+
+
+# --------------------------------------------------------------------------------------
+# Review over time (feature 002)
+# --------------------------------------------------------------------------------------
+
+NEXT_STEPS = ("continue", "progress", "regress", "hold")
+PERIODS: Dict[str, Optional[int]] = {"14d": 14, "30d": 30, "90d": 90, "all": None}
+REVIEW_EXPORT_FORMATS = ("review_report", "review_csv")
+GAP_DAYS_DEFAULT = 7
+
+METRIC_DEFINITIONS.update({
+    "reps_completed": {
+        "unit": "count",
+        "definition": "Counted repetitions of the exercise in the session, excluding any flagged as out of range.",
+    },
+    "avg_form": {
+        "unit": "score 0-100",
+        "definition": "Mean form score of the counted repetitions of the exercise in the session.",
+    },
+    "avg_duration": {
+        "unit": "seconds",
+        "definition": "Mean time per counted repetition of the exercise in the session.",
+    },
+    "tempo_sd": {
+        "unit": "seconds",
+        "definition": "Tempo consistency: the spread (population standard deviation) of repetition durations; lower is steadier.",
+    },
+    "partial_share": {
+        "unit": "percent",
+        "definition": "Partial repetitions as a share of all attempts (partial plus counted) for the exercise in the session.",
+    },
+})
+
+
+class GoalValidationError(PTLogError):
+    """A goal target is out of range or no target was given."""
+
+
+class ComparisonError(PTLogError):
+    """Two sessions cannot be compared (no common exercise, or several without a choice)."""
+
+
+class ReviewValidationError(PTLogError):
+    """A review's next step or notes are invalid."""
+
+
+@dataclass
+class Review:
+    """The PT's review of one session (one per session; edits replace it)."""
+    session_id: int
+    reviewed_at: str
+    notes: Optional[str]
+    next_step: str            # continue | progress | regress | hold
+
+
+@dataclass
+class Goal:
+    """A target per patient and exercise."""
+    patient_id: str
+    exercise_name: str
+    target_rom: Optional[float]     # degrees, 1-180
+    target_reps: Optional[int]      # count, >= 1
+    set_at: str
+
+
+@dataclass
+class ReviewSettings:
+    patient_id: str
+    gap_days: int = GAP_DAYS_DEFAULT   # days, 1-90
+
+
+@dataclass
+class SessionMeasure:
+    """Per-session, per-exercise figures derived from recorded reps (never stored)."""
+    session_id: int
+    patient_id: str
+    start_time: str
+    status: str
+    interrupted: bool
+    exercise_name: str
+    reps_completed: int              # count
+    target_reps: int                 # count
+    avg_rom: Optional[float]         # degrees
+    avg_form: Optional[float]        # score 0-100
+    avg_duration: Optional[float]    # seconds
+    tempo_sd: Optional[float]        # seconds
+    partial_count: int               # count
+    partial_share: Optional[float]   # percent
+    safety_stops: List[tuple] = field(default_factory=list)   # (timestamp, message)
+
+
+@dataclass
+class Flag:
+    rule: str
+    exercise: Optional[str]
+    session_ids: List[int]
+    values: Dict[str, Any]
+    message: str
+
+
+@dataclass
+class NotEvaluated:
+    rule: str
+    exercise: Optional[str]
+    needed: int
+    have: int
+
+
+@dataclass
+class FlagResult:
+    flags: List[Flag] = field(default_factory=list)
+    not_evaluated: List[NotEvaluated] = field(default_factory=list)
+
+
+@dataclass
+class Trend:
+    exercise: str
+    period: str
+    points: List[SessionMeasure] = field(default_factory=list)
+    summary: Dict[str, Dict[str, Optional[float]]] = field(default_factory=dict)   # measure -> first/latest/change
+    goal: Optional[Goal] = None
+    rom_progress_pct: Optional[int] = None
+    enough_for_trend: bool = False
+
+
+@dataclass
+class ComparisonRow:
+    name: str
+    unit: str
+    a: Optional[float]
+    b: Optional[float]
+    change: Optional[float]
+    pct_change: Optional[float]
+    better: str                      # higher | lower | informational
+
+
+@dataclass
+class Comparison:
+    exercise: str
+    a: SessionMeasure
+    b: SessionMeasure
+    rows: List[ComparisonRow] = field(default_factory=list)
+
+
+@dataclass
+class ReviewSummary:
+    patient_id: str
+    period: str
+    period_start: Optional[str]
+    generated_at: str
+    gap_days: int
+    trends: Dict[str, Trend] = field(default_factory=dict)
+    flags: FlagResult = field(default_factory=FlagResult)
+    goals: List[Dict[str, Any]] = field(default_factory=list)      # {"goal": Goal, "latest_rom", "progress_pct", "latest_reps"}
+    sessions: List[Dict[str, Any]] = field(default_factory=list)   # newest first: {"session", "measures", "review"}

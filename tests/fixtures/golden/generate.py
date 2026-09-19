@@ -12,8 +12,8 @@ then copies their output next to this script:
 
 Run once from the repo root:  .venv/bin/python tests/fixtures/golden/generate.py
 
-Requires the legacy writer modules, which last exist at commit 4884fc4 on branch
-001-unified-session-log (they were retired in the following commit). To regenerate, check
+Requires the legacy writer modules (including src/session_tracker.py), which last exist at
+commit 4884fc4 on branch 001-unified-session-log (retired in the following commits). To regenerate, check
 out that commit into a scratch worktree and run this script from there. Not collected
 by pytest. The summary values passed to the writers at session end are the whole-session
 values from expected_summary(), not the last tracker's values the legacy loops passed,

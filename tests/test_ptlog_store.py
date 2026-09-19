@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.ptlog.store import MIGRATIONS, SessionStore, default_db_path
+from src.ptlog.store import MIGRATIONS, SCHEMA_VERSION, SessionStore, default_db_path
 
 EXPECTED_TABLES = {
     "patients", "sessions", "exercise_sets", "reps", "partial_reps", "form_events",
@@ -26,11 +26,11 @@ class TestOpen:
             pass
         assert EXPECTED_TABLES <= _tables(tmp_db)
 
-    def test_schema_version_is_one(self, tmp_db, fake_clock):
+    def test_schema_version_matches_migrations(self, tmp_db, fake_clock):
         with SessionStore(tmp_db, clock=fake_clock).open() as store:
             rows = store.conn.execute("SELECT version FROM schema_version ORDER BY version").fetchall()
-        assert [r[0] for r in rows] == [1]
-        assert MIGRATIONS[0][0] == 1
+        assert [r[0] for r in rows] == [v for v, _ in MIGRATIONS]
+        assert MIGRATIONS[0][0] == 1 and MIGRATIONS[-1][0] == SCHEMA_VERSION
 
     def test_pragmas(self, tmp_db, fake_clock):
         with SessionStore(tmp_db, clock=fake_clock).open() as store:
@@ -53,7 +53,7 @@ class TestOpen:
             versions = store.conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
             unassigned_rows = store.conn.execute(
                 "SELECT COUNT(*) FROM patients WHERE id='unassigned'").fetchone()[0]
-        assert versions == 1
+        assert versions == len(MIGRATIONS)
         assert unassigned_rows == 1
 
     def test_get_unknown_patient_returns_none(self, tmp_db, fake_clock):
@@ -117,7 +117,7 @@ class TestSessionWrites:
         sid = store.start_session("unassigned", "webcam", "0")
         row = store.conn.execute("SELECT * FROM sessions WHERE id = ?", (sid,)).fetchone()
         assert row["status"] == "running"
-        assert row["schema_version"] == 1
+        assert row["schema_version"] == SCHEMA_VERSION
         assert row["patient_id"] == "unassigned"
         assert row["source"] == "webcam"
         assert row["source_ref"] == "0"

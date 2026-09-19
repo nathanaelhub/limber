@@ -16,11 +16,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from .privacy import validate_label, validate_patient_id
+from .privacy import validate_label, validate_notes, validate_patient_id
 from .models import (
+    PTLogError,
+    GAP_DAYS_DEFAULT,
+    NEXT_STEPS,
     UNASSIGNED_ID,
     UNASSIGNED_LABEL,
     BuiltinPatientError,
+    Goal,
+    GoalValidationError,
+    Review,
+    ReviewValidationError,
     ControlEvent,
     DeleteReport,
     DuplicatePatientError,
@@ -40,7 +47,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -170,9 +177,43 @@ CREATE TABLE IF NOT EXISTS import_ledger (
 );
 """
 
+SCHEMA_V2_SQL = """
+CREATE TABLE IF NOT EXISTS reviews (
+    session_id   INTEGER PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    reviewed_at  TEXT NOT NULL,
+    notes        TEXT,
+    next_step    TEXT NOT NULL CHECK (next_step IN ('continue', 'progress', 'regress', 'hold'))
+);
+
+CREATE TABLE IF NOT EXISTS goals (
+    patient_id     TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    exercise_name  TEXT NOT NULL,
+    target_rom     REAL CHECK (target_rom IS NULL OR (target_rom >= 1 AND target_rom <= 180)),
+    target_reps    INTEGER CHECK (target_reps IS NULL OR target_reps >= 1),
+    set_at         TEXT NOT NULL,
+    PRIMARY KEY (patient_id, exercise_name),
+    CHECK (target_rom IS NOT NULL OR target_reps IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS review_settings (
+    patient_id  TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    gap_days    INTEGER NOT NULL DEFAULT 7 CHECK (gap_days BETWEEN 1 AND 90)
+);
+
+CREATE TABLE IF NOT EXISTS review_exports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id  TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    format      TEXT NOT NULL CHECK (format IN ('review_report', 'review_csv')),
+    period      TEXT NOT NULL,
+    path        TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+"""
+
 # Forward-only migrations: (version, sql). Applied in order on open().
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
+    (2, SCHEMA_V2_SQL),
 ]
 
 
@@ -574,6 +615,8 @@ class SessionStore:
                 events += self.conn.execute(sql, sessions).fetchone()[0]
             export_paths = [r[0] for r in self.conn.execute(
                 f"SELECT path FROM exports WHERE session_id IN ({marks})", sessions)]
+        export_paths += [r[0] for r in self.conn.execute(
+            "SELECT path FROM review_exports WHERE patient_id = ?", (pid,))]
         self.conn.execute("DELETE FROM patients WHERE id = ?", (pid,))   # cascades through every child table
         self.conn.commit()
         removed_files = 0
@@ -766,6 +809,113 @@ class SessionStore:
             (row.file_sha256, row.source_path, row.session_id, row.outcome, row.reason, row.imported_at or self._now()),
         )
         self.conn.commit()
+
+    # ---------------------------------------------------------------- review over time (feature 002)
+
+    def set_goal(self, patient_id: str, exercise_name: str, target_rom: Optional[float] = None,
+                 target_reps: Optional[int] = None) -> Goal:
+        """Set or update a goal; a None argument keeps the existing value (FR-019)."""
+        patient = self.get_patient(patient_id)
+        if patient is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        current = self.get_goal(patient.id, exercise_name)
+        rom = current.target_rom if (target_rom is None and current) else target_rom
+        reps = current.target_reps if (target_reps is None and current) else target_reps
+        if rom is not None and not (1 <= float(rom) <= 180):
+            raise GoalValidationError("target_rom must be 1–180 degrees")
+        if reps is not None and int(reps) < 1:
+            raise GoalValidationError("target_reps must be at least 1")
+        if rom is None and reps is None:
+            raise GoalValidationError("a goal needs at least one target (range of motion or reps)")
+        self.conn.execute(
+            "INSERT OR REPLACE INTO goals (patient_id, exercise_name, target_rom, target_reps, set_at) VALUES (?, ?, ?, ?, ?)",
+            (patient.id, exercise_name, float(rom) if rom is not None else None,
+             int(reps) if reps is not None else None, self._now()),
+        )
+        self.conn.commit()
+        return self.get_goal(patient.id, exercise_name)
+
+    def get_goal(self, patient_id: str, exercise_name: str) -> Optional[Goal]:
+        row = self.conn.execute(
+            "SELECT * FROM goals WHERE patient_id = ? AND exercise_name = ?", (patient_id, exercise_name)).fetchone()
+        return Goal(row["patient_id"], row["exercise_name"], row["target_rom"], row["target_reps"], row["set_at"]) if row else None
+
+    def list_goals(self, patient_id: str) -> List[Goal]:
+        rows = self.conn.execute(
+            "SELECT * FROM goals WHERE patient_id = ? ORDER BY exercise_name COLLATE NOCASE", (patient_id,)).fetchall()
+        return [Goal(r["patient_id"], r["exercise_name"], r["target_rom"], r["target_reps"], r["set_at"]) for r in rows]
+
+    def clear_goal(self, patient_id: str, exercise_name: str) -> bool:
+        cur = self.conn.execute("DELETE FROM goals WHERE patient_id = ? AND exercise_name = ?", (patient_id, exercise_name))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_gap_days(self, patient_id: str) -> int:
+        row = self.conn.execute("SELECT gap_days FROM review_settings WHERE patient_id = ?", (patient_id,)).fetchone()
+        return int(row["gap_days"]) if row else GAP_DAYS_DEFAULT
+
+    def set_gap_days(self, patient_id: str, days: int) -> int:
+        if self.get_patient(patient_id) is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        if not (1 <= int(days) <= 90):
+            raise PTLogError("gap threshold must be between 1 and 90 days")
+        self.conn.execute("INSERT OR REPLACE INTO review_settings (patient_id, gap_days) VALUES (?, ?)", (patient_id, int(days)))
+        self.conn.commit()
+        return int(days)
+
+    def sessions_in_period(self, patient_id: str, since: Optional[datetime]) -> List[Session]:
+        """Full session graphs for a patient, oldest first, started at or after `since` (all when None)."""
+        if since is None:
+            rows = self.conn.execute(
+                "SELECT id FROM sessions WHERE patient_id = ? ORDER BY start_time ASC, id ASC", (patient_id,)).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT id FROM sessions WHERE patient_id = ? AND start_time >= ? ORDER BY start_time ASC, id ASC",
+                (patient_id, since.isoformat())).fetchall()
+        return [self.load_session(r["id"]) for r in rows]
+
+    def exercise_names(self, patient_id: str) -> List[str]:
+        """Distinct exercise names recorded for the patient, in first-seen order."""
+        rows = self.conn.execute(
+            """
+            SELECT es.exercise_name, MIN(s.start_time) AS first_seen
+            FROM exercise_sets es JOIN sessions s ON s.id = es.session_id
+            WHERE s.patient_id = ? GROUP BY es.exercise_name ORDER BY first_seen ASC, es.exercise_name
+            """, (patient_id,)).fetchall()
+        return [r["exercise_name"] for r in rows]
+
+    def record_review_export(self, patient_id: str, fmt: str, period: str, path: Path | str) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO review_exports (patient_id, format, period, path, created_at) VALUES (?, ?, ?, ?, ?)",
+            (patient_id, fmt, period, str(path), self._now()))
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def set_review(self, session_id: int, next_step: str, notes: Optional[str] = None) -> Review:
+        """Record (or replace) the PT's review of a session (FR-008, FR-009, FR-010)."""
+        if next_step not in NEXT_STEPS:
+            raise ReviewValidationError(f"next step must be one of {', '.join(NEXT_STEPS)}")
+        try:
+            clean_notes = validate_notes(notes)
+        except PTLogError as exc:
+            raise ReviewValidationError(str(exc)) from exc
+        if self.conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)).fetchone() is None:
+            raise SessionNotFoundError(f"Session {session_id} not found")
+        self.conn.execute(
+            "INSERT OR REPLACE INTO reviews (session_id, reviewed_at, notes, next_step) VALUES (?, ?, ?, ?)",
+            (session_id, self._now(), clean_notes, next_step))
+        self.conn.commit()
+        return self.get_review(session_id)
+
+    def get_review(self, session_id: int) -> Optional[Review]:
+        row = self.conn.execute("SELECT * FROM reviews WHERE session_id = ?", (session_id,)).fetchone()
+        return Review(row["session_id"], row["reviewed_at"], row["notes"], row["next_step"]) if row else None
+
+    def pending_reviews(self, patient_id: str) -> List[SessionSummaryRow]:
+        """Sessions of the patient without a review, newest first (FR-011)."""
+        reviewed = {r[0] for r in self.conn.execute(
+            "SELECT r.session_id FROM reviews r JOIN sessions s ON s.id = r.session_id WHERE s.patient_id = ?", (patient_id,))}
+        return [row for row in self.list_sessions(patient_id) if row.id not in reviewed]
 
 
 def _ts_key(ts: Optional[str]):

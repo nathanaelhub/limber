@@ -50,7 +50,8 @@ from src.ptlog.store import SessionStore, default_db_path
 from src.ptlog import views as ptviews
 from src.ptlog.exports import FORMATS, to_observation_dict
 from src.ptlog.models import PTLogError
-from src.session_tracker import SessionTracker
+from src.ptlog import review as ptreview
+from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
 def _open_store():
@@ -308,9 +309,8 @@ def render_sidebar():
             'video': '🎬 Video Analysis',
             'patients': '👥 Patients',
             'sessions': '📋 Sessions',
-            'pt_summary': '🩺 PT Summary',
             'obs_logs': '🔬 Observation Logs',
-            'progress': '📊 Progress Report',
+            'review': '🩺 Review',
             'learn': '📚 How It Works'
         }
 
@@ -414,7 +414,7 @@ def page_home():
     # Recent activity
     st.markdown("### Recent Sessions")
 
-    # Sample recent sessions (would be loaded from session_tracker in production)
+    # Recent sessions from the canonical record
     recent_sessions = [
         {"date": "2024-01-15", "exercise": "Knee Extension", "reps": 10, "form": 85},
         {"date": "2024-01-14", "exercise": "Shoulder Flexion", "reps": 12, "form": 78},
@@ -1479,71 +1479,68 @@ def page_sessions():
 
 
 # =============================================================================
-# PAGE: PROGRESS REPORT (trend math from src/session_tracker fed by the record)
+# PAGE: REVIEW (trends, flags, comparison, session reviews, goals, exports)
 # =============================================================================
 
-def page_progress_report():
-    """Progress over time for the selected patient, from the canonical record."""
-    st.markdown("## 📊 Progress Report")
+REVIEW_SECTIONS = ["Trends", "Flags", "Compare", "Session review", "Goals & settings", "Export"]
+
+
+def page_review():
+    """Review a patient's course of care; each section renders only when chosen."""
+    st.markdown("## 🩺 Review")
     pid = st.session_state.get("patient_id") or "unassigned"
+    section = st.radio("Section", REVIEW_SECTIONS, horizontal=True, key="review_tab", label_visibility="collapsed")
+    if section == "Trends":
+        _review_trends(pid)
+    else:
+        st.info(f"{section}: coming in this feature.")
+
+
+def _period_selector(key):
+    return st.selectbox("Period", list(PERIODS), index=len(PERIODS) - 1, key=key,
+                        format_func=lambda p: ptviews.PERIOD_LABELS[p])
+
+
+def _review_trends(pid):
     with _open_store() as store:
-        history = ptviews.load_session_data_for_trends(store, pid)
-    if not history:
+        names = ptreview.exercise_names(store, pid)
+    if not names:
         st.info(f"No sessions recorded for patient {pid} yet.")
         return
-
-    exercises = sorted({e.exercise_name for s in history for e in s.exercises})
     col1, col2 = st.columns([2, 1])
     with col1:
-        days = st.select_slider("Time period (days)", options=[7, 14, 30, 90, 180, 365], value=30, key="progress_days")
+        exercise = st.selectbox("Exercise", names, key="review_trend_exercise")
     with col2:
-        exercise = st.selectbox("Exercise", exercises, key="progress_exercise")
-
-    tracker = SessionTracker.from_history(history, pid)
-    progress = tracker.calculate_progress(exercise, days_back=days)
-
-    total_reps = sum(e.reps_completed for s in history for e in s.exercises)
-    form_scores = [s.overall_form_score for s in history if s.exercises]
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Sessions", len(history))
-    c2.metric(ptviews.metric_label("total_reps"), total_reps)
-    c3.metric(ptviews.metric_label("avg_form_score"), f"{sum(form_scores) / len(form_scores):.1f}" if form_scores else "n/a")
-    c4.metric("ROM trend", progress.rom_trend if progress else "n/a",
-              f"{progress.rom_change_percent:+.1f}%" if progress else None)
-    st.markdown("---")
-
-    if progress is None:
-        st.info("At least two sessions with this exercise inside the period are needed to compute a trend.")
-    else:
-        chart = pd.DataFrame({"Date": progress.dates, ptviews.metric_label("rom"): progress.rom_values,
-                              ptviews.metric_label("form_score"): progress.form_scores}).set_index("Date")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"### {ptviews.metric_label('rom')}")
-            st.line_chart(chart[[ptviews.metric_label("rom")]])
-            st.caption(ptviews.metric_definition("rom"))
-        with col2:
-            st.markdown(f"### {ptviews.metric_label('form_score')}")
-            st.line_chart(chart[[ptviews.metric_label("form_score")]])
-            st.caption(ptviews.metric_definition("form_score"))
-
-    st.markdown("### Areas for attention")
-    try:
-        concerns = tracker.get_exercises_needing_attention()
-    except Exception:
-        concerns = []
-    if concerns:
-        for c in concerns:
-            st.warning(f"**{c.get('exercise', '')}** — {', '.join(c.get('concerns', []))}" if isinstance(c, dict) else str(c))
-    else:
-        st.success("No exercises are flagged for attention in the recorded sessions.")
-
-    st.markdown("---")
-    csv_rows = ["date,exercise,reps,form_score,rom_range"] + [
-        f"{s.date},{e.exercise_name},{e.reps_completed},{e.avg_form_score:.1f},{e.rom_range:.1f}"
-        for s in history for e in s.exercises]
-    st.download_button("📊 Export session data (CSV)", "\n".join(csv_rows) + "\n",
-                       file_name=f"{pid}_progress.csv", mime="text/csv")
+        period = _period_selector("review_trend_period")
+    with _open_store() as store:
+        t = ptreview.trend(store, pid, exercise, period)
+    if not t.points:
+        st.info(f"No sessions of {exercise} in this period.")
+        return
+    rows = ptviews.trend_table_rows(t)
+    table = pd.DataFrame(rows).rename(columns={
+        "date": "Date", "session_id": "Session", "reps": ptviews.metric_label("reps_completed"),
+        "avg_form": ptviews.metric_label("avg_form"), "avg_rom": ptviews.metric_label("avg_rom"),
+        "avg_duration": ptviews.metric_label("avg_duration"), "tempo_sd": ptviews.metric_label("tempo_sd"),
+        "partial_share": ptviews.metric_label("partial_share"), "status": "Status"})
+    st.dataframe(table, use_container_width=True, hide_index=True)
+    chart = pd.DataFrame({
+        "Date": [ptviews.date_minute(p.start_time) for p in t.points],
+        ptviews.metric_label("avg_rom"): [p.avg_rom for p in t.points],
+        ptviews.metric_label("avg_form"): [p.avg_form for p in t.points],
+    }).set_index("Date")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"### {ptviews.metric_label('avg_rom')}")
+        st.line_chart(chart[[ptviews.metric_label("avg_rom")]])
+        st.caption(ptviews.metric_definition("avg_rom"))
+    with c2:
+        st.markdown(f"### {ptviews.metric_label('avg_form')}")
+        st.line_chart(chart[[ptviews.metric_label("avg_form")]])
+        st.caption(ptviews.metric_definition("avg_form"))
+    st.markdown("### First → latest")
+    for line in ptviews.trend_summary_lines(t):
+        st.write(line)
 
 
 # =============================================================================
@@ -1792,8 +1789,8 @@ def main():
         page_pt_summary()
     elif page == 'obs_logs':
         page_observation_logs()
-    elif page == 'progress':
-        page_progress_report()
+    elif page == 'review':
+        page_review()
     elif page == 'learn':
         page_how_it_works()
     else:

@@ -40,7 +40,7 @@ def seeded_env(tmp_db, monkeypatch):
     return tmp_db
 
 
-PAGES = ["home", "patients", "sessions", "pt_summary", "obs_logs", "progress", "video", "learn"]
+PAGES = ["home", "patients", "sessions", "obs_logs", "review", "video", "learn"]
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -80,3 +80,19 @@ def test_sidebar_patient_selector_lists_store_patients(seeded_env):
     assert not at.exception
     sel = at.sidebar.selectbox[0]
     assert [o.split(" · ")[0] for o in sel.options] == ["unassigned", "P-017"]
+
+
+def _review_page(seeded_env, section):
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "review"
+    at.session_state["patient_id"] = "P-017"
+    at.session_state["review_tab"] = section
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    return at
+
+
+def test_review_page_trends_tab(seeded_env):
+    at = _review_page(seeded_env, "Trends")
+    frames = at.dataframe
+    assert frames and "avg ROM (degrees)" in list(frames[0].value.columns)

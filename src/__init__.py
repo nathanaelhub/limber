@@ -9,7 +9,7 @@ Modules:
     - analyze: Core video/image analysis with pose estimation
     - form_assessment: Biomechanical form checking and feedback
     - ptlog: The canonical session record (patients, sessions, events, exports)
-    - session_tracker: Trend analysis over history built from the record
+    - session_summary: Clinical summary of one session
     - utils: Helper functions for angle calculation and visualization
 """
 

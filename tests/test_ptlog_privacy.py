@@ -56,3 +56,21 @@ class TestLabel:
 
     def test_accepts_clinical_label(self):
         assert validate_label("Post-op knee, week 3") == "Post-op knee, week 3"
+
+
+class TestNotes:
+    def test_accepts_empty_and_clinical_text(self):
+        from src.ptlog.privacy import validate_notes
+        assert validate_notes(None) is None
+        assert validate_notes("") is None
+        assert validate_notes("  post-op week 3, tolerated full set ") == "post-op week 3, tolerated full set"
+        assert validate_notes("x" * 1000) == "x" * 1000
+
+    @pytest.mark.parametrize("value,rule", [
+        ("seen by Jane Doe", "name"), ("DOB 1990-01-02", "date"), ("MRN 123456", "six or more"),
+    ])
+    def test_rejects_identifying_text(self, value, rule):
+        from src.ptlog.privacy import validate_notes
+        with pytest.raises(PatientValidationError) as exc:
+            validate_notes(value)
+        assert rule in str(exc.value)
