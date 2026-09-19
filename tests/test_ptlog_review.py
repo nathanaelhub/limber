@@ -35,7 +35,7 @@ class TestMigration2:
             versions = [r[0] for r in store.conn.execute("SELECT version FROM schema_version ORDER BY version")]
             tables = {r[0] for r in store.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             assert store.load_session(1).total_reps == 3
-        assert versions == [1, 2]
+        assert versions == [v for v, _ in MIGRATIONS]   # every later migration applies too
         assert {"reviews", "goals", "review_settings", "review_exports"} <= tables
 
 

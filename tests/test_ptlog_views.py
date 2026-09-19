@@ -134,3 +134,17 @@ class TestReviewLines:
         store.set_review(sid, "progress", "post-op week 3")
         lines = views.review_lines(review.session_review_view(store, sid))
         assert lines[0] == "REVIEW: reviewed 2026-03-24 10:12 | next step: progress | notes: post-op week 3"
+
+
+class TestRosterRendering:
+    def test_rows_and_columns(self):
+        from src.ptlog.models import RosterRow
+        row = RosterRow("P-020", None, False, None, "none", "none", None, 0, 0, None, "no program", 0, 0, False, None, False)
+        r = views.roster_table_rows([row])[0]
+        assert r["days_since_last"] == "no sessions yet" and r["adherence"] == "no program"
+        assert r["practice_gap"] == "no" and r["last_next_step"] == "none" and r["label"] == ""
+        row2 = RosterRow("P-017", "Post-op knee", False, "knee_rehab", "Knee Rehabilitation", "active", 2, 2, 4, 44, "", 1, 1, True, "hold", True)
+        r2 = views.roster_table_rows([row2])[0]
+        assert r2["adherence"] == "44%" and r2["practice_gap"] == "yes" and r2["days_since_last"] == "2"
+        cols = views.roster_columns()
+        assert cols["adherence"] == views.metric_label("adherence_pct") and "count" in cols["pending_reviews"]

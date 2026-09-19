@@ -40,7 +40,7 @@ def seeded_env(tmp_db, monkeypatch):
     return tmp_db
 
 
-PAGES = ["home", "patients", "sessions", "obs_logs", "review", "video", "learn"]
+PAGES = ["home", "patients", "sessions", "obs_logs", "review", "tracker", "video", "learn"]
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -134,3 +134,19 @@ def test_review_page_export_tab(seeded_env):
     at = _review_page(seeded_env, "Export")
     labels = {b.label for b in at.get("download_button")}
     assert {"Review report (text)", "Review data (CSV)"} <= labels
+
+
+def _tracker_page(seeded_env, section):
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "tracker"
+    at.session_state["patient_id"] = "P-017"
+    at.session_state["tracker_tab"] = section
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    return at
+
+
+def test_tracker_page_roster(seeded_env):
+    at = _tracker_page(seeded_env, "Roster")
+    frames = at.dataframe
+    assert frames and any("pending reviews (count)" in str(c).lower() for c in frames[0].value.columns)

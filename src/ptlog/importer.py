@@ -24,8 +24,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
-
 from .models import UNASSIGNED_ID, ControlEvent, ExerciseSetInfo, LedgerRow, PartialRepEvent, RepEvent
 from .recorder import derive_exercise_key
 from .store import REPO_ROOT, SessionStore
@@ -103,30 +101,15 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-_CATALOG: Optional[Dict[str, Dict[str, Any]]] = None
-
-
 def exercise_catalog(config_path: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
-    """Display name (lower) -> {key, side, up_angle, down_angle, target_reps} from config.yaml."""
-    global _CATALOG
-    if _CATALOG is not None and config_path is None:
-        return _CATALOG
-    path = config_path or (REPO_ROOT / "config.yaml")
-    catalog: Dict[str, Dict[str, Any]] = {}
-    try:
-        data = yaml.safe_load(path.read_text()) or {}
-        for key, ex in (data.get("exercises") or {}).items():
-            name = str(ex.get("display_name", key))
-            catalog[name.lower()] = {
-                "key": key, "side": ex.get("side", "left"),
-                "up_angle": float(ex.get("up_angle", 0.0)), "down_angle": float(ex.get("down_angle", 0.0)),
-                "target_reps": int(ex.get("target_reps", 10)),
-            }
-    except (OSError, yaml.YAMLError):
-        catalog = {}
-    if config_path is None:
-        _CATALOG = catalog
-    return catalog
+    """Display name (lower) -> {key, side, up_angle, down_angle, target_reps}; delegates to programs.py."""
+    from .programs import load_catalog
+    catalog = load_catalog(config_path)
+    return {
+        entry["display_name"].lower(): {"key": key, "side": entry["side"], "up_angle": entry["up_angle"],
+                                        "down_angle": entry["down_angle"], "target_reps": entry["target_reps"]}
+        for key, entry in catalog.exercises.items()
+    }
 
 
 def set_info_for(name: str, target_reps: Optional[int] = None) -> ExerciseSetInfo:

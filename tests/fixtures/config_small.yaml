@@ -1,0 +1,23 @@
+exercises:
+  knee_extension:
+    display_name: "Knee Extension"
+    keypoints: [11, 13, 15]
+    up_angle: 170
+    down_angle: 90
+    form_tolerance: 15
+    target_reps: 10
+    side: "left"
+  partial_squat:
+    display_name: "Partial Squat"
+    keypoints: [11, 13, 15]
+    up_angle: 170
+    down_angle: 120
+    form_tolerance: 15
+    target_reps: 12
+    side: "bilateral"
+programs:
+  mini_knee:
+    name: "Mini Knee"
+    exercises:
+      - knee_extension
+      - partial_squat

@@ -51,6 +51,8 @@ from src.ptlog import views as ptviews
 from src.ptlog.exports import FORMATS, to_observation_dict
 from src.ptlog.models import PTLogError
 from src.ptlog import review as ptreview
+from src.ptlog import tracker as pttracker
+from src.ptlog import programs as ptprograms
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -310,6 +312,7 @@ def render_sidebar():
             'sessions': '📋 Sessions',
             'obs_logs': '🔬 Observation Logs',
             'review': '🩺 Review',
+            'tracker': '🗂️ Tracker',
             'learn': '📚 How It Works'
         }
 
@@ -1354,6 +1357,42 @@ def _review_export(pid):
 
 
 # =============================================================================
+# PAGE: TRACKER (caseload roster, queue, adherence, discharged, export)
+# =============================================================================
+
+TRACKER_SECTIONS = ["Roster", "Queue", "Adherence", "Discharged", "Export"]
+
+
+def page_tracker():
+    """Manage the caseload; each section renders only when chosen."""
+    st.markdown("## 🗂️ Tracker")
+    section = st.radio("Section", TRACKER_SECTIONS, horizontal=True, key="tracker_tab", label_visibility="collapsed")
+    if section == "Roster":
+        _tracker_roster()
+    else:
+        st.info(f"{section}: coming in this feature.")
+
+
+def _tracker_roster():
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c1:
+        sort = st.selectbox("Sort", ["attention", "id"], key="tracker_sort")
+    with c2:
+        program_ids = ["all"] + [p.id for p in ptprograms.list_programs()] + ["custom"]
+        program = st.selectbox("Program", program_ids, key="tracker_program_filter")
+    with c3:
+        only = st.checkbox("Needs attention only", key="tracker_needs_attention")
+    with _open_store() as store:
+        rows = pttracker.roster(store, sort=sort, program=None if program == "all" else program, needs_attention=only)
+    if not rows:
+        st.info("No active patients match.")
+        return
+    table = pd.DataFrame(ptviews.roster_table_rows(rows)).rename(columns=ptviews.roster_columns())
+    st.dataframe(table, use_container_width=True, hide_index=True)
+    st.caption(f"{len(rows)} active patient(s). {ptviews.metric_definition('adherence_pct')}")
+
+
+# =============================================================================
 # PAGE: HOW IT WORKS (Educational)
 # =============================================================================
 
@@ -1599,6 +1638,8 @@ def main():
         page_observation_logs()
     elif page == 'review':
         page_review()
+    elif page == 'tracker':
+        page_tracker()
     elif page == 'learn':
         page_how_it_works()
     else:

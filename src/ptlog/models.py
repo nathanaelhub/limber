@@ -470,3 +470,131 @@ class ReviewSummary:
     flags: FlagResult = field(default_factory=FlagResult)
     goals: List[Dict[str, Any]] = field(default_factory=list)      # {"goal": Goal, "latest_rom", "progress_pct", "latest_reps"}
     sessions: List[Dict[str, Any]] = field(default_factory=list)   # newest first: {"session", "measures", "review"}
+
+
+# --------------------------------------------------------------------------------------
+# Multi-patient tracker (feature 003)
+# --------------------------------------------------------------------------------------
+
+ASSIGNMENT_STATUSES = ("scheduled", "active", "completed", "superseded")
+QUEUE_KINDS = ("pending_review", "attention_flag", "practice_gap", "low_adherence")
+ADHERENCE_THRESHOLD_DEFAULT = 60
+
+METRIC_DEFINITIONS.update({
+    "adherence_pct": {
+        "unit": "percent",
+        "definition": "Recorded sessions (capped at the plan each week) divided by planned sessions over the last four complete assignment weeks.",
+    },
+    "sessions_per_week": {
+        "unit": "count",
+        "definition": "Number of sessions the assigned program plans for each seven-day assignment week.",
+    },
+})
+
+
+class ProgramValidationError(PTLogError):
+    """An exercise key is unknown or a program has no exercises."""
+
+
+class AssignmentValidationError(PTLogError):
+    """Sessions per week or dates of an assignment are out of range."""
+
+
+@dataclass
+class Program:
+    """A named, ordered list of exercise keys (pre-built from the configuration, or custom)."""
+    id: str
+    name: str
+    description: str
+    exercise_keys: List[str]
+    exercise_names: List[str] = field(default_factory=list)
+
+
+@dataclass
+class Assignment:
+    """A program assigned to a patient with a plan and dates; status is derived, not stored."""
+    id: int
+    patient_id: str
+    program_id: str
+    program_name: str
+    exercise_keys: List[str]
+    sessions_per_week: int          # count, 1-14
+    start_date: str                 # YYYY-MM-DD
+    end_date: Optional[str]         # YYYY-MM-DD or None
+    created_at: str
+
+
+@dataclass
+class Discharge:
+    patient_id: str
+    discharged_on: str              # YYYY-MM-DD
+    reason: Optional[str]
+    created_at: str
+
+
+@dataclass
+class AdherenceWeek:
+    index: int                      # 1-based assignment week
+    start: str                      # YYYY-MM-DD inclusive
+    end: str                        # YYYY-MM-DD inclusive
+    planned: int                    # count
+    recorded: int                   # count of sessions with at least one counted rep
+    counted: int                    # min(recorded, planned)
+    exercises_performed: List[str] = field(default_factory=list)
+    exercises_missing: List[str] = field(default_factory=list)
+    missed: bool = False
+    in_progress: bool = False
+
+
+@dataclass
+class Adherence:
+    assignment: Optional[Assignment]
+    status: str                     # none | scheduled | active | completed | superseded
+    weeks: List[AdherenceWeek] = field(default_factory=list)
+    percentage: Optional[int] = None    # percent over complete weeks
+    note: str = ""
+
+
+@dataclass
+class RosterRow:
+    patient_id: str
+    label: Optional[str]
+    is_builtin: bool
+    program_id: Optional[str]
+    program_name: str               # display name or "none"
+    program_status: str             # none | scheduled | active | completed | superseded
+    days_since_last: Optional[int]  # days; None when no sessions
+    sessions_7d: int
+    sessions_30d: int
+    adherence_pct: Optional[int]
+    adherence_note: str
+    pending_reviews: int
+    open_flags: int                 # flags from every rule except practice gap, last 30 days
+    practice_gap: bool
+    last_next_step: Optional[str]
+    needs_attention: bool
+
+
+@dataclass
+class QueueItem:
+    kind: str                       # pending_review | attention_flag | practice_gap | low_adherence
+    patient_id: str
+    target: str                     # session:<id> | flags:<patient> | adherence:<patient>
+    session_id: Optional[int]
+    age_days: int
+    description: str
+
+
+@dataclass
+class QueueResult:
+    items: Dict[str, List[QueueItem]] = field(default_factory=dict)   # kind -> items, QUEUE_KINDS order
+    totals: Dict[str, int] = field(default_factory=dict)
+
+    @property
+    def count(self) -> int:
+        return sum(self.totals.values())
+
+
+@dataclass
+class TrackerSettings:
+    adherence_threshold: int = ADHERENCE_THRESHOLD_DEFAULT

@@ -129,3 +129,37 @@ def make_session():
         return sid
 
     return _make
+
+
+# ---------------------------------------------------------------- tracker helpers (feature 003)
+
+from datetime import date as _date  # noqa: E402
+
+D0_DATE = _date(2026, 3, 23)
+
+
+@pytest.fixture
+def caseload(make_session):
+    """Factory: register patients and record sessions from a compact description.
+
+    caseload(store, clock, {"P-017": [(days_ago, exercise, [(form, rom, dur), ...]), ...], ...})
+    Sessions are recorded relative to 2026-03-23 09:15. Returns {patient_id: [session_id, ...]}
+    in the order given. Patients that already exist are reused.
+    """
+    from datetime import datetime, timedelta
+
+    def _build(store, clock, spec):
+        base = datetime(2026, 3, 23, 9, 15, 0)
+        ids = {}
+        for patient_id, sessions in spec.items():
+            if store.get_patient(patient_id) is None:
+                store.add_patient(patient_id)
+            ids[patient_id] = []
+            for entry in sessions:
+                days_ago, exercise, reps = entry[0], entry[1], entry[2]
+                kwargs = entry[3] if len(entry) > 3 else {}
+                ids[patient_id].append(make_session(store, clock, patient_id, exercise,
+                                                    base - timedelta(days=days_ago), reps, **kwargs))
+        return ids
+
+    return _build

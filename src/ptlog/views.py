@@ -19,7 +19,7 @@ NOT_AVAILABLE = "not available"
 def metric_label(field: str) -> str:
     """'rom' -> 'ROM (degrees)'; the unit always comes from METRIC_DEFINITIONS."""
     unit = METRIC_DEFINITIONS[field]["unit"]
-    pretty = {"rom": "ROM", "avg_rom": "avg ROM", "avg_form_score": "avg form score"}.get(field, field.replace("_", " "))
+    pretty = {"rom": "ROM", "avg_rom": "avg ROM", "avg_form_score": "avg form score", "adherence_pct": "adherence"}.get(field, field.replace("_", " "))
     return f"{pretty} ({unit})"
 
 
@@ -353,3 +353,37 @@ def comparison_rows(comparison) -> List[Dict[str, Any]]:
             "better": BETTER_TEXT[r.better],
         })
     return rows
+
+
+# ------------------------------------------------------------------ tracker (feature 003)
+
+def fmt_days(value) -> str:
+    return "no sessions yet" if value is None else str(int(value))
+
+
+def roster_columns() -> Dict[str, str]:
+    return {
+        "patient_id": "Patient", "label": "Label", "program": "Program", "program_status": "Program status",
+        "days_since_last": "Days since last session (days)", "sessions_7d": "Sessions, last 7 days (count)",
+        "sessions_30d": "Sessions, last 30 days (count)", "adherence": metric_label("adherence_pct"),
+        "pending_reviews": "Pending reviews (count)", "open_flags": "Open flags (count)",
+        "practice_gap": "Practice gap", "last_next_step": "Last next step", "needs_attention": "Needs attention",
+    }
+
+
+def roster_table_rows(rows) -> List[Dict[str, Any]]:
+    return [{
+        "patient_id": r.patient_id,
+        "label": r.label or "",
+        "program": r.program_name,
+        "program_status": r.program_status,
+        "days_since_last": fmt_days(r.days_since_last),
+        "sessions_7d": r.sessions_7d,
+        "sessions_30d": r.sessions_30d,
+        "adherence": f"{r.adherence_pct}%" if r.adherence_pct is not None else r.adherence_note,
+        "pending_reviews": r.pending_reviews,
+        "open_flags": r.open_flags,
+        "practice_gap": "yes" if r.practice_gap else "no",
+        "last_next_step": r.last_next_step or "none",
+        "needs_attention": "yes" if r.needs_attention else "no",
+    } for r in rows]

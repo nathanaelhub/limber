@@ -316,3 +316,64 @@ class TestReviewExport:
         assert r.returncode == 0 and r.stdout.count("\n") == 1 and "_review_30d_" in r.stdout
         r = run_cli(cli_env, "review", "export", "ghost", "--format", "all", "--out", str(out_dir))
         assert r.returncode == 1
+
+
+def seed_caseload(tmp_db):
+    """A (declining form, one pending, knee_rehab assigned 21 days ago), B (quiet 20 days), C (discharged), D (none)."""
+    from datetime import date
+    from src.ptlog.store import SessionStore
+    from src.ptlog.models import ExerciseSetInfo, RepEvent
+    from tests.fixtures.golden.sequence import FixedClock
+    knee = ExerciseSetInfo("knee_extension", "Knee Extension", "left", 1, 170.0, 90.0)
+    clock = FixedClock(datetime.now())
+    ids = {}
+    with SessionStore(tmp_db, clock=clock).open() as s:
+        for pid in ("P-017", "P-018", "P-019", "P-020"):
+            s.add_patient(pid)
+
+        def rec(pid, days_ago, form):
+            start = datetime.now() - timedelta(days=days_ago)
+            clock.set(start)
+            sid = s.start_session(pid, "video", "clip.mp4")
+            set_id = s.open_set(sid, knee)
+            s.add_rep(set_id, RepEvent(1, 10.0, 88.0, 78.0, 3.0, form, (start + timedelta(seconds=5)).isoformat(), 60))
+            clock.set(start + timedelta(seconds=30))
+            s.end_session(sid)
+            return sid
+
+        ids["P-017"] = [rec("P-017", d, f) for d, f in ((18, 90), (12, 86), (5, 81), (2, 75))]
+        for sid, step in zip(ids["P-017"][:3], ("continue", "continue", "hold")):
+            s.set_review(sid, step)
+        ids["P-018"] = [rec("P-018", 20, 88)]
+        s.set_review(ids["P-018"][0], "continue")
+        ids["P-019"] = [rec("P-019", 3, 88)]
+        s.discharge("P-019", date.today(), "goals met")
+        KEYS = ["knee_extension", "knee_extension_right", "partial_squat", "seated_hip_flexion", "seated_hip_flexion_right"]
+        s.assign_program("P-017", "knee_rehab", "Knee Rehabilitation", KEYS, 3, date.today() - timedelta(days=21))
+    return ids
+
+
+class TestTrackerRoster:
+    def test_roster_sorts_and_filters(self, cli_env, tmp_db):
+        seed_caseload(tmp_db)
+        r = run_cli(cli_env, "tracker", "roster")
+        assert r.returncode == 0, out(r)
+        lines = [l for l in r.stdout.strip().splitlines() if l.strip()]
+        assert "adherence" in lines[0].lower() and "pending" in lines[0].lower()
+        rows = [l.split()[0] for l in lines[1:]]
+        assert rows == ["P-017", "P-018", "P-020"]
+        r = run_cli(cli_env, "tracker", "roster", "--sort", "id")
+        assert [l.split()[0] for l in r.stdout.strip().splitlines()[1:]] == ["P-017", "P-018", "P-020"]
+        r = run_cli(cli_env, "tracker", "roster", "--needs-attention")
+        assert [l.split()[0] for l in r.stdout.strip().splitlines()[1:]] == ["P-017", "P-018"]
+        r = run_cli(cli_env, "tracker", "roster", "--program", "knee_rehab")
+        assert [l.split()[0] for l in r.stdout.strip().splitlines()[1:]] == ["P-017"]
+        rows = json.loads(run_cli(cli_env, "tracker", "roster", "--json").stdout)
+        a = next(x for x in rows if x["patient_id"] == "P-017")
+        assert a["pending_reviews"] == 1 and a["open_flags"] == 1 and a["adherence_pct"] == 44 and a["last_next_step"] == "hold"
+
+    def test_programs(self, cli_env):
+        r = run_cli(cli_env, "tracker", "programs")
+        assert r.returncode == 0 and "knee_rehab" in r.stdout and "Knee Rehabilitation" in r.stdout and "custom" in r.stdout
+        rows = json.loads(run_cli(cli_env, "tracker", "programs", "--json").stdout)
+        assert [p["id"] for p in rows] == ["knee_rehab", "shoulder_mobility", "hip_strengthening", "general_conditioning", "custom"]

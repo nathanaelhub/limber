@@ -14,6 +14,7 @@ Commands:
     export      Export a session in a legacy file format
     import-legacy  Import pre-existing session files once
     review      Trends, flags, comparisons, session reviews, goals, and review exports
+    tracker     Caseload roster, programs, adherence, and the cross-patient queue
     calibrate   Help set up optimal camera positioning
 
 Usage Examples:
@@ -615,6 +616,50 @@ def cmd_review(args):
         return 2
 
 
+def cmd_tracker(args):
+    """Handle the tracker command group (caseload roster, programs, assignments, adherence, queue)."""
+    from dataclasses import asdict
+    from src.ptlog import programs, tracker, views
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            sub = args.tracker_cmd
+            if sub == "roster":
+                rows = tracker.roster(store, sort=args.sort, program=args.program, needs_attention=args.needs_attention)
+                if args.json:
+                    print(json.dumps([asdict(r) for r in rows], indent=2))
+                else:
+                    print(f"{'patient':<14}{'label':<22}{'program':<24}{'last (days)':<13}{'7d':>3} {'30d':>4}  "
+                          f"{'adherence':<20}{'pending':>7} {'flags':>5}  {'gap':<4} next step")
+                    for t in views.roster_table_rows(rows):
+                        program = f"{t['program']} ({t['program_status']})" if t['program'] != "none" else "none"
+                        print(f"{t['patient_id']:<14}{t['label'][:21]:<22}{program[:23]:<24}{t['days_since_last']:<13}"
+                              f"{t['sessions_7d']:>3} {t['sessions_30d']:>4}  {t['adherence']:<20}{t['pending_reviews']:>7} "
+                              f"{t['open_flags']:>5}  {t['practice_gap']:<4} {t['last_next_step']}")
+                    if not rows:
+                        print("No active patients.")
+            elif sub == "programs":
+                items = [{"id": p.id, "name": p.name, "description": p.description, "exercise_keys": p.exercise_keys,
+                          "exercise_names": p.exercise_names} for p in programs.list_programs()]
+                items.append({"id": "custom", "name": "Custom", "description": "Your own list of exercise keys (see --exercises)",
+                              "exercise_keys": [], "exercise_names": []})
+                if args.json:
+                    print(json.dumps(items, indent=2))
+                else:
+                    for it in items:
+                        names = ", ".join(it["exercise_names"]) if it["exercise_names"] else it["description"]
+                        print(f"{it['id']:<22}{it['name']:<24}{len(it['exercise_keys']):>2} exercises  {names}")
+            else:
+                print_error("Usage: tracker {roster,programs}")
+                return 1
+        return 0
+    except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
+        print_error(str(e))
+        return 1
+    except sqlite3.OperationalError as e:
+        print_error(f"Database error: {e}")
+        return 2
+
+
 def cmd_calibrate(args):
     """Handle the calibrate command for camera setup."""
     print_header("Camera Calibration Guide")
@@ -934,6 +979,17 @@ Examples:
     rx.add_argument("--format", "-f", required=True, choices=["report", "csv", "all"])
     rx.add_argument("--out", "-o", default=None, help="Output directory (default: exports/)")
 
+    # Tracker command group
+    tracker_parser = subparsers.add_parser("tracker", help="Manage the caseload: roster, programs, adherence, queue")
+    tracker_sub = tracker_parser.add_subparsers(dest="tracker_cmd")
+    tr = tracker_sub.add_parser("roster", help="Every active patient at a glance")
+    tr.add_argument("--sort", default="attention", choices=["attention", "id"])
+    tr.add_argument("--program", default=None, help="Only patients on this program id")
+    tr.add_argument("--needs-attention", action="store_true")
+    tr.add_argument("--json", action="store_true")
+    tp = tracker_sub.add_parser("programs", help="Pre-built programs from the configuration")
+    tp.add_argument("--json", action="store_true")
+
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")
     calibrate_parser.add_argument("--camera", "-c", type=int, default=0,
@@ -961,6 +1017,8 @@ Examples:
         return cmd_import_legacy(args)
     elif args.command == "review":
         return cmd_review(args)
+    elif args.command == "tracker":
+        return cmd_tracker(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":

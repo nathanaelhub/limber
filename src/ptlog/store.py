@@ -12,14 +12,18 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable, List, Optional
 
 from .privacy import validate_label, validate_notes, validate_patient_id
 from .models import (
     PTLogError,
+    ADHERENCE_THRESHOLD_DEFAULT,
     GAP_DAYS_DEFAULT,
+    Assignment,
+    AssignmentValidationError,
+    Discharge,
     NEXT_STEPS,
     UNASSIGNED_ID,
     UNASSIGNED_LABEL,
@@ -47,7 +51,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -211,9 +215,38 @@ CREATE TABLE IF NOT EXISTS review_exports (
 """
 
 # Forward-only migrations: (version, sql). Applied in order on open().
+SCHEMA_V3_SQL = """
+CREATE TABLE IF NOT EXISTS assignments (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id         TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    program_id         TEXT NOT NULL,
+    program_name       TEXT NOT NULL,
+    exercise_keys      TEXT NOT NULL,
+    sessions_per_week  INTEGER NOT NULL CHECK (sessions_per_week BETWEEN 1 AND 14),
+    start_date         TEXT NOT NULL,
+    end_date           TEXT,
+    created_at         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assignments_patient ON assignments(patient_id, start_date);
+
+CREATE TABLE IF NOT EXISTS discharges (
+    patient_id     TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    discharged_on  TEXT NOT NULL,
+    reason         TEXT,
+    created_at     TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tracker_settings (
+    id                   INTEGER PRIMARY KEY CHECK (id = 1),
+    adherence_threshold  INTEGER NOT NULL DEFAULT 60 CHECK (adherence_threshold BETWEEN 1 AND 100)
+);
+INSERT OR IGNORE INTO tracker_settings (id, adherence_threshold) VALUES (1, 60);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
+    (3, SCHEMA_V3_SQL),
 ]
 
 
@@ -916,6 +949,125 @@ class SessionStore:
         reviewed = {r[0] for r in self.conn.execute(
             "SELECT r.session_id FROM reviews r JOIN sessions s ON s.id = r.session_id WHERE s.patient_id = ?", (patient_id,))}
         return [row for row in self.list_sessions(patient_id) if row.id not in reviewed]
+
+    # ---------------------------------------------------------------- tracker (feature 003)
+
+    @staticmethod
+    def _to_date(value) -> Optional[date]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        return date.fromisoformat(str(value)[:10])
+
+    @staticmethod
+    def _assignment_from_row(row: sqlite3.Row) -> Assignment:
+        return Assignment(row["id"], row["patient_id"], row["program_id"], row["program_name"],
+                          json.loads(row["exercise_keys"]), row["sessions_per_week"], row["start_date"],
+                          row["end_date"], row["created_at"])
+
+    def assign_program(self, patient_id: str, program_id: str, program_name: str, exercise_keys: List[str],
+                       sessions_per_week: int = 3, start_date=None, end_date=None) -> Assignment:
+        """Assign a program; any assignment still open on the new start ends the day before (FR-006, FR-007)."""
+        from .programs import validate_exercise_keys
+        patient = self.get_patient(patient_id)
+        if patient is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        if patient.is_builtin:
+            raise BuiltinPatientError("The built-in 'unassigned' patient cannot be assigned a program")
+        keys = validate_exercise_keys(list(exercise_keys))
+        if not (1 <= int(sessions_per_week) <= 14):
+            raise AssignmentValidationError("sessions per week must be 1–14")
+        start = self._to_date(start_date) or self.clock().date()
+        end = self._to_date(end_date)
+        if end is not None and end < start:
+            raise AssignmentValidationError("end date must not be before the start date")
+        previous_day = (start - timedelta(days=1)).isoformat()
+        self.conn.execute(
+            "UPDATE assignments SET end_date = ? WHERE patient_id = ? AND (end_date IS NULL OR end_date >= ?)",
+            (previous_day, patient.id, start.isoformat()))
+        cur = self.conn.execute(
+            """
+            INSERT INTO assignments (patient_id, program_id, program_name, exercise_keys, sessions_per_week,
+                                     start_date, end_date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (patient.id, program_id, program_name, json.dumps(keys), int(sessions_per_week), start.isoformat(),
+             end.isoformat() if end else None, self._now()))
+        self.conn.commit()
+        row = self.conn.execute("SELECT * FROM assignments WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return self._assignment_from_row(row)
+
+    def active_assignment(self, patient_id: str, on=None) -> Optional[Assignment]:
+        on_date = (self._to_date(on) or self.clock().date()).isoformat()
+        row = self.conn.execute(
+            """
+            SELECT * FROM assignments WHERE patient_id = ? AND start_date <= ? AND (end_date IS NULL OR end_date >= ?)
+            ORDER BY start_date DESC, id DESC LIMIT 1
+            """, (patient_id, on_date, on_date)).fetchone()
+        return self._assignment_from_row(row) if row else None
+
+    def assignment_history(self, patient_id: str) -> List[Assignment]:
+        rows = self.conn.execute(
+            "SELECT * FROM assignments WHERE patient_id = ? ORDER BY start_date DESC, id DESC", (patient_id,)).fetchall()
+        return [self._assignment_from_row(r) for r in rows]
+
+    def discharge(self, patient_id: str, on=None, reason: Optional[str] = None) -> Discharge:
+        patient = self.get_patient(patient_id)
+        if patient is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        if patient.is_builtin:
+            raise BuiltinPatientError("The built-in 'unassigned' patient cannot be discharged")
+        clean = validate_notes(reason)
+        on_date = (self._to_date(on) or self.clock().date()).isoformat()
+        self.conn.execute(
+            "INSERT OR REPLACE INTO discharges (patient_id, discharged_on, reason, created_at) VALUES (?, ?, ?, ?)",
+            (patient.id, on_date, clean, self._now()))
+        self.conn.commit()
+        return self.get_discharge(patient.id)
+
+    def reactivate(self, patient_id: str) -> bool:
+        cur = self.conn.execute("DELETE FROM discharges WHERE patient_id = ?", (patient_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_discharge(self, patient_id: str) -> Optional[Discharge]:
+        row = self.conn.execute("SELECT * FROM discharges WHERE patient_id = ?", (patient_id,)).fetchone()
+        return Discharge(row["patient_id"], row["discharged_on"], row["reason"], row["created_at"]) if row else None
+
+    def active_patients(self) -> List[Patient]:
+        discharged = {r[0] for r in self.conn.execute("SELECT patient_id FROM discharges")}
+        return [p for p in self.list_patients() if p.id not in discharged]
+
+    def discharged_patients(self) -> List[tuple]:
+        rows = self.conn.execute("SELECT patient_id FROM discharges ORDER BY discharged_on DESC, patient_id").fetchall()
+        result = []
+        for r in rows:
+            patient = self.get_patient(r["patient_id"])
+            if patient is not None:
+                result.append((patient, self.get_discharge(patient.id)))
+        return result
+
+    def get_adherence_threshold(self) -> int:
+        row = self.conn.execute("SELECT adherence_threshold FROM tracker_settings WHERE id = 1").fetchone()
+        return int(row[0]) if row else ADHERENCE_THRESHOLD_DEFAULT
+
+    def set_adherence_threshold(self, value: int) -> int:
+        if not (1 <= int(value) <= 100):
+            raise PTLogError("adherence threshold must be between 1 and 100 percent")
+        self.conn.execute("INSERT OR REPLACE INTO tracker_settings (id, adherence_threshold) VALUES (1, ?)", (int(value),))
+        self.conn.commit()
+        return int(value)
+
+    def latest_review(self, patient_id: str) -> Optional[Review]:
+        row = self.conn.execute(
+            """
+            SELECT r.* FROM reviews r JOIN sessions s ON s.id = r.session_id
+            WHERE s.patient_id = ? ORDER BY s.start_time DESC, s.id DESC LIMIT 1
+            """, (patient_id,)).fetchone()
+        return Review(row["session_id"], row["reviewed_at"], row["notes"], row["next_step"]) if row else None
 
 
 def _ts_key(ts: Optional[str]):
