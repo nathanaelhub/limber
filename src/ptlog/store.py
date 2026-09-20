@@ -492,6 +492,10 @@ class SessionStore:
             self._finish_session(session_id, status="completed", end_time=end_time)
         return self.load_session(session_id)
 
+    def last_activity_time(self, session_id: int) -> Optional[str]:
+        """Timestamp of the latest stored event or sample of a session (None when it has none)."""
+        return self._last_activity_time(session_id)
+
     def interrupt_session(self, session_id: int, reason: str) -> None:
         """Mark one running session interrupted; a no-op for a session already finished."""
         row = self.conn.execute("SELECT status, start_time FROM sessions WHERE id = ?", (session_id,)).fetchone()

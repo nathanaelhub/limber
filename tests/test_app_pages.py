@@ -300,3 +300,31 @@ def test_live_page_while_playing_offers_switch_and_reset(seeded_env, stub_webrtc
     at.button(key="live_switch").click().run()
     at.button(key="live_reset").click().run()
     assert proc.requests == [("switch", "knee_extension"), ("reset",)]
+
+
+def _running_live_session(db, age_seconds):
+    import os
+    start = datetime.now() - timedelta(seconds=age_seconds)
+    with SessionStore(db, clock=FixedClock(start)).open() as store:
+        sid = store.start_session("P-017", "webcam", "Default", {"pid": os.getpid(), "origin": "web"})
+        set_id = store.open_set(sid, KNEE)
+        store.add_rep(set_id, RepEvent(1, 85.0, 172.0, 87.0, 2.0, 91.0, start.isoformat(), 60))
+    return sid
+
+
+def test_live_page_interrupts_a_session_whose_stream_was_lost(seeded_env, stub_webrtc):
+    sid = _running_live_session(seeded_env, age_seconds=120)
+    at = _live_page({"live_session_id": sid})
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        s = store.load_session(sid)
+    assert (s.status, s.interrupted_reason, s.total_reps) == ("interrupted", "stream_lost", 1)
+    assert any("interrupted" in w.value for w in at.warning)
+
+
+def test_live_page_leaves_a_session_that_is_still_finishing(seeded_env, stub_webrtc):
+    sid = _running_live_session(seeded_env, age_seconds=1)
+    at = _live_page({"live_session_id": sid})
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        assert store.load_session(sid).status == "running"

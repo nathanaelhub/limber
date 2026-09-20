@@ -426,6 +426,9 @@ def page_home():
 # PAGE: LIVE SESSION
 # =============================================================================
 
+LIVE_LOST_AFTER_SECONDS = 10   # a running session with no stream and no activity for this long was lost
+
+
 def _live_summary_block():
     """After a stream: the stored summary of the session it recorded, with a way to open it."""
     sid = st.session_state.get("live_session_id")
@@ -437,7 +440,21 @@ def _live_summary_block():
         except PTLogError:
             st.session_state.pop("live_session_id", None)
             return
-    st.success(ptviews.live_summary_line(session))
+    if session.status == "running":
+        # No stream is playing, yet the session never ended: the tab or connection was lost.
+        # Wait out the moment in which a normal stop is still being written.
+        with _open_store() as store:
+            last = store.last_activity_time(session.id) or session.start_time
+            if (datetime.now() - datetime.fromisoformat(last)).total_seconds() > LIVE_LOST_AFTER_SECONDS:
+                store.interrupt_session(session.id, "stream_lost")
+                session = store.load_session(session.id)
+    if session.status == "running":
+        st.info(f"Session {session.id} is finishing…")
+        return
+    if session.status == "interrupted":
+        st.warning(ptviews.live_summary_line(session))
+    else:
+        st.success(ptviews.live_summary_line(session))
     if st.button("📋 Open in Sessions", key="live_open_session"):
         st.session_state.sessions_scope = "All patients"
         st.session_state.sessions_open = session.id

@@ -54,9 +54,9 @@ its implementation task. Suite command: `.venv/bin/python -m pytest tests`.
 
 **Goal**: a killed process leaves an interrupted session with its reps; a new stream supersedes an old one; page reruns never interrupt a live stream.
 
-- [ ] T018 [P] [US3] Write failing tests in tests/test_live_interrupt.py: a subprocess runs a `LiveSession` for four reps and is SIGKILLed; reopening the store shows the session interrupted with four reps (SC-003); opening a second store in the same process while a `LiveSession` runs leaves it running and `end()` completes it; starting a second `LiveSession` marks the first interrupted with reason `superseded_by_new_session`; 30 seconds of fake clock with no keypoints then `end()` completes normally
-- [ ] T019 [US3] Make the tests pass: `on_ended` safety in `LiveVideoProcessor`, and in `page_live_session()` interrupt a session still `running` in state when the stream is not playing and no processor holds it (`interrupt_session(id, "stream_lost")`), showing the status in the summary block
-- [ ] T020 [US3] Run the suite; checkpoint commit
+- [X] T018 [P] [US3] Write failing tests in tests/test_live_interrupt.py: a subprocess runs a `LiveSession` for four reps and is SIGKILLed; reopening the store shows the session interrupted with four reps (SC-003); opening a second store in the same process while a `LiveSession` runs leaves it running and `end()` completes it; starting a second `LiveSession` marks the first interrupted with reason `superseded_by_new_session`; 30 seconds of fake clock with no keypoints then `end()` completes normally
+- [X] T019 [US3] Make the tests pass: `on_ended` safety in `LiveVideoProcessor`, and in `page_live_session()` interrupt a session still `running` in state when the stream is not playing and no processor holds it (`interrupt_session(id, "stream_lost")`), showing the status in the summary block
+- [X] T020 [US3] Run the suite; checkpoint commit
 
 ## Phase 6: User Story 4 - Screenshot and cleanup (P4)
 
