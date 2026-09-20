@@ -176,11 +176,11 @@ created from `main` before T001.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T043 [P] Add "Update 5 — Multi-Patient PT Tracker" to `docs/UPDATES.md` (roster columns and sort, programs and assignment with supersession, adherence weeks and percentage, queue kinds and threshold, discharge, roster export, tracker CLI group, Tracker page, migration 3)
-- [ ] T044 [P] Update `README.md`: tracker commands in Quick Start, Project Structure (add `programs.py`, `adherence.py`, `tracker.py`, roster export), feature bullet
-- [ ] T045 [P] Update `docs/PROJECT_OVERVIEW.md`: architecture tree and Key Files for the tracker modules
-- [ ] T046 Run `specs/003-pt-tracker/quickstart.md` steps 1–8 against a scratch database (step 9 via `tests/test_app_pages.py`) and record outcomes under `## Notes` in `specs/003-pt-tracker/checklists/requirements.md`
-- [ ] T047 Final gate: full suite green; `git diff --stat main -- analyze.py src/form_assessment.py src/utils.py config.yaml tests/test_analysis.py tests/test_form_assessment.py requirements.txt` empty; `grep -rnE '^(import|from) (socket|urllib|http|requests)' src/ptlog/` empty; the 50-patient performance test passing; then run `/speckit-analyze`
+- [X] T043 [P] Add "Update 5 — Multi-Patient PT Tracker" to `docs/UPDATES.md` (roster columns and sort, programs and assignment with supersession, adherence weeks and percentage, queue kinds and threshold, discharge, roster export, tracker CLI group, Tracker page, migration 3)
+- [X] T044 [P] Update `README.md`: tracker commands in Quick Start, Project Structure (add `programs.py`, `adherence.py`, `tracker.py`, roster export), feature bullet
+- [X] T045 [P] Update `docs/PROJECT_OVERVIEW.md`: architecture tree and Key Files for the tracker modules
+- [X] T046 Run `specs/003-pt-tracker/quickstart.md` steps 1–8 against a scratch database (step 9 via `tests/test_app_pages.py`) and record outcomes under `## Notes` in `specs/003-pt-tracker/checklists/requirements.md`
+- [X] T047 Final gate: full suite green; `git diff --stat main -- analyze.py src/form_assessment.py src/utils.py config.yaml tests/test_analysis.py tests/test_form_assessment.py requirements.txt` empty; `grep -rnE '^(import|from) (socket|urllib|http|requests)' src/ptlog/` empty; the 50-patient performance test passing; then run `/speckit-analyze`
 
 ---
 

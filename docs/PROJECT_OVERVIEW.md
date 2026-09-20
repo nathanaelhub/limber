@@ -64,6 +64,9 @@ ai-pt-assistant/
 │       ├── measures.py     # Per-session per-exercise measures (derived, never stored)
 │       ├── flags.py        # Seven attention rules with thresholds and evidence
 │       ├── review.py       # Trends, comparison, reviews, flags, review summary
+│       ├── programs.py     # Exercise and program catalog from config.yaml
+│       ├── adherence.py    # Assignment weeks, coverage, adherence percentage
+│       ├── tracker.py      # Caseload roster, attention sort, cross-patient queue
 │       ├── views.py        # Unit-labelled rendering for CLI and web
 │       ├── privacy.py      # Pseudonymous-ID and notes rules
 │       ├── importer.py     # One-time legacy import
@@ -134,6 +137,13 @@ events, and control events. `SessionStore` is the only writer; `SessionRecorder`
 code that reads the engine's outputs; `exports/` reproduces the four legacy file formats
 from the record; `importer.py` brings pre-existing files in once. Every metric carries a
 unit and a plain-language definition.
+
+### `src/ptlog/tracker.py`, `adherence.py`, `programs.py` (~600 lines)
+**Multi-patient tracker**
+
+The caseload roster with adherence, pending reviews, and open flags per patient; program
+assignment from the configuration's programs with supersession and history; week-by-week
+adherence; the cross-patient queue; discharge; and the roster export.
 
 ### `src/ptlog/review.py`, `measures.py`, `flags.py` (~900 lines)
 **Review over time**

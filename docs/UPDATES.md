@@ -2,6 +2,56 @@
 
 ---
 
+## Update 5 — 2026-09-20 — Multi-Patient PT Tracker
+
+Feature spec: `specs/003-pt-tracker/`. Reads from the canonical record and the review feature;
+nothing about recording changed. Schema moved to version 3 (`assignments`, `discharges`,
+`tracker_settings`), applied automatically on first open.
+
+### 1. Roster
+
+`tracker roster [--sort attention|id] [--program ID] [--needs-attention]` lists every active
+patient with: program and its status, days since the last session, sessions in the last 7 and 30
+days, adherence over the last four complete assignment weeks, pending reviews, open attention
+flags (last 30 days), a practice-gap marker, and the next step from the most recent review. The
+attention sort puts more flags, then more pending reviews, then lower adherence, then the longest
+absence first.
+
+### 2. Programs and assignment
+
+`tracker programs` lists the four pre-built programs from `config.yaml`; `tracker assign
+<patient> --program knee_rehab | --exercises k1,k2 [--per-week 3] [--start DATE] [--end DATE]`
+assigns one (or a custom list of exercise keys). A patient has one active assignment; a new one
+ends the previous one the day before it starts, and `tracker assignments <patient>` shows the
+history with statuses (scheduled, active, completed, superseded).
+
+### 3. Adherence
+
+`tracker adherence <patient>` shows seven-day assignment weeks from the start date: sessions
+recorded against planned (a session counts once, and only with a counted rep), which assigned
+exercises were performed, missed weeks, the current week in progress, and the percentage over
+the last four complete weeks, capped per week.
+
+### 4. Queue and threshold
+
+`tracker queue` lists everything needing action across active patients, oldest first within each
+kind: pending reviews, attention flags, practice gaps, and adherence below the threshold
+(`tracker settings --adherence-threshold 60`). There is no acknowledgement state; items leave
+when the underlying condition is resolved.
+
+### 5. Discharge and export
+
+`tracker discharge <patient> [--on DATE] [--reason …]` removes a patient from the roster and queue
+while keeping every session, review, goal, and assignment; `tracker reactivate` brings them back;
+`tracker discharged` lists them. `tracker export-roster` writes `roster_<time>.csv`.
+
+### 6. Web app
+
+A Tracker page (Roster, Queue, Adherence, Discharged, Export) and, on the Patients page, a
+program assignment form with history and a discharge control.
+
+---
+
 ## Update 4 — 2026-09-19 — Review Over Time
 
 Feature spec: `specs/002-review-over-time/`. Everything reads from the canonical session record;

@@ -39,3 +39,11 @@
 - `/speckit-analyze` (2026-09-19): 28 requirements, 47 tasks, 100% covered; no constitution conflicts.
   Remediated: (L) the no-sessions adherence edge case added to T006; (L) modified test files added to the
   plan tree. The week-boundary edge case is covered by T006's 23:59 case.
+- `/speckit-implement` completion (2026-09-20): T001–T047 done on branch `003-pt-tracker` (5 commits).
+  Suite 384 passed, including the 50-patient performance test and headless renders of every Tracker
+  section and the Patients page controls. Quickstart against a scratch database seeded from the legacy
+  fixtures: step 3 programs listed, assignment with supersession and history, unknown key rejected;
+  step 4 adherence (first week in progress); step 5 roster with attention order and filters; step 6
+  queue with pending reviews and practice gaps, threshold changed, a reviewed session left the queue;
+  step 7 discharge, exclusion, discharged list, name-like reason rejected, reactivation; step 8 roster
+  CSV named by time only. Final gate: engine files untouched versus main, no network imports.

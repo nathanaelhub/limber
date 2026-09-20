@@ -628,11 +628,11 @@ def cmd_tracker(args):
                 if args.json:
                     print(json.dumps([asdict(r) for r in rows], indent=2))
                 else:
-                    print(f"{'patient':<14}{'label':<22}{'program':<24}{'last (days)':<13}{'7d':>3} {'30d':>4}  "
+                    print(f"{'patient':<14}{'label':<22}{'program':<32}{'last (days)':<13}{'7d':>3} {'30d':>4}  "
                           f"{'adherence':<20}{'pending':>7} {'flags':>5}  {'gap':<4} next step")
                     for t in views.roster_table_rows(rows):
                         program = f"{t['program']} ({t['program_status']})" if t['program'] != "none" else "none"
-                        print(f"{t['patient_id']:<14}{t['label'][:21]:<22}{program[:23]:<24}{t['days_since_last']:<13}"
+                        print(f"{t['patient_id']:<14}{t['label'][:21]:<22}{program[:31]:<32}{t['days_since_last']:<13}"
                               f"{t['sessions_7d']:>3} {t['sessions_30d']:>4}  {t['adherence']:<20}{t['pending_reviews']:>7} "
                               f"{t['open_flags']:>5}  {t['practice_gap']:<4} {t['last_next_step']}")
                     if not rows:

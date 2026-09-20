@@ -1020,7 +1020,7 @@ class SessionStore:
             raise PatientNotFoundError(f"Patient '{patient_id}' not found")
         if patient.is_builtin:
             raise BuiltinPatientError("The built-in 'unassigned' patient cannot be discharged")
-        clean = validate_notes(reason)
+        clean = validate_notes(reason, what="Discharge reason")
         on_date = (self._to_date(on) or self.clock().date()).isoformat()
         self.conn.execute(
             "INSERT OR REPLACE INTO discharges (patient_id, discharged_on, reason, created_at) VALUES (?, ?, ?, ?)",

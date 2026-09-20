@@ -57,15 +57,16 @@ def validate_label(value: Optional[str]) -> Optional[str]:
     return value
 
 
-def validate_notes(value: Optional[str]) -> Optional[str]:
-    """Return normalized clinical notes (None when empty) or raise on identifying text.
+def validate_notes(value: Optional[str], what: str = "Notes") -> Optional[str]:
+    """Return normalized free text (None when empty) or raise on identifying text.
 
-    Same three patterns as labels; no length cap, since chart notes can be long.
+    Same three patterns as labels; no length cap, since chart notes can be long. `what` names
+    the field in the error (notes, discharge reason, ...).
     """
     if value is None:
         return None
     value = value.strip()
     if not value:
         return None
-    _check_phi(value, "Notes")
+    _check_phi(value, what)
     return value

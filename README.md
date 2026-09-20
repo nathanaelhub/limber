@@ -9,6 +9,7 @@ An intelligent exercise monitoring system using YOLO11 pose estimation to provid
 - **Form assessment** with biomechanical checks
 - **One canonical session record** (local SQLite) with pseudonymous patients, crash-safe logging, and exports in the legacy PTA-Log, JSON, CSV, and text formats
 - **Review over time**: trends per exercise, attention flags with evidence, side-by-side comparison, session reviews with notes and next steps, goals, and review summary exports
+- **Multi-patient tracker**: caseload roster, program assignment from the pre-built programs, week-by-week adherence, a cross-patient queue, discharge, and a roster export
 - **Multiple interfaces**: CLI, Web (Streamlit), and programmatic API
 
 ## Installation
@@ -85,6 +86,11 @@ python interfaces/cli.py review flags P-017
 python interfaces/cli.py review mark 3 --next-step progress --notes "post-op week 3"
 python interfaces/cli.py review export P-017 --format all
 
+# Manage the caseload: programs, adherence, and a cross-patient work queue
+python interfaces/cli.py tracker assign P-017 --program knee_rehab --per-week 3
+python interfaces/cli.py tracker roster --needs-attention
+python interfaces/cli.py tracker queue
+
 # Launch web interface
 streamlit run interfaces/app.py
 ```
@@ -127,9 +133,9 @@ ai-pt-assistant/
 │   ├── utils.py            # Helper functions
 │   ├── form_assessment.py  # Form checking
 │   ├── session_summary.py  # Clinical summary of one session
-│   └── ptlog/              # Canonical record: store, recorder, measures, flags, review, views, exports, importer
+│   └── ptlog/              # Canonical record: store, recorder, measures, flags, review, programs, adherence, tracker, views, exports, importer
 ├── interfaces/
-│   ├── cli.py              # Command-line interface (patients, sessions, review, export, import-legacy)
+│   ├── cli.py              # Command-line interface (patients, sessions, review, tracker, export, import-legacy)
 │   └── app.py              # Streamlit web app
 ├── specs/                  # Spec Kit feature specs, plans, and tasks
 ├── data/                   # ptassist.db (created on first run, git-ignored)
