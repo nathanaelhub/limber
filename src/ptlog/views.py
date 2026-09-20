@@ -387,3 +387,40 @@ def roster_table_rows(rows) -> List[Dict[str, Any]]:
         "last_next_step": r.last_next_step or "none",
         "needs_attention": "yes" if r.needs_attention else "no",
     } for r in rows]
+
+
+def assignment_line(adh) -> str:
+    a = adh.assignment
+    span = f"from {a.start_date}" + (f" to {a.end_date}" if a.end_date else "")
+    return f"{a.program_name} — {a.sessions_per_week} sessions/week {span} ({adh.status})"
+
+
+def adherence_lines(adh) -> List[str]:
+    """Assignment line, one line per week, and the percentage or note."""
+    if adh.assignment is None:
+        return ["No program assigned."]
+    lines = [assignment_line(adh)]
+    if adh.status == "superseded":
+        return lines + ["Superseded by a later assignment; no adherence computed."]
+    if adh.status == "scheduled":
+        return lines + [f"Starts on {adh.assignment.start_date}; no adherence yet."]
+    for w in adh.weeks:
+        flag = "in progress" if w.in_progress else ("missed" if w.missed else "")
+        parts = [f"week {w.index}", f"{w.start}..{w.end}", f"{w.recorded}/{w.planned}"] + ([flag] if flag else [])
+        lines.append("  ".join(parts) + f" | performed: {', '.join(w.exercises_performed) or '—'} | "
+                     f"missing: {', '.join(w.exercises_missing) or '—'}")
+    complete = [w for w in adh.weeks if not w.in_progress]
+    if adh.percentage is None:
+        lines.append("First week in progress; adherence is computed after the first complete week.")
+    else:
+        suffix = f" ({adh.note})" if adh.note else ""
+        lines.append(f"Adherence: {adh.percentage}% over {len(complete)} complete weeks{suffix}")
+    return lines
+
+
+def adherence_table_rows(adh) -> List[Dict[str, Any]]:
+    return [{
+        "week": w.index, "from": w.start, "to": w.end, "recorded": f"{w.recorded}/{w.planned}",
+        "status": "in progress" if w.in_progress else ("missed" if w.missed else "done"),
+        "performed": ", ".join(w.exercises_performed) or "—", "missing": ", ".join(w.exercises_missing) or "—",
+    } for w in adh.weeks]

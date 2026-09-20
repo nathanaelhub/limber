@@ -81,13 +81,13 @@ created from `main` before T001.
 
 ### Tests for User Story 2 (write first, MUST FAIL)
 
-- [ ] T019 [P] [US2] Extend `tests/test_cli_ptlog.py`: `tracker assign P-017 --program knee_rehab --per-week 3 --start 2026-03-01` prints `Assigned Knee Rehabilitation to P-017: 3 sessions/week from 2026-03-01`; a second `assign … --exercises squat,pushup --start 2026-03-15` prints the assigned line plus `Ended previous assignment (Knee Rehabilitation) on 2026-03-14`; `tracker assignments P-017` lists both newest first with statuses; `--exercises bogus` → exit 1 naming `bogus`; `--per-week 15` → exit 1; `--end 2026-02-01` with start 2026-03-01 → exit 1; assigning to `unassigned` → exit 1; `--json` on `assignments` parses
-- [ ] T020 [P] [US2] Extend `tests/test_app_pages.py`: `test_patients_page_program_form` renders the Patients page and asserts a selectbox whose options include the four config program names and "Custom", a number input labelled with "sessions per week", a date input, and a "Assign program" button; after `store.assign_program(...)` in the fixture, the page shows the history dataframe with the program name
+- [X] T019 [P] [US2] Extend `tests/test_cli_ptlog.py`: `tracker assign P-017 --program knee_rehab --per-week 3 --start 2026-03-01` prints `Assigned Knee Rehabilitation to P-017: 3 sessions/week from 2026-03-01`; a second `assign … --exercises squat,pushup --start 2026-03-15` prints the assigned line plus `Ended previous assignment (Knee Rehabilitation) on 2026-03-14`; `tracker assignments P-017` lists both newest first with statuses; `--exercises bogus` → exit 1 naming `bogus`; `--per-week 15` → exit 1; `--end 2026-02-01` with start 2026-03-01 → exit 1; assigning to `unassigned` → exit 1; `--json` on `assignments` parses
+- [X] T020 [P] [US2] Extend `tests/test_app_pages.py`: `test_patients_page_program_form` renders the Patients page and asserts a selectbox whose options include the four config program names and "Custom", a number input labelled with "sessions per week", a date input, and a "Assign program" button; after `store.assign_program(...)` in the fixture, the page shows the history dataframe with the program name
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] `interfaces/cli.py` (depends on T019): add `tracker assign` (mutually exclusive `--program` / `--exercises`, `--per-week` default 3, `--start` default today, `--end`) and `tracker assignments`; resolve program name via `programs.get_program`
-- [ ] T022 [US2] `interfaces/app.py` (depends on T020): in `page_patients()` add a "Program" section for the selected patient: program selectbox (config programs plus Custom), a multiselect of exercise keys shown by display name when Custom, sessions per week, start and end date inputs, an "Assign program" button calling `store.assign_program`, and the assignment history table with status from `adherence.assignment_status`
+- [X] T021 [US2] `interfaces/cli.py` (depends on T019): add `tracker assign` (mutually exclusive `--program` / `--exercises`, `--per-week` default 3, `--start` default today, `--end`) and `tracker assignments`; resolve program name via `programs.get_program`
+- [X] T022 [US2] `interfaces/app.py` (depends on T020): in `page_patients()` add a "Program" section for the selected patient: program selectbox (config programs plus Custom), a multiselect of exercise keys shown by display name when Custom, sessions per week, start and end date inputs, an "Assign program" button calling `store.assign_program`, and the assignment history table with status from `adherence.assignment_status`
 
 **Checkpoint**: programs assignable with history
 
@@ -101,15 +101,15 @@ created from `main` before T001.
 
 ### Tests for User Story 3 (write first, MUST FAIL)
 
-- [ ] T023 [P] [US3] Add the adherence section to `tests/test_ptlog_tracker.py`: `tracker.adherence_for(store, "P-017", today)` equals `adherence.compute` over the patient's sessions since the assignment start; `views.adherence_lines(adherence)` renders `week 3  2026-03-15..2026-03-21  0/3  missed | performed: — | missing: knee_extension, partial_squat`, the current week with `in progress`, and `Adherence: 44% over 3 complete weeks`; the no-program and first-week notes render as single lines
-- [ ] T024 [P] [US3] Extend `tests/test_cli_ptlog.py`: `tracker adherence P-017` prints the assignment line, the weekly rows, and the percentage line; unknown patient → exit 1; `--json` parses with `weeks` and `percentage`
-- [ ] T025 [P] [US3] Extend `tests/test_app_pages.py`: the Adherence section renders a weekly dataframe for the sidebar patient without exception, and "no program" when none is assigned
+- [X] T023 [P] [US3] Add the adherence section to `tests/test_ptlog_tracker.py`: `tracker.adherence_for(store, "P-017", today)` equals `adherence.compute` over the patient's sessions since the assignment start; `views.adherence_lines(adherence)` renders `week 3  2026-03-15..2026-03-21  0/3  missed | performed: — | missing: knee_extension, partial_squat`, the current week with `in progress`, and `Adherence: 44% over 3 complete weeks`; the no-program and first-week notes render as single lines
+- [X] T024 [P] [US3] Extend `tests/test_cli_ptlog.py`: `tracker adherence P-017` prints the assignment line, the weekly rows, and the percentage line; unknown patient → exit 1; `--json` parses with `weeks` and `percentage`
+- [X] T025 [P] [US3] Extend `tests/test_app_pages.py`: the Adherence section renders a weekly dataframe for the sidebar patient without exception, and "no program" when none is assigned
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Implement `adherence_for(store, patient_id, today=None)` in `src/ptlog/tracker.py` and `adherence_lines(adherence)` plus `adherence_table_rows(adherence)` in `src/ptlog/views.py` (depends on T023)
-- [ ] T027 [US3] `interfaces/cli.py` (depends on T024, T026): add `tracker adherence`
-- [ ] T028 [US3] `interfaces/app.py` (depends on T025, T026): implement the Adherence section (weekly table with exercises performed/missing, percentage or note)
+- [X] T026 [US3] Implement `adherence_for(store, patient_id, today=None)` in `src/ptlog/tracker.py` and `adherence_lines(adherence)` plus `adherence_table_rows(adherence)` in `src/ptlog/views.py` (depends on T023)
+- [X] T027 [US3] `interfaces/cli.py` (depends on T024, T026): add `tracker adherence`
+- [X] T028 [US3] `interfaces/app.py` (depends on T025, T026): implement the Adherence section (weekly table with exercises performed/missing, percentage or note)
 
 **Checkpoint**: adherence visible per patient
 

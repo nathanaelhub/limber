@@ -230,3 +230,41 @@ class TestRoster:
             CountingStore.calls = 0
             rows = tracker.roster(store, now=D0)
         assert CountingStore.calls <= len(rows)
+
+
+# ======================================================================================
+# T023 — adherence view (User Story 3)
+# ======================================================================================
+
+from src.ptlog import views  # noqa: E402
+
+
+class TestAdherenceView:
+    def test_adherence_for_and_lines(self, fixed_store, caseload):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        t = {"target_reps": 1}
+        # assignment start 2026-03-01; sessions: week1 x3, week2 x1, week3 x0, week4 (current) x2; today 2026-03-23
+        caseload(store, clock, {"P-017": [(22, "Knee Extension", KE, t), (20, "Partial Squat", [(85, 40.0, 2.0)], t),
+                                          (18, "Knee Extension", KE, t), (14, "Knee Extension", KE, t),
+                                          (1, "Knee Extension", KE, t), (0, "Knee Extension", KE, t)]})
+        store.assign_program("P-017", "custom", "Custom", ["knee_extension", "partial_squat"], 3, date(2026, 3, 1))
+        adh = tracker.adherence_for(store, "P-017", TODAY)
+        assert adh.percentage == 44 and [w.recorded for w in adh.weeks] == [3, 1, 0, 2]
+        lines = views.adherence_lines(adh)
+        assert lines[0].startswith("Custom — 3 sessions/week from 2026-03-01 (active)")
+        assert "week 3  2026-03-15..2026-03-21  0/3  missed | performed: — | missing: knee_extension, partial_squat" in lines
+        assert any(l.startswith("week 4  2026-03-22..2026-03-28  2/3  in progress") for l in lines)
+        assert lines[-1] == "Adherence: 44% over 3 complete weeks"
+        rows = views.adherence_table_rows(adh)
+        assert rows[0]["week"] == 1 and rows[0]["recorded"] == "3/3" and rows[2]["status"] == "missed"
+
+    def test_no_program_and_first_week(self, fixed_store, caseload):
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        assert views.adherence_lines(tracker.adherence_for(store, "P-017", TODAY)) == ["No program assigned."]
+        store.assign_program("P-017", "custom", "Custom", ["knee_extension"], 3, TODAY - timedelta(days=2))
+        lines = views.adherence_lines(tracker.adherence_for(store, "P-017", TODAY))
+        assert lines[-1] == "First week in progress; adherence is computed after the first complete week."
+        with pytest.raises(PatientNotFoundError):
+            tracker.adherence_for(store, "ghost", TODAY)

@@ -1057,6 +1057,53 @@ def page_patients():
         except PTLogError as exc:
             st.error(str(exc))
 
+    _patient_program_section(pid)
+
+
+def _patient_program_section(pid):
+    """Program assignment form and history for one patient (feature 003)."""
+    from datetime import date
+    from src.ptlog import adherence as ptadherence
+    st.markdown("### Program")
+    catalog = ptprograms.list_programs()
+    names = [p.name for p in catalog] + ["Custom"]
+    choice = st.selectbox("Program", names, key="patients_program_choice")
+    custom_keys = []
+    if choice == "Custom":
+        all_keys = list(ptprograms.load_catalog().exercises)
+        custom_keys = st.multiselect("Exercises", all_keys, format_func=ptprograms.exercise_name, key="patients_program_keys")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        per_week = st.number_input("Sessions per week (count)", min_value=1, max_value=14, value=3, key="patients_program_per_week")
+    with c2:
+        start = st.date_input("Start date", value=date.today(), key="patients_program_start")
+    with c3:
+        set_end = st.checkbox("Set an end date", key="patients_program_set_end")
+        end = st.date_input("End date", value=date.today(), key="patients_program_end") if set_end else None
+    if st.button("Assign program", key="patients_program_assign"):
+        try:
+            with _open_store() as store:
+                if choice == "Custom":
+                    a = store.assign_program(pid, "custom", "Custom", custom_keys, int(per_week), start, end)
+                else:
+                    prog = next(p for p in catalog if p.name == choice)
+                    a = store.assign_program(pid, prog.id, prog.name, prog.exercise_keys, int(per_week), start, end)
+            st.success(f"Assigned {a.program_name} to {pid}: {a.sessions_per_week} sessions/week from {a.start_date}")
+            st.rerun()
+        except PTLogError as exc:
+            st.error(str(exc))
+    with _open_store() as store:
+        history = store.assignment_history(pid)
+    if history:
+        st.dataframe(pd.DataFrame([{
+            "Program": h.program_name, "From": h.start_date, "To": h.end_date or "open",
+            "Status": ptadherence.assignment_status(h, date.today()),
+            "Sessions per week (count)": h.sessions_per_week,
+            "Exercises": ", ".join(ptprograms.exercise_name(k) for k in h.exercise_keys),
+        } for h in history]), use_container_width=True, hide_index=True)
+    else:
+        st.caption("No program assigned yet.")
+
 
 # =============================================================================
 # PAGE: SESSIONS (history and full event log from the canonical record)
@@ -1369,6 +1416,8 @@ def page_tracker():
     section = st.radio("Section", TRACKER_SECTIONS, horizontal=True, key="tracker_tab", label_visibility="collapsed")
     if section == "Roster":
         _tracker_roster()
+    elif section == "Adherence":
+        _tracker_adherence()
     else:
         st.info(f"{section}: coming in this feature.")
 
@@ -1390,6 +1439,29 @@ def _tracker_roster():
     table = pd.DataFrame(ptviews.roster_table_rows(rows)).rename(columns=ptviews.roster_columns())
     st.dataframe(table, use_container_width=True, hide_index=True)
     st.caption(f"{len(rows)} active patient(s). {ptviews.metric_definition('adherence_pct')}")
+
+
+def _tracker_adherence():
+    pid = st.session_state.get("patient_id") or "unassigned"
+    with _open_store() as store:
+        try:
+            adh = pttracker.adherence_for(store, pid)
+        except PTLogError as exc:
+            st.error(str(exc))
+            return
+    if adh.assignment is None:
+        st.info(f"No program assigned to {pid}. Assign one on the Patients page.")
+        return
+    st.markdown(f"**{ptviews.assignment_line(adh)}**")
+    if adh.weeks:
+        st.dataframe(pd.DataFrame(ptviews.adherence_table_rows(adh)).rename(columns={
+            "week": "Week", "from": "From", "to": "To", "recorded": "Recorded / planned (count)",
+            "status": "Status", "performed": "Exercises performed", "missing": "Exercises missing"}),
+            use_container_width=True, hide_index=True)
+    for line in ptviews.adherence_lines(adh)[1:]:
+        if line.startswith("Adherence:") or line.startswith("First week") or line.startswith("Starts") or line.startswith("Superseded"):
+            st.write(line)
+    st.caption(ptviews.metric_definition("adherence_pct"))
 
 
 # =============================================================================

@@ -648,8 +648,51 @@ def cmd_tracker(args):
                     for it in items:
                         names = ", ".join(it["exercise_names"]) if it["exercise_names"] else it["description"]
                         print(f"{it['id']:<22}{it['name']:<24}{len(it['exercise_keys']):>2} exercises  {names}")
+            elif sub == "assign":
+                if args.program:
+                    prog = programs.get_program(args.program)
+                    if prog is None:
+                        print_error(f"Unknown program '{args.program}'; run: tracker programs")
+                        return 1
+                    keys, name, prog_id = prog.exercise_keys, prog.name, prog.id
+                else:
+                    keys = [k.strip() for k in args.exercises.split(",") if k.strip()]
+                    name, prog_id = "Custom", "custom"
+                previous = store.active_assignment(args.patient, args.start) if store.get_patient(args.patient) else None
+                a = store.assign_program(args.patient, prog_id, name, keys, args.per_week, args.start, args.end)
+                span = f"from {a.start_date}" + (f" to {a.end_date}" if a.end_date else "")
+                print_success(f"Assigned {a.program_name} to {args.patient}: {a.sessions_per_week} sessions/week {span}")
+                if previous is not None and previous.id != a.id:
+                    ended = next((h for h in store.assignment_history(args.patient) if h.id == previous.id), None)
+                    if ended is not None:
+                        print_info(f"Ended previous assignment ({ended.program_name}) on {ended.end_date}")
+            elif sub == "assignments":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                from src.ptlog import adherence as adherence_mod
+                from datetime import date as _date
+                history = store.assignment_history(args.patient)
+                if args.json:
+                    print(json.dumps([dict(asdict(a), status=adherence_mod.assignment_status(a, _date.today())) for a in history], indent=2))
+                else:
+                    if not history:
+                        print("No assignments.")
+                    for a in history:
+                        status = adherence_mod.assignment_status(a, _date.today())
+                        print(f"{a.start_date} → {a.end_date or 'open'}  {a.program_name} ({status})  "
+                              f"{a.sessions_per_week}/week  [{', '.join(a.exercise_keys)}]")
+            elif sub == "adherence":
+                adh = tracker.adherence_for(store, args.patient)
+                if args.json:
+                    print(json.dumps({"status": adh.status, "percentage": adh.percentage, "note": adh.note,
+                                      "assignment": asdict(adh.assignment) if adh.assignment else None,
+                                      "weeks": [asdict(w) for w in adh.weeks]}, indent=2))
+                else:
+                    print_header(f"Adherence: {args.patient}")
+                    for line in views.adherence_lines(adh):
+                        print(line)
             else:
-                print_error("Usage: tracker {roster,programs}")
+                print_error("Usage: tracker {roster,programs,assign,assignments,adherence}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -989,6 +1032,21 @@ Examples:
     tr.add_argument("--json", action="store_true")
     tp = tracker_sub.add_parser("programs", help="Pre-built programs from the configuration")
     tp.add_argument("--json", action="store_true")
+
+    ta = tracker_sub.add_parser("assign", help="Assign a program to a patient (ends any current one)")
+    ta.add_argument("patient")
+    src = ta.add_mutually_exclusive_group(required=True)
+    src.add_argument("--program", default=None, help="Program id from: tracker programs")
+    src.add_argument("--exercises", default=None, help="Comma-separated exercise keys for a custom program")
+    ta.add_argument("--per-week", type=int, default=3, help="Planned sessions per week (1-14)")
+    ta.add_argument("--start", default=None, help="Start date YYYY-MM-DD (default today)")
+    ta.add_argument("--end", default=None, help="Optional end date YYYY-MM-DD")
+    tas = tracker_sub.add_parser("assignments", help="A patient's assignment history")
+    tas.add_argument("patient")
+    tas.add_argument("--json", action="store_true")
+    tad = tracker_sub.add_parser("adherence", help="Week-by-week adherence to the assigned program")
+    tad.add_argument("patient")
+    tad.add_argument("--json", action="store_true")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")

@@ -150,3 +150,33 @@ def test_tracker_page_roster(seeded_env):
     at = _tracker_page(seeded_env, "Roster")
     frames = at.dataframe
     assert frames and any("pending reviews (count)" in str(c).lower() for c in frames[0].value.columns)
+
+
+def test_patients_page_program_form(seeded_env):
+    from datetime import date
+    from src.ptlog.store import SessionStore
+    with SessionStore(seeded_env).open() as store:
+        store.assign_program("P-017", "knee_rehab", "Knee Rehabilitation",
+                             ["knee_extension", "knee_extension_right", "partial_squat", "seated_hip_flexion", "seated_hip_flexion_right"],
+                             3, date.today())
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    options = [tuple(s.options) for s in at.selectbox]
+    assert any({"Knee Rehabilitation", "Shoulder Mobility", "Hip Strengthening", "General Conditioning", "Custom"} <= set(o) for o in options)
+    assert any("sessions per week" in n.label.lower() for n in at.number_input)
+    assert at.date_input
+    assert "Assign program" in {b.label for b in at.button}
+    assert any("Knee Rehabilitation" in str(f.value.to_dict()) for f in at.dataframe)
+
+
+def test_tracker_page_adherence(seeded_env):
+    from datetime import date, timedelta
+    from src.ptlog.store import SessionStore
+    at = _tracker_page(seeded_env, "Adherence")
+    assert any("no program" in i.value.lower() for i in at.info)
+    with SessionStore(seeded_env).open() as store:
+        store.assign_program("P-017", "custom", "Custom", ["knee_extension"], 3, date.today() - timedelta(days=10))
+    at = _tracker_page(seeded_env, "Adherence")
+    assert at.dataframe

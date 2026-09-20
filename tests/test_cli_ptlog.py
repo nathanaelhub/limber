@@ -377,3 +377,45 @@ class TestTrackerRoster:
         assert r.returncode == 0 and "knee_rehab" in r.stdout and "Knee Rehabilitation" in r.stdout and "custom" in r.stdout
         rows = json.loads(run_cli(cli_env, "tracker", "programs", "--json").stdout)
         assert [p["id"] for p in rows] == ["knee_rehab", "shoulder_mobility", "hip_strengthening", "general_conditioning", "custom"]
+
+
+class TestTrackerAssign:
+    def test_assign_supersede_history_and_validation(self, cli_env, tmp_db):
+        from datetime import date
+        run_cli(cli_env, "patients", "add", "P-017")
+        r = run_cli(cli_env, "tracker", "assign", "P-017", "--program", "knee_rehab", "--per-week", "3", "--start", "2026-03-01")
+        assert r.returncode == 0 and "Assigned Knee Rehabilitation to P-017: 3 sessions/week from 2026-03-01" in out(r)
+        r = run_cli(cli_env, "tracker", "assign", "P-017", "--exercises", "squat,pushup", "--start", "2026-03-15")
+        assert r.returncode == 0 and "Assigned Custom to P-017: 3 sessions/week from 2026-03-15" in out(r)
+        assert "Ended previous assignment (Knee Rehabilitation) on 2026-03-14" in out(r)
+        r = run_cli(cli_env, "tracker", "assignments", "P-017")
+        lines = [l for l in r.stdout.strip().splitlines() if l.startswith("2026")]
+        assert lines[0].startswith("2026-03-15") and "Custom" in lines[0] and lines[1].startswith("2026-03-01") and "Knee Rehabilitation" in lines[1]
+        assert "superseded" in lines[1] or "completed" in lines[1]
+        rows = json.loads(run_cli(cli_env, "tracker", "assignments", "P-017", "--json").stdout)
+        assert [x["program_id"] for x in rows] == ["custom", "knee_rehab"] and rows[1]["end_date"] == "2026-03-14"
+        r = run_cli(cli_env, "tracker", "assign", "P-017", "--exercises", "bogus")
+        assert r.returncode == 1 and "bogus" in out(r)
+        r = run_cli(cli_env, "tracker", "assign", "P-017", "--program", "knee_rehab", "--per-week", "15")
+        assert r.returncode == 1
+        r = run_cli(cli_env, "tracker", "assign", "P-017", "--program", "knee_rehab", "--start", "2026-03-01", "--end", "2026-02-01")
+        assert r.returncode == 1 and "end date" in out(r)
+        r = run_cli(cli_env, "tracker", "assign", "unassigned", "--program", "knee_rehab")
+        assert r.returncode == 1
+        r = run_cli(cli_env, "tracker", "assign", "P-017", "--program", "nope")
+        assert r.returncode == 1 and "nope" in out(r)
+
+
+class TestTrackerAdherence:
+    def test_adherence_rows_and_percentage(self, cli_env, tmp_db):
+        seed_caseload(tmp_db)
+        r = run_cli(cli_env, "tracker", "adherence", "P-017")
+        assert r.returncode == 0 and "Knee Rehabilitation" in r.stdout and "3 sessions/week" in r.stdout
+        assert r.stdout.count("week ") >= 4 and "in progress" in r.stdout
+        assert "Adherence: 44% over 3 complete weeks" in r.stdout
+        d = json.loads(run_cli(cli_env, "tracker", "adherence", "P-017", "--json").stdout)
+        assert d["percentage"] == 44 and len(d["weeks"]) == 4 and d["weeks"][2]["in_progress"] is False
+        r = run_cli(cli_env, "tracker", "adherence", "P-018")
+        assert r.returncode == 0 and "No program assigned" in r.stdout
+        r = run_cli(cli_env, "tracker", "adherence", "ghost")
+        assert r.returncode == 1
