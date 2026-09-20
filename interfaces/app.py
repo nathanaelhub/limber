@@ -1058,6 +1058,36 @@ def page_patients():
             st.error(str(exc))
 
     _patient_program_section(pid)
+    _patient_discharge_section(pid)
+
+
+def _patient_discharge_section(pid):
+    """Discharge or reactivate the selected patient (feature 003)."""
+    from datetime import date
+    st.markdown("### Caseload status")
+    with _open_store() as store:
+        discharge = store.get_discharge(pid)
+    if discharge is not None:
+        st.info(f"{pid} was discharged on {discharge.discharged_on}" + (f": {discharge.reason}" if discharge.reason else ""))
+        if st.button("Reactivate", key="patients_reactivate"):
+            with _open_store() as store:
+                store.reactivate(pid)
+            st.success(f"Reactivated {pid}")
+            st.rerun()
+        return
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        on = st.date_input("Discharge date", value=date.today(), key="patients_discharge_date")
+    with c2:
+        reason = st.text_input("Reason (optional; no names, dates of birth, or record numbers)", key="patients_discharge_reason")
+    if st.button("Discharge patient", key="patients_discharge_button"):
+        try:
+            with _open_store() as store:
+                d = store.discharge(pid, on, reason or None)
+            st.success(f"Discharged {d.patient_id} on {d.discharged_on}")
+            st.rerun()
+        except PTLogError as exc:
+            st.error(str(exc))
 
 
 def _patient_program_section(pid):
@@ -1418,8 +1448,12 @@ def page_tracker():
         _tracker_roster()
     elif section == "Adherence":
         _tracker_adherence()
-    else:
-        st.info(f"{section}: coming in this feature.")
+    elif section == "Queue":
+        _tracker_queue()
+    elif section == "Discharged":
+        _tracker_discharged()
+    elif section == "Export":
+        _tracker_export()
 
 
 def _tracker_roster():
@@ -1462,6 +1496,57 @@ def _tracker_adherence():
         if line.startswith("Adherence:") or line.startswith("First week") or line.startswith("Starts") or line.startswith("Superseded"):
             st.write(line)
     st.caption(ptviews.metric_definition("adherence_pct"))
+
+
+def _tracker_queue():
+    with _open_store() as store:
+        current = store.get_adherence_threshold()
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        threshold = st.number_input("Adherence threshold (percent below which a patient is queued)",
+                                    min_value=1, max_value=100, value=int(current), key="tracker_threshold")
+    with c2:
+        if st.button("Save threshold", key="tracker_threshold_save"):
+            with _open_store() as store:
+                store.set_adherence_threshold(int(threshold))
+            st.success(f"Adherence threshold: {int(threshold)}%")
+    with _open_store() as store:
+        q = pttracker.queue(store)
+    if q.count == 0:
+        st.success("Caseload is up to date.")
+        return
+    for kind, items in q.items.items():
+        if not items:
+            continue
+        with st.expander(f"{ptviews.QUEUE_LABELS[kind]} ({len(items)})", expanded=True):
+            for it in items:
+                (st.warning if kind in ("attention_flag", "practice_gap") else st.info)(f"**{it.patient_id}** — {it.description}  \n→ {it.target}")
+
+
+def _tracker_discharged():
+    with _open_store() as store:
+        rows = store.discharged_patients()
+    if not rows:
+        st.info("No discharged patients.")
+        return
+    st.dataframe(pd.DataFrame([{"Patient": p.id, "Label": p.label or "", "Discharged on": d.discharged_on, "Reason": d.reason or ""}
+                               for p, d in rows]), use_container_width=True, hide_index=True)
+    pid = st.selectbox("Patient", [p.id for p, _ in rows], key="tracker_reactivate_select")
+    if st.button("Reactivate", key="tracker_reactivate_button"):
+        with _open_store() as store:
+            store.reactivate(pid)
+        st.success(f"Reactivated {pid}")
+        st.rerun()
+
+
+def _tracker_export():
+    from src.ptlog.exports import to_roster_csv
+    with _open_store() as store:
+        rows = pttracker.roster(store)
+    now = datetime.now()
+    st.download_button("Roster (CSV)", to_roster_csv(rows, now), file_name=f"roster_{now:%Y%m%d_%H%M%S}.csv",
+                       mime="text/csv", key="tracker_dl_roster")
+    st.caption(f"{len(rows)} active patient(s); the export always includes every active patient.")
 
 
 # =============================================================================

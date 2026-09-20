@@ -419,3 +419,59 @@ class TestTrackerAdherence:
         assert r.returncode == 0 and "No program assigned" in r.stdout
         r = run_cli(cli_env, "tracker", "adherence", "ghost")
         assert r.returncode == 1
+
+
+class TestTrackerQueueAndSettings:
+    def test_queue_sections_and_threshold(self, cli_env, tmp_db):
+        ids = seed_caseload(tmp_db)
+        r = run_cli(cli_env, "tracker", "queue")
+        assert r.returncode == 0 and "Pending reviews" in r.stdout and "Attention flags" in r.stdout
+        assert f"session:{ids['P-017'][3]}" in r.stdout and "P-018" in r.stdout
+        d = json.loads(run_cli(cli_env, "tracker", "queue", "--json").stdout)
+        assert d["totals"]["pending_review"] == 1 and d["totals"]["practice_gap"] >= 1
+        r = run_cli(cli_env, "tracker", "settings")
+        assert r.returncode == 0 and "Adherence threshold: 60%" in r.stdout
+        r = run_cli(cli_env, "tracker", "settings", "--adherence-threshold", "30")
+        assert r.returncode == 0 and "Adherence threshold: 30%" in r.stdout
+        r = run_cli(cli_env, "tracker", "settings", "--adherence-threshold", "0")
+        assert r.returncode == 1
+
+    def test_empty_queue_message(self, cli_env):
+        r = run_cli(cli_env, "tracker", "queue")
+        assert r.returncode == 0 and "Caseload is up to date." in r.stdout
+
+
+class TestTrackerDischarge:
+    def test_discharge_reactivate_lists(self, cli_env, tmp_db):
+        from datetime import date
+        seed_caseload(tmp_db)
+        r = run_cli(cli_env, "tracker", "discharge", "P-018", "--reason", "goals met")
+        assert r.returncode == 0 and f"Discharged P-018 on {date.today().isoformat()}" in out(r)
+        r = run_cli(cli_env, "tracker", "roster")
+        assert "P-018" not in r.stdout
+        r = run_cli(cli_env, "tracker", "queue")
+        assert "P-018" not in r.stdout
+        r = run_cli(cli_env, "tracker", "discharged")
+        assert r.returncode == 0 and "P-018" in r.stdout and "goals met" in r.stdout and "P-019" in r.stdout
+        r = run_cli(cli_env, "tracker", "discharge", "P-017", "--reason", "moved to Jane Doe clinic")
+        assert r.returncode == 1 and "name" in out(r)
+        r = run_cli(cli_env, "tracker", "discharge", "unassigned")
+        assert r.returncode == 1
+        r = run_cli(cli_env, "tracker", "reactivate", "P-018")
+        assert r.returncode == 0 and "Reactivated P-018" in out(r)
+        r = run_cli(cli_env, "tracker", "reactivate", "P-018")
+        assert r.returncode == 0 and "P-018 is already active" in out(r)
+        r = run_cli(cli_env, "sessions", "list", "--patient", "P-018")
+        assert r.returncode == 0 and "Knee Extension" in r.stdout
+
+
+class TestTrackerExport:
+    def test_export_roster(self, cli_env, tmp_db, tmp_path):
+        seed_caseload(tmp_db)
+        r = run_cli(cli_env, "tracker", "export-roster", "--out", str(tmp_path))
+        assert r.returncode == 0
+        path = Path(r.stdout.strip())
+        assert path.exists() and path.name.startswith("roster_") and path.suffix == ".csv"
+        text = path.read_text()
+        assert text.startswith("patient_id,label,program,program_status,days_since_last_session,")
+        assert "P-017" in text and "P-019" not in text

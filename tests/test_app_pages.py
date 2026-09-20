@@ -180,3 +180,32 @@ def test_tracker_page_adherence(seeded_env):
         store.assign_program("P-017", "custom", "Custom", ["knee_extension"], 3, date.today() - timedelta(days=10))
     at = _tracker_page(seeded_env, "Adherence")
     assert at.dataframe
+
+
+def test_tracker_page_queue(seeded_env):
+    at = _tracker_page(seeded_env, "Queue")
+    assert at.warning or at.info or at.success
+    assert any("threshold" in n.label.lower() for n in at.number_input)
+
+
+def test_tracker_page_discharged_and_patient_controls(seeded_env):
+    from src.ptlog.store import SessionStore
+    at = _tracker_page(seeded_env, "Discharged")
+    assert at.info or at.dataframe
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.run()
+    assert not at.exception and "Discharge patient" in {b.label for b in at.button}
+    with SessionStore(seeded_env).open() as store:
+        store.discharge("P-017", reason="goals met")
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.run()
+    assert not at.exception and "Reactivate" in {b.label for b in at.button}
+    at = _tracker_page(seeded_env, "Discharged")
+    assert at.dataframe and any("goals met" in str(f.value.to_dict()) for f in at.dataframe)
+
+
+def test_tracker_page_export(seeded_env):
+    at = _tracker_page(seeded_env, "Export")
+    assert "Roster (CSV)" in {b.label for b in at.get("download_button")}

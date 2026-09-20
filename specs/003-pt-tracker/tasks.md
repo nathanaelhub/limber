@@ -123,15 +123,15 @@ created from `main` before T001.
 
 ### Tests for User Story 4 (write first, MUST FAIL)
 
-- [ ] T029 [P] [US4] Add the queue section to `tests/test_ptlog_tracker.py`: P-017 with pending sessions 5 and 2 days old and P-018 with one 9 days old → `pending_review` items ordered P-018, P-017 (older), P-017 (newer) with `session_id`, `target == "session:<id>"`, `age_days`; a form-declining history → one `attention_flag` item with the rule in `description`; a patient 9 days since last session with gap 7 → `practice_gap` item with `age_days == 9`; a patient with an assignment at 40% → `low_adherence` item with "40%" and "60%" in the description, gone after `set_adherence_threshold(30)`; `queue().totals` counts per kind; after `set_review` on a pending session the item is gone; a discharged patient contributes nothing; an empty caseload gives no items; performance: 50 patients × 20 sessions (built with `make_session`, `PRAGMA synchronous=OFF`) — `roster()` and `queue()` each under 3 s
-- [ ] T030 [P] [US4] Extend `tests/test_cli_ptlog.py`: `tracker queue` prints sections with counts and one line per item, or `Caseload is up to date.`; `tracker settings` prints `Adherence threshold: 60%`; `--adherence-threshold 30` updates; `0` → exit 1
-- [ ] T031 [P] [US4] Extend `tests/test_app_pages.py`: the Queue section renders without exception and shows either items or the up-to-date message
+- [X] T029 [P] [US4] Add the queue section to `tests/test_ptlog_tracker.py`: P-017 with pending sessions 5 and 2 days old and P-018 with one 9 days old → `pending_review` items ordered P-018, P-017 (older), P-017 (newer) with `session_id`, `target == "session:<id>"`, `age_days`; a form-declining history → one `attention_flag` item with the rule in `description`; a patient 9 days since last session with gap 7 → `practice_gap` item with `age_days == 9`; a patient with an assignment at 40% → `low_adherence` item with "40%" and "60%" in the description, gone after `set_adherence_threshold(30)`; `queue().totals` counts per kind; after `set_review` on a pending session the item is gone; a discharged patient contributes nothing; an empty caseload gives no items; performance: 50 patients × 20 sessions (built with `make_session`, `PRAGMA synchronous=OFF`) — `roster()` and `queue()` each under 3 s
+- [X] T030 [P] [US4] Extend `tests/test_cli_ptlog.py`: `tracker queue` prints sections with counts and one line per item, or `Caseload is up to date.`; `tracker settings` prints `Adherence threshold: 60%`; `--adherence-threshold 30` updates; `0` → exit 1
+- [X] T031 [P] [US4] Extend `tests/test_app_pages.py`: the Queue section renders without exception and shows either items or the up-to-date message
 
 ### Implementation for User Story 4
 
-- [ ] T032 [US4] Implement `queue(store, now=None) -> QueueResult` in `src/ptlog/tracker.py` per research D8 (reuses `snapshot`), and `queue_lines(result)` in `src/ptlog/views.py` (depends on T029)
-- [ ] T033 [US4] `interfaces/cli.py` (depends on T030, T032): add `tracker queue` and `tracker settings`
-- [ ] T034 [US4] `interfaces/app.py` (depends on T031, T032): implement the Queue section (one expander per kind with counts, items as warnings/info with the target) and the threshold number input under the Queue section
+- [X] T032 [US4] Implement `queue(store, now=None) -> QueueResult` in `src/ptlog/tracker.py` per research D8 (reuses `snapshot`), and `queue_lines(result)` in `src/ptlog/views.py` (depends on T029)
+- [X] T033 [US4] `interfaces/cli.py` (depends on T030, T032): add `tracker queue` and `tracker settings`
+- [X] T034 [US4] `interfaces/app.py` (depends on T031, T032): implement the Queue section (one expander per kind with counts, items as warnings/info with the target) and the threshold number input under the Queue section
 
 **Checkpoint**: a working caseload work list
 
@@ -145,13 +145,13 @@ created from `main` before T001.
 
 ### Tests for User Story 5 (write first, MUST FAIL)
 
-- [ ] T035 [P] [US5] Extend `tests/test_cli_ptlog.py`: `tracker discharge P-018 --reason "goals met"` prints `Discharged P-018 on <today>`; `tracker roster` no longer lists P-018 and `tracker queue` has none of its items; `tracker discharged` lists P-018 with the reason; `--reason "moved to Jane Doe clinic"` → exit 1 naming "name"; `tracker discharge unassigned` → exit 1; `tracker reactivate P-018` prints `Reactivated P-018` then `P-018 is already active`; `sessions list --patient P-018` still shows the sessions
-- [ ] T036 [P] [US5] Extend `tests/test_app_pages.py`: the Discharged section renders (empty message or table); the Patients page shows a "Discharge patient" button for an active selected patient and "Reactivate" for a discharged one
+- [X] T035 [P] [US5] Extend `tests/test_cli_ptlog.py`: `tracker discharge P-018 --reason "goals met"` prints `Discharged P-018 on <today>`; `tracker roster` no longer lists P-018 and `tracker queue` has none of its items; `tracker discharged` lists P-018 with the reason; `--reason "moved to Jane Doe clinic"` → exit 1 naming "name"; `tracker discharge unassigned` → exit 1; `tracker reactivate P-018` prints `Reactivated P-018` then `P-018 is already active`; `sessions list --patient P-018` still shows the sessions
+- [X] T036 [P] [US5] Extend `tests/test_app_pages.py`: the Discharged section renders (empty message or table); the Patients page shows a "Discharge patient" button for an active selected patient and "Reactivate" for a discharged one
 
 ### Implementation for User Story 5
 
-- [ ] T037 [US5] `interfaces/cli.py` (depends on T035): add `tracker discharge`, `tracker reactivate`, `tracker discharged`
-- [ ] T038 [US5] `interfaces/app.py` (depends on T036): implement the Discharged section (table with reactivate buttons) and the discharge/reactivate control (date, reason, button) on the Patients page
+- [X] T037 [US5] `interfaces/cli.py` (depends on T035): add `tracker discharge`, `tracker reactivate`, `tracker discharged`
+- [X] T038 [US5] `interfaces/app.py` (depends on T036): implement the Discharged section (table with reactivate buttons) and the discharge/reactivate control (date, reason, button) on the Patients page
 
 **Checkpoint**: caseload membership manageable
 
@@ -165,10 +165,10 @@ created from `main` before T001.
 
 ### Tests for User Story 6 (write first, MUST FAIL)
 
-- [ ] T039 [P] [US6] Write `tests/test_ptlog_roster_export.py`: `to_roster_csv(rows, now)` starts with the exact header from `contracts/exports.md`, uses `\r\n`, one row per active patient in attention order, empty cells for None, `practice_gap` true/false; `write_roster_export(store, tmp_path, now=D0)` writes `roster_20260323_091500.csv`; the filter state does not affect the export (all active patients); extend `tests/test_cli_ptlog.py` with `tracker export-roster --out DIR` printing the path; extend `tests/test_app_pages.py` with the Export section showing a "Roster (CSV)" download button
-- [ ] T040 [US6] Implement `src/ptlog/exports/roster_csv.py` (`to_roster_csv`, `write_roster_export`) and register `to_roster_csv` in `src/ptlog/exports/__init__.py` (depends on T039)
-- [ ] T041 [US6] `interfaces/cli.py` (depends on T040): add `tracker export-roster`
-- [ ] T042 [US6] `interfaces/app.py` (depends on T040): implement the Export section with the download button
+- [X] T039 [P] [US6] Write `tests/test_ptlog_roster_export.py`: `to_roster_csv(rows, now)` starts with the exact header from `contracts/exports.md`, uses `\r\n`, one row per active patient in attention order, empty cells for None, `practice_gap` true/false; `write_roster_export(store, tmp_path, now=D0)` writes `roster_20260323_091500.csv`; the filter state does not affect the export (all active patients); extend `tests/test_cli_ptlog.py` with `tracker export-roster --out DIR` printing the path; extend `tests/test_app_pages.py` with the Export section showing a "Roster (CSV)" download button
+- [X] T040 [US6] Implement `src/ptlog/exports/roster_csv.py` (`to_roster_csv`, `write_roster_export`) and register `to_roster_csv` in `src/ptlog/exports/__init__.py` (depends on T039)
+- [X] T041 [US6] `interfaces/cli.py` (depends on T040): add `tracker export-roster`
+- [X] T042 [US6] `interfaces/app.py` (depends on T040): implement the Export section with the download button
 
 **Checkpoint**: all six stories complete
 

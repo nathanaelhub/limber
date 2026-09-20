@@ -424,3 +424,20 @@ def adherence_table_rows(adh) -> List[Dict[str, Any]]:
         "status": "in progress" if w.in_progress else ("missed" if w.missed else "done"),
         "performed": ", ".join(w.exercises_performed) or "—", "missing": ", ".join(w.exercises_missing) or "—",
     } for w in adh.weeks]
+
+
+QUEUE_LABELS = {"pending_review": "Pending reviews", "attention_flag": "Attention flags",
+                "practice_gap": "Practice gaps", "low_adherence": "Low adherence"}
+
+
+def queue_lines(result) -> List[str]:
+    if result.count == 0:
+        return ["Caseload is up to date."]
+    lines: List[str] = []
+    for kind, items in result.items.items():
+        if not items:
+            continue
+        lines.append(f"{QUEUE_LABELS[kind]} ({len(items)})")
+        for it in items:
+            lines.append(f"- {it.patient_id} | {it.description} | {it.target}")
+    return lines

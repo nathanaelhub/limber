@@ -125,3 +125,48 @@ def adherence_for(store: SessionStore, patient_id: str, today: Optional[date] = 
         return adherence_mod.compute(None, [], today)
     since = datetime.combine(date.fromisoformat(assignment.start_date), datetime.min.time())
     return adherence_mod.compute(assignment, store.sessions_in_period(patient_id, since), today)
+
+
+# ------------------------------------------------------------------ queue (US4)
+
+def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
+    """Everything needing the PT's action across active patients, oldest first per kind (FR-013)."""
+    from .models import QUEUE_KINDS
+    now = _now(now)
+    threshold = store.get_adherence_threshold()
+    keyed = {kind: [] for kind in QUEUE_KINDS}
+    for patient in store.active_patients():
+        snap = snapshot(store, patient, now)
+        if patient.is_builtin and not snap.rows:
+            continue
+        pid = patient.id
+        starts = {s.id: s.start_time for s in snap.sessions}
+        for row in snap.pending:
+            age = (now - datetime.fromisoformat(row.start_time)).days
+            desc = (f"Session {row.id} on {row.start_time[:10]} ({', '.join(row.exercises) or 'no exercise'}, "
+                    f"{row.total_reps or 0} reps) awaits review")
+            keyed["pending_review"].append((-age, QueueItem("pending_review", pid, f"session:{row.id}", row.id, age, desc)))
+        gap_value: Optional[int] = None
+        for f in snap.flags.flags:
+            if f.rule == "practice_gap":
+                gap_value = max(gap_value or 0, int(f.values.get("days", 0)))
+                continue
+            earliest = min((starts[i] for i in f.session_ids if i in starts), default=None)
+            age = (now - datetime.fromisoformat(earliest)).days if earliest else 0
+            keyed["attention_flag"].append((-age, QueueItem("attention_flag", pid, f"flags:{pid}", None, age, f"[{f.rule}] {f.message}")))
+        last = snap.rows[0].start_time if snap.rows else None
+        days_since = (now - datetime.fromisoformat(last)).days if last else None
+        if days_since is not None and days_since > snap.gap_days:
+            gap_value = max(gap_value or 0, days_since)
+        if gap_value:
+            keyed["practice_gap"].append((-gap_value, QueueItem(
+                "practice_gap", pid, f"flags:{pid}", None, gap_value,
+                f"{gap_value} days since the last session (threshold {snap.gap_days} days)")))
+        pct = snap.adherence.percentage
+        if pct is not None and pct < threshold and snap.assignment is not None:
+            keyed["low_adherence"].append((pct, QueueItem(
+                "low_adherence", pid, f"adherence:{pid}", None, 0,
+                f"Adherence {pct}% is below the {threshold}% threshold "
+                f"({snap.assignment.program_name}, {snap.assignment.sessions_per_week} sessions/week)")))
+    items = {kind: [it for _, it in sorted(keyed[kind], key=lambda x: (x[0], x[1].patient_id))] for kind in QUEUE_KINDS}
+    return QueueResult(items=items, totals={kind: len(v) for kind, v in items.items()})

@@ -691,8 +691,42 @@ def cmd_tracker(args):
                     print_header(f"Adherence: {args.patient}")
                     for line in views.adherence_lines(adh):
                         print(line)
+            elif sub == "queue":
+                q = tracker.queue(store)
+                if args.json:
+                    print(json.dumps({"totals": q.totals, "items": {k: [asdict(i) for i in v] for k, v in q.items.items()}}, indent=2))
+                else:
+                    for line in views.queue_lines(q):
+                        print(line)
+            elif sub == "settings":
+                if args.adherence_threshold is not None:
+                    store.set_adherence_threshold(args.adherence_threshold)
+                print(f"Adherence threshold: {store.get_adherence_threshold()}%")
+            elif sub == "discharge":
+                d = store.discharge(args.patient, args.on, args.reason)
+                print_success(f"Discharged {d.patient_id} on {d.discharged_on}")
+            elif sub == "reactivate":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                if store.reactivate(args.patient):
+                    print_success(f"Reactivated {args.patient}")
+                else:
+                    print_info(f"{args.patient} is already active")
+            elif sub == "discharged":
+                rows = store.discharged_patients()
+                if args.json:
+                    print(json.dumps([{"patient_id": p.id, "label": p.label, "discharged_on": d.discharged_on, "reason": d.reason}
+                                      for p, d in rows], indent=2))
+                else:
+                    if not rows:
+                        print("No discharged patients.")
+                    for p, d in rows:
+                        print(f"{p.id:<14}{(p.label or '')[:21]:<22}{d.discharged_on}  {d.reason or ''}")
+            elif sub == "export-roster":
+                from src.ptlog.exports import write_roster_export
+                print(write_roster_export(store, args.out))
             else:
-                print_error("Usage: tracker {roster,programs,assign,assignments,adherence}")
+                print_error("Usage: tracker {roster,programs,assign,assignments,adherence,queue,settings,discharge,reactivate,discharged,export-roster}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -1047,6 +1081,21 @@ Examples:
     tad = tracker_sub.add_parser("adherence", help="Week-by-week adherence to the assigned program")
     tad.add_argument("patient")
     tad.add_argument("--json", action="store_true")
+
+    tq = tracker_sub.add_parser("queue", help="Everything needing the PT's action across active patients")
+    tq.add_argument("--json", action="store_true")
+    ts = tracker_sub.add_parser("settings", help="Show or set the adherence threshold")
+    ts.add_argument("--adherence-threshold", type=int, default=None, help="Percent (1-100) below which adherence is queued")
+    td = tracker_sub.add_parser("discharge", help="Discharge a patient (keeps all data)")
+    td.add_argument("patient")
+    td.add_argument("--on", default=None, help="Discharge date YYYY-MM-DD (default today)")
+    td.add_argument("--reason", default=None, help="Optional reason (no names, dates of birth, or record numbers)")
+    trx = tracker_sub.add_parser("reactivate", help="Return a discharged patient to the active roster")
+    trx.add_argument("patient")
+    tdl = tracker_sub.add_parser("discharged", help="List discharged patients")
+    tdl.add_argument("--json", action="store_true")
+    tex = tracker_sub.add_parser("export-roster", help="Export the active roster as CSV")
+    tex.add_argument("--out", "-o", default=None, help="Output directory (default: exports/)")
 
     # Calibrate command
     calibrate_parser = subparsers.add_parser("calibrate", help="Camera setup helper")

@@ -268,3 +268,76 @@ class TestAdherenceView:
         assert lines[-1] == "First week in progress; adherence is computed after the first complete week."
         with pytest.raises(PatientNotFoundError):
             tracker.adherence_for(store, "ghost", TODAY)
+
+
+# ======================================================================================
+# T029 — queue (User Story 4)
+# ======================================================================================
+
+import time  # noqa: E402
+
+
+def seed_queue(store, clock, caseload):
+    t = {"target_reps": 1}
+    ids = caseload(store, clock, {
+        "P-017": [(18, "Knee Extension", [(90, 78.0, 3.0)], t), (12, "Knee Extension", [(86, 78.0, 3.0)], t),
+                  (5, "Knee Extension", [(81, 78.0, 3.0)], t), (2, "Knee Extension", [(75, 78.0, 3.0)], t)],
+        "P-018": [(9, "Knee Extension", KE, t)],
+        "P-019": [(20, "Squat", [(88, 90.0, 2.5)], t), (19, "Squat", [(88, 90.0, 2.5)], t), (13, "Squat", [(88, 90.0, 2.5)], t),
+                  (12, "Squat", [(88, 90.0, 2.5)], t), (6, "Squat", [(88, 90.0, 2.5)], t), (5, "Squat", [(88, 90.0, 2.5)], t)],
+    })
+    for sid in ids["P-017"][:2]:
+        store.set_review(sid, "continue")
+    for sid in ids["P-019"]:
+        store.set_review(sid, "continue")
+    store.assign_program("P-019", "custom", "Custom", ["squat"], 5, TODAY - timedelta(days=21))
+    return ids
+
+
+class TestQueue:
+    def test_kinds_order_and_targets(self, fixed_store, caseload):
+        store, clock = fixed_store
+        ids = seed_queue(store, clock, caseload)
+        q = tracker.queue(store, now=D0)
+        pending = q.items["pending_review"]
+        assert [(i.patient_id, i.session_id, i.age_days) for i in pending] == [("P-018", ids["P-018"][0], 9), ("P-017", ids["P-017"][2], 5), ("P-017", ids["P-017"][3], 2)]
+        assert pending[0].target == f"session:{ids['P-018'][0]}"
+        flags = q.items["attention_flag"]
+        assert len(flags) == 1 and flags[0].patient_id == "P-017" and "form_declining" in flags[0].description and flags[0].target == "flags:P-017"
+        gaps = q.items["practice_gap"]
+        assert [(g.patient_id, g.age_days) for g in gaps] == [("P-018", 9)]
+        low = q.items["low_adherence"]
+        assert len(low) == 1 and low[0].patient_id == "P-019" and "40%" in low[0].description and "60%" in low[0].description and low[0].target == "adherence:P-019"
+        assert q.totals == {"pending_review": 3, "attention_flag": 1, "practice_gap": 1, "low_adherence": 1} and q.count == 6
+
+    def test_items_resolve(self, fixed_store, caseload):
+        store, clock = fixed_store
+        ids = seed_queue(store, clock, caseload)
+        store.set_adherence_threshold(30)
+        assert tracker.queue(store, now=D0).items["low_adherence"] == []
+        store.set_review(ids["P-018"][0], "hold")
+        q = tracker.queue(store, now=D0)
+        assert q.totals["pending_review"] == 2 and all(i.patient_id == "P-017" for i in q.items["pending_review"])
+        store.discharge("P-017", TODAY)
+        q = tracker.queue(store, now=D0)
+        assert all(i.patient_id != "P-017" for kind in q.items.values() for i in kind)
+
+    def test_empty_caseload(self, fixed_store):
+        store, _ = fixed_store
+        q = tracker.queue(store, now=D0)
+        assert q.count == 0 and all(v == [] for v in q.items.values())
+
+    def test_performance_50_patients(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.conn.execute("PRAGMA synchronous=OFF")
+        for p in range(50):
+            pid = f"P-{p:03d}"
+            store.add_patient(pid)
+            for i in range(20):
+                make_session(store, clock, pid, "Knee Extension", D0 - timedelta(days=60 - i * 3), [(85 + i % 10, 78.0, 3.0)])
+            if p % 2 == 0:
+                store.assign_program(pid, "custom", "Custom", ["knee_extension"], 3, TODAY - timedelta(days=28))
+        t0 = time.perf_counter(); rows = tracker.roster(store, now=D0); t_roster = time.perf_counter() - t0
+        t0 = time.perf_counter(); q = tracker.queue(store, now=D0); t_queue = time.perf_counter() - t0
+        assert len(rows) == 50 and q.count > 0
+        assert t_roster < 3.0 and t_queue < 3.0, (t_roster, t_queue)
