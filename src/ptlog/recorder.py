@@ -10,6 +10,7 @@ never changes engine behaviour. See specs/001-unified-session-log/contracts/reco
 
 from __future__ import annotations
 
+import os
 import logging
 import re
 from datetime import datetime
@@ -114,6 +115,8 @@ class SessionRecorder:
         pid = patient_id or UNASSIGNED_ID
         if self.store.get_patient(pid) is None:
             raise PatientNotFoundError(f"Patient '{pid}' not found")
+        # The recording process id lets recovery tell a live session from an abandoned one.
+        extras = {**(extras or {}), "pid": os.getpid()}
         self._session_id = self.store.start_session(pid, source, str(source_ref), extras)
         self._last_flush = self.clock()
         self._open_set(exercise_config, exercise_key)

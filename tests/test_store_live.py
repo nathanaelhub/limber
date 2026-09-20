@@ -86,3 +86,19 @@ def test_interrupt_session(tmp_db):
     store.interrupt_session(done, "stream_lost")
     assert store.load_session(done).status == "completed"
     store.close()
+
+
+def test_recorder_marks_every_session_with_its_process(tmp_db):
+    """A command-line session must survive another process opening the record (e.g. `sessions list`)."""
+    from types import SimpleNamespace
+    from src.ptlog.recorder import SessionRecorder
+    cfg = SimpleNamespace(name="Knee Extension", side="left", target_reps=10, up_angle=170, down_angle=90)
+    store = SessionStore(tmp_db).open()
+    rec = SessionRecorder(store)
+    sid = rec.start(None, "webcam", "0", cfg, exercise_key="knee_extension", extras={"camera_id": 0})
+    assert store.load_session(sid).source_extras == {"camera_id": 0, "pid": os.getpid()}
+    video = SessionRecorder(store)
+    assert _status(tmp_db, sid) == ("running", None)
+    vid = video.start(None, "video", "clip.mp4", cfg, exercise_key="knee_extension")
+    assert store.load_session(vid).source_extras == {"pid": os.getpid()}
+    store.close()

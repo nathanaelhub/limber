@@ -38,8 +38,9 @@ for 10 seconds.
 
 Behaviour change in the record: opening the record no longer interrupts a running session
 whose recording process is still alive (the web app opens the record on every page render).
-Live sessions store their process id in the session extras for this; command-line sessions
-recover as before. `SessionStore` also gained `check_same_thread`, `interrupt_session()`, and
+Every recorded session (web, command-line webcam, and video) stores its process id in the
+session extras for this, so running `sessions list` in another terminal during a session no
+longer interrupts it. Sessions from a dead process recover as before. `SessionStore` also gained `check_same_thread`, `interrupt_session()`, and
 `last_activity_time()`.
 
 ### 4. Tests
