@@ -85,3 +85,30 @@ def test_switch_and_reset_requests_apply_on_the_next_frame(app_module, db):
     assert [e.kind for e in s.control_events] == ["reset", "switch"]
     assert [x.exercise_key for x in s.sets] == ["knee_extension", "squat"]
     assert proc.exercise_key == "squat"
+
+
+class TestScreenshot:
+    def test_writes_a_png_named_by_pseudonymous_id_and_time(self, tmp_path):
+        import cv2
+        from datetime import datetime
+        from src.live_session import save_screenshot
+        frame = np.full((120, 160, 3), 200, dtype=np.uint8)
+        path = save_screenshot(frame, "P-017", out_dir=tmp_path / "shots", now=datetime(2026, 3, 23, 9, 15, 8))
+        assert path.name == "P-017_20260323_091508.png" and path.parent == tmp_path / "shots"
+        assert cv2.imread(str(path)).shape == (120, 160, 3)
+
+    def test_no_frame_or_bad_id(self, tmp_path):
+        from src.live_session import save_screenshot
+        with pytest.raises(ValueError):
+            save_screenshot(None, "P-017", out_dir=tmp_path)
+        from src.ptlog.models import PatientValidationError
+        with pytest.raises(PatientValidationError):       # never a name or a path in a file name
+            save_screenshot(np.zeros((4, 4, 3), dtype=np.uint8), "../Jane Doe", out_dir=tmp_path)
+        assert list(tmp_path.iterdir()) == []
+
+    def test_default_location_is_the_export_directory(self, tmp_path, monkeypatch):
+        from src.live_session import save_screenshot
+        from src.ptlog import exports
+        monkeypatch.setattr(exports, "default_export_dir", lambda: tmp_path / "exports")
+        path = save_screenshot(np.zeros((4, 4, 3), dtype=np.uint8), None)
+        assert path.parent == tmp_path / "exports" and path.name.startswith("unassigned_")

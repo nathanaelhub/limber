@@ -183,3 +183,18 @@ class LiveSession:
                 engine_session = self.tracker.session
             self._result = self.recorder.end(engine_session)
             return self._result
+
+
+def save_screenshot(frame: Optional[np.ndarray], patient_id: Optional[str],
+                    out_dir: Optional[Path] = None, now: Optional[datetime] = None) -> Path:
+    """Write the annotated frame as `<pseudonymous id>_<YYYYMMDD_HHMMSS>.png` under the export location."""
+    if frame is None:
+        raise ValueError("No frame to save")
+    from src.ptlog import exports
+    pid = validate_patient_id(patient_id or UNASSIGNED)
+    out = Path(out_dir) if out_dir else exports.default_export_dir()
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{pid}_{(now or datetime.now()):%Y%m%d_%H%M%S}.png"
+    if not cv2.imwrite(str(path), frame):
+        raise ValueError(f"Could not write {path}")
+    return path

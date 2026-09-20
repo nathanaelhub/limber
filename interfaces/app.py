@@ -45,7 +45,7 @@ from src.utils import get_angle_from_keypoints, extract_keypoint, calculate_angl
 # Import core analysis engine for real video processing
 from analyze import main as analyze_video
 from analyze import load_config as load_exercise_config
-from src.live_session import LiveSession
+from src.live_session import LiveSession, save_screenshot
 
 # Import observation logger helpers
 from src.ptlog.store import SessionStore, default_db_path
@@ -558,7 +558,15 @@ def page_live_session():
 
     st.markdown("---")
     if st.button("📸 Save Screenshot", key="live_screenshot"):
-        st.info("No frame to save. Start the stream first.")
+        frame = getattr(processor, "last_frame", None) if playing else None
+        if frame is None:
+            st.info("No frame to save. Start the stream first.")
+        else:
+            try:
+                shot = save_screenshot(frame, getattr(processor, "patient_id", None) or patient_id)
+                st.success(f"Screenshot saved: {shot}")
+            except (ValueError, PTLogError) as err:
+                st.error(str(err))
 
 
 # =============================================================================

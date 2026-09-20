@@ -328,3 +328,24 @@ def test_live_page_leaves_a_session_that_is_still_finishing(seeded_env, stub_web
     assert not at.exception, [e.value for e in at.exception]
     with SessionStore(seeded_env).open() as store:
         assert store.load_session(sid).status == "running"
+
+
+def test_live_page_screenshot_without_a_frame(seeded_env, stub_webrtc):
+    at = _live_page()
+    at.button(key="live_screenshot").click().run()
+    assert not at.exception
+    assert any("No frame to save" in i.value for i in at.info)
+
+
+def test_live_page_screenshot_saves_the_current_frame(seeded_env, stub_webrtc, tmp_path, monkeypatch):
+    import numpy as np
+    from src.ptlog import exports
+    monkeypatch.setattr(exports, "default_export_dir", lambda: tmp_path / "exports")
+    proc = _FakeProcessor()
+    proc.last_frame = np.full((60, 80, 3), 128, dtype=np.uint8)
+    stub_webrtc["ctx"] = _StubCtx(playing=True, processor=proc)
+    at = _live_page()
+    at.button(key="live_screenshot").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    (png,) = list((tmp_path / "exports").glob("P-017_*.png"))
+    assert any(png.name in s.value for s in at.success)

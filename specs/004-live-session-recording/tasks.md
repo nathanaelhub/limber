@@ -60,9 +60,9 @@ its implementation task. Suite command: `.venv/bin/python -m pytest tests`.
 
 ## Phase 6: User Story 4 - Screenshot and cleanup (P4)
 
-- [ ] T021 [P] [US4] Write failing tests in tests/test_live_processor.py: `save_screenshot(frame, "P-017", out_dir, now)` writes `P-017_<YYYYMMDD_HHMMSS>.png` readable by OpenCV with the frame's shape; None frame raises `ValueError`; page test: pressing Save Screenshot while not playing shows "No frame to save"
-- [ ] T022 [US4] Implement `save_screenshot` in src/live_session.py and the button in `page_live_session()` in interfaces/app.py (path shown on success)
-- [ ] T023 [US4] Run the suite; checkpoint commit
+- [X] T021 [P] [US4] Write failing tests in tests/test_live_processor.py: `save_screenshot(frame, "P-017", out_dir, now)` writes `P-017_<YYYYMMDD_HHMMSS>.png` readable by OpenCV with the frame's shape; None frame raises `ValueError`; page test: pressing Save Screenshot while not playing shows "No frame to save"
+- [X] T022 [US4] Implement `save_screenshot` in src/live_session.py and the button in `page_live_session()` in interfaces/app.py (path shown on success)
+- [X] T023 [US4] Run the suite; checkpoint commit
 
 ## Phase 7: Polish
 
