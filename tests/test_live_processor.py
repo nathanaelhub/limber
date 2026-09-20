@@ -61,3 +61,27 @@ def test_unknown_patient_reports_an_error_and_keeps_streaming(app_module, db):
     proc.configure("P-404", "knee_extension", 10, "Default")
     assert proc.process_image(FRAME) is FRAME
     assert "P-404" in proc.error and proc.session_id is None
+
+
+def test_switch_and_reset_requests_apply_on_the_next_frame(app_module, db):
+    angles = rep_cycle() * 2
+    infer = FakeInfer(angles)
+    proc = app_module.LiveVideoProcessor(infer=infer)
+    proc.configure("P-017", "knee_extension", 10, "Default")
+    for _ in angles:
+        proc.process_image(FRAME)
+    proc.request_reset()
+    proc.request_switch("squat")
+    with SessionStore(db).open() as store:
+        assert store.load_session(proc.session_id).control_events == []     # nothing until a frame arrives
+    infer.extend([172.0])
+    proc.process_image(FRAME)
+    proc.request_switch("squat")                                            # already on squat: no second switch
+    infer.extend([172.0])
+    proc.process_image(FRAME)
+    proc.on_ended()
+    with SessionStore(db).open() as store:
+        s = store.load_session(proc.session_id)
+    assert [e.kind for e in s.control_events] == ["reset", "switch"]
+    assert [x.exercise_key for x in s.sets] == ["knee_extension", "squat"]
+    assert proc.exercise_key == "squat"

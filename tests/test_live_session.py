@@ -205,3 +205,69 @@ def test_recording_adds_under_two_ms_per_frame(store):
     t_on = timed(on)
     on.end()
     assert (t_on - t_off) * 1000 < 2.0, f"recording cost {(t_on - t_off) * 1000:.2f} ms/frame"
+
+
+class TestSwitchAndReset:
+    """US2: the page's switch and reset record what the command-line 'n' and 'r' keys record."""
+
+    def test_switch_mid_movement(self, store):
+        mid = list(np.linspace(172.0, 130.0, 6)) + [130.0] * 6     # moving, between the two thresholds
+        angles = rep_cycle() * 3 + mid
+        live, infer = make_live(store, angles)
+        sid = live.start()
+        run(live, len(angles))
+        live.switch("squat")
+        s = store.load_session(sid)
+        assert [x.exercise_key for x in s.sets] == ["knee_extension", "squat"]
+        assert s.sets[0].end_time is not None and s.sets[1].end_time is None
+        assert len(s.sets[0].reps) == 3
+        assert s.sets[0].partial_reps[-1].reason == "interrupted"
+        (event,) = s.control_events
+        assert (event.kind, event.from_exercise, event.to_exercise) == ("switch", "Knee Extension", "Squat")
+        assert live.exercise_key == "squat" and live.exercise_name == "Squat"
+        assert live.tracker.rep_count == 0 and live.metrics.get("rep_count", 0) == 0
+        infer.extend(rep_cycle())
+        run(live, len(rep_cycle()))
+        done = live.end()
+        assert len(done.sets[1].reps) == 1 and done.total_reps == 4
+
+    def test_reset_keeps_the_set_open(self, store):
+        angles = rep_cycle() * 2
+        live, infer = make_live(store, angles)
+        sid = live.start()
+        run(live, len(angles))
+        live.reset()
+        s = store.load_session(sid)
+        (event,) = s.control_events
+        assert (event.kind, event.rep_count_at_reset) == ("reset", 2)
+        assert len(s.sets) == 1 and s.sets[0].end_time is None
+        assert live.tracker.rep_count == 0 and live.metrics.get("rep_count", 0) == 0
+        infer.extend(rep_cycle())
+        run(live, len(rep_cycle()))
+        assert len(live.end().sets[0].reps) == 3
+
+    def test_target_change_applies_to_the_next_set_only(self, store):
+        live, _ = make_live(store, target=10)
+        sid = live.start()
+        live.set_target_reps(15)
+        assert store.load_session(sid).sets[0].target_reps == 10
+        live.switch("squat")
+        assert store.load_session(sid).sets[1].target_reps == 15
+
+    def test_switch_to_unknown_exercise_changes_nothing(self, store):
+        live, _ = make_live(store)
+        sid = live.start()
+        with pytest.raises(ValueError):
+            live.switch("moonwalk")
+        s = store.load_session(sid)
+        assert len(s.sets) == 1 and s.control_events == [] and live.exercise_key == "knee_extension"
+
+    def test_switch_and_reset_are_ignored_before_start_and_after_end(self, store):
+        live, _ = make_live(store)
+        live.switch("squat")
+        live.reset()
+        sid = live.start()
+        live.end()
+        live.switch("squat")
+        live.reset()
+        assert store.load_session(sid).control_events == []

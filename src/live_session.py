@@ -133,6 +133,42 @@ class LiveSession:
             self.last_frame = annotated
             return annotated
 
+    def set_target_reps(self, target_reps: int) -> None:
+        """Applies to sets opened from now on; the running set keeps its target."""
+        with self._lock:
+            self.target_reps = int(target_reps)
+
+    def _active(self) -> bool:
+        return self._started and not self.ended
+
+    def _clear_frame_state(self) -> None:
+        self.last_assessment = None
+        self.metrics = {}
+
+    def switch(self, exercise_key: str) -> None:
+        """Like the command-line 'n' key: interrupted partial rep, switch event, new set and tracker."""
+        with self._lock:
+            if not self._active():
+                return
+            new_config = self._config_for(exercise_key)          # raises before anything is recorded
+            self.tracker._record_partial_rep("interrupted")      # same call the command-line loop makes
+            self.recorder.switch(new_config, self.tracker, self.frame_num, exercise_key=exercise_key)
+            self.exercise_key, self.config = exercise_key, new_config
+            self.tracker = ExerciseTracker(new_config, self.fps)
+            self.form_analyzer = self._analyzer_factory(base_exercise(exercise_key))
+            self._clear_frame_state()
+
+    def reset(self) -> None:
+        """Like the command-line 'r' key: interrupted partial rep, reset event, fresh counter, same set."""
+        with self._lock:
+            if not self._active():
+                return
+            self.tracker._record_partial_rep("interrupted")
+            self.recorder.reset(self.tracker, self.frame_num)
+            self.tracker = ExerciseTracker(self.config, self.fps)
+            self.form_analyzer.reset()
+            self._clear_frame_state()
+
     def end(self) -> Optional[Session]:
         """Finalize the tracker and end the recorded session. Idempotent."""
         with self._lock:

@@ -44,11 +44,11 @@ its implementation task. Suite command: `.venv/bin/python -m pytest tests`.
 
 **Independent test**: reps, switch, reps, reset, reps, end; the event log shows the order and the reps sit under the right sets.
 
-- [ ] T013 [P] [US2] Write failing tests in tests/test_live_session.py: `switch("squat")` mid-movement stores an interrupted partial rep, closes the set, stores a switch event with both exercise names, opens a set with a zero counter; `reset()` stores a reset with the count, keeps the set open, zeroes `metrics["rep_count"]`; a `target_reps` change applies to the set opened by the next switch only; switch to an unknown key raises `ValueError` and leaves the session unchanged
-- [ ] T014 [US2] Implement `switch()`, `reset()`, and the `target_reps` setter in src/live_session.py
-- [ ] T015 [P] [US2] Write failing tests in tests/test_live_processor.py for `LiveVideoProcessor` with a fake frame object and injected infer: `request_switch` and `request_reset` are applied on the next `recv`; `recv` before attributes are set passes the frame through
-- [ ] T016 [US2] Implement `request_switch` / `request_reset` in `LiveVideoProcessor` and the "Switch exercise" and "Reset reps" buttons in `page_live_session()` in interfaces/app.py; extend the page test for the buttons while playing (stub playing with a fake processor)
-- [ ] T017 [US2] Run the suite; checkpoint commit
+- [X] T013 [P] [US2] Write failing tests in tests/test_live_session.py: `switch("squat")` mid-movement stores an interrupted partial rep, closes the set, stores a switch event with both exercise names, opens a set with a zero counter; `reset()` stores a reset with the count, keeps the set open, zeroes `metrics["rep_count"]`; a `target_reps` change applies to the set opened by the next switch only; switch to an unknown key raises `ValueError` and leaves the session unchanged
+- [X] T014 [US2] Implement `switch()`, `reset()`, and the `target_reps` setter in src/live_session.py
+- [X] T015 [P] [US2] Write failing tests in tests/test_live_processor.py for `LiveVideoProcessor` with a fake frame object and injected infer: `request_switch` and `request_reset` are applied on the next `recv`; `recv` before attributes are set passes the frame through
+- [X] T016 [US2] Implement `request_switch` / `request_reset` in `LiveVideoProcessor` and the "Switch exercise" and "Reset reps" buttons in `page_live_session()` in interfaces/app.py; extend the page test for the buttons while playing (stub playing with a fake processor)
+- [X] T017 [US2] Run the suite; checkpoint commit
 
 ## Phase 5: User Story 3 - Interruptions and one open session (P3)
 

@@ -190,6 +190,27 @@ class LiveVideoProcessor(VideoProcessorBase):
         self.session_id = None
         self.error = None
         self.last_frame = None
+        self.pending_switch = None
+        self.pending_reset = False
+
+    def request_switch(self, exercise_key):
+        """Applied inside the next frame callback, so the engine is only touched from the stream's thread."""
+        self.pending_switch = exercise_key
+
+    def request_reset(self):
+        self.pending_reset = True
+
+    def _apply_requests(self):
+        if self.pending_reset:
+            self.pending_reset = False
+            self.live.reset()
+        key, self.pending_switch = self.pending_switch, None
+        if key and key != self.live.exercise_key:
+            try:
+                self.live.switch(key)
+                self.exercise_key = key
+            except ValueError as err:
+                self.error = str(err)
 
     def configure(self, patient_id, exercise_key, target_reps, camera_label, db_path=None):
         """Set what the next session records. The patient and camera are fixed once the session exists."""
@@ -199,6 +220,8 @@ class LiveVideoProcessor(VideoProcessorBase):
             self.camera_label = camera_label
             self.db_path = db_path
         self.target_reps = int(target_reps)
+        if self.live is not None:
+            self.live.set_target_reps(self.target_reps)
 
     def _infer(self, img):
         if self._infer_override is not None:
@@ -225,6 +248,7 @@ class LiveVideoProcessor(VideoProcessorBase):
         self._ensure_live()
         if self.live is None:
             return img
+        self._apply_requests()
         out = self.live.process(img)
         self.last_frame = out
         if self.live.error and not self.error:
@@ -493,6 +517,14 @@ def page_live_session():
             st.caption(f"Recording session {processor.session_id} for {processor.patient_id or 'unassigned'}")
         else:
             st.caption("Starting… the session begins with the first processed frame.")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button(f"🔀 Switch exercise to {exercise}", key="live_switch",
+                         disabled=(processor.exercise_key == exercise_key)):
+                processor.request_switch(exercise_key)
+        with c2:
+            if st.button("🔄 Reset reps", key="live_reset"):
+                processor.request_reset()
     else:
         _live_summary_block()
 

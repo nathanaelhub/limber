@@ -272,3 +272,31 @@ def test_live_page_shows_stored_summary_and_opens_the_session(seeded_env, stub_w
     assert not at.exception, [e.value for e in at.exception]
     assert at.session_state["current_page"] == "sessions"
     assert at.session_state["sessions_open"] == sid
+
+
+class _FakeProcessor:
+    def __init__(self):
+        self.session_id, self.patient_id, self.exercise_key = 41, "P-017", "squat"
+        self.error, self.last_frame, self.requests, self.configured = None, None, [], None
+
+    def configure(self, *args):
+        self.configured = args
+
+    def request_switch(self, key):
+        self.requests.append(("switch", key))
+
+    def request_reset(self):
+        self.requests.append(("reset",))
+
+
+def test_live_page_while_playing_offers_switch_and_reset(seeded_env, stub_webrtc):
+    proc = _FakeProcessor()
+    stub_webrtc["ctx"] = _StubCtx(playing=True, processor=proc)
+    at = _live_page()
+    assert not at.exception, [e.value for e in at.exception]
+    assert proc.configured[:2] == ("P-017", "knee_extension")
+    assert any("Recording session 41 for P-017" in c.value for c in at.caption)
+    assert at.session_state["live_session_id"] == 41
+    at.button(key="live_switch").click().run()
+    at.button(key="live_reset").click().run()
+    assert proc.requests == [("switch", "knee_extension"), ("reset",)]
