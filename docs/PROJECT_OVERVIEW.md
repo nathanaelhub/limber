@@ -57,6 +57,7 @@ ai-pt-assistant/
 │   ├── utils.py            # Angle calculation, keypoint extraction
 │   ├── form_assessment.py  # Biomechanical form checking
 │   ├── session_summary.py  # Clinical summary of one session
+│   ├── live_session.py     # LiveSession: engine + recorder per browser frame (web live page)
 │   └── ptlog/              # Canonical session record and review
 │       ├── models.py       # Entities with units and definitions
 │       ├── store.py        # SQLite store: single writer, reads, migrations, recovery
@@ -128,6 +129,14 @@ Biomechanically-informed analysis of exercise form:
 - `FormAnalyzer` - Main form assessment engine
 - `FormFeedback` - Structured feedback messages
 - `OverallFormAssessment` - Complete frame analysis
+
+### `src/live_session.py` (~200 lines)
+**Live web sessions**
+
+`LiveSession` runs the engine's per-frame steps for frames that arrive through a callback (the
+browser stream) and records through `SessionRecorder`, with `switch()`, `reset()`, `end()`, and
+`save_screenshot()`. It mirrors the command-line webcam loop without editing it; an opt-in
+parity test on a sample clip guards the two against drift.
 
 ### `src/ptlog/` (~1,800 lines)
 **The canonical session record**

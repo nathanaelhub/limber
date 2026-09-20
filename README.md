@@ -95,6 +95,11 @@ python interfaces/cli.py tracker queue
 streamlit run interfaces/app.py
 ```
 
+**Live sessions in the browser:** open *Live Session*, pick the patient in the sidebar, choose the
+exercise, target reps, and camera, and press START. The page runs the same engine as the command
+line and records the session as it happens; STOP shows the stored summary with a link to the
+session. Switch exercise, Reset reps, and Save Screenshot work while streaming.
+
 **Where data lives:** every session is written to one local SQLite file, `data/ptassist.db`
 (set `PTASSIST_DB=/path/to/file.db` to use another location). Exports default to `exports/`.
 Both folders are ignored by git. Patients are identified only by a pseudonymous ID; names,

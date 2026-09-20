@@ -66,9 +66,9 @@ its implementation task. Suite command: `.venv/bin/python -m pytest tests`.
 
 ## Phase 7: Polish
 
-- [ ] T024 [P] Add tests/test_live_parity_e2e.py, skipped unless `PTASSIST_E2E=1` and the model and clip exist: `LiveSession` fed every frame of videos/Squats.demo.video.mp4 stores the same reps and partial reps as `analyze.main()` for the clip (SC-001)
-- [ ] T025 [P] Add Update 6 to docs/UPDATES.md, a live-session note to README.md, and the adapter to docs/PROJECT_OVERVIEW.md
-- [ ] T026 Run quickstart steps 1 and 4 (and step 2 if the model is present); record results in specs/004-live-session-recording/checklists/requirements.md; final commit
+- [X] T024 [P] Add tests/test_live_parity_e2e.py, skipped unless `PTASSIST_E2E=1` and the model and clip exist: `LiveSession` fed every frame of videos/Squats.demo.video.mp4 stores the same reps and partial reps as `analyze.main()` for the clip (SC-001)
+- [X] T025 [P] Add Update 6 to docs/UPDATES.md, a live-session note to README.md, and the adapter to docs/PROJECT_OVERVIEW.md
+- [X] T026 Run quickstart steps 1 and 4 (and step 2 if the model is present); record results in specs/004-live-session-recording/checklists/requirements.md; final commit
 
 ## Dependencies
 

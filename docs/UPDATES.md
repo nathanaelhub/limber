@@ -2,6 +2,56 @@
 
 ---
 
+## Update 6 — 2026-09-20 — Live Web Session Recording
+
+Feature spec: `specs/004-live-session-recording/`. The web app's Live Session page now runs the
+real exercise engine and records every session into the canonical record, exactly like the
+command-line webcam session. No schema change.
+
+### 1. One engine, one record
+
+The page's private rep counter (no smoothing, no form assessment, nothing saved) is removed.
+`src/live_session.py` adds `LiveSession`, a small adapter that performs the same per-frame
+steps as the command-line webcam loop (pose → joint angle → `ExerciseTracker` →
+`FormAnalyzer` → `SessionRecorder` → angle and panel drawing) for frames delivered by the
+browser stream. `analyze.py` is not edited. `LiveVideoProcessor` in `interfaces/app.py` feeds
+the stream to it. The on-video panel is the engine's own: exercise, reps against target,
+angle (degrees), phase, form status, and up to two feedback messages.
+
+### 2. What the PT does
+
+Select the patient in the sidebar, choose the exercise (the list now comes from `config.yaml`),
+target reps, and camera, then press START. The session is recorded under that patient from the
+first processed frame, with source "webcam" and the camera choice as its reference. While
+streaming: **Switch exercise** closes the set and opens a new one, **Reset reps** records a
+reset, **Save Screenshot** writes `exports/<patient id>_<YYYYMMDD_HHMMSS>.png`. STOP ends the
+session and the page shows the stored summary (reps, average form score 0-100, average ROM in
+degrees, duration) with **Open in Sessions**. The placeholder "Save Session" button is gone;
+sessions save themselves.
+
+### 3. Interruptions
+
+A killed app leaves the session marked interrupted with every recorded rep. A second stream
+ends an earlier running session as interrupted. A session whose stream was lost (closed tab)
+is marked interrupted with reason `stream_lost` when the page next finds it with no activity
+for 10 seconds.
+
+Behaviour change in the record: opening the record no longer interrupts a running session
+whose recording process is still alive (the web app opens the record on every page render).
+Live sessions store their process id in the session extras for this; command-line sessions
+recover as before. `SessionStore` also gained `check_same_thread`, `interrupt_session()`, and
+`last_activity_time()`.
+
+### 4. Tests
+
+Synthetic 17-keypoint poses drive the real tracker with no camera or model
+(`tests/test_live_session.py`, `test_live_processor.py`, `test_live_interrupt.py`,
+`test_store_live.py`, live-page tests in `test_app_pages.py`). Recording adds under 2 ms per
+frame over 300 frames. Opt-in clip parity against the command-line runner:
+`PTASSIST_E2E=1 .venv/bin/python -m pytest tests/test_live_parity_e2e.py`.
+
+---
+
 ## Update 5 — 2026-09-20 — Multi-Patient PT Tracker
 
 Feature spec: `specs/003-pt-tracker/`. Reads from the canonical record and the review feature;
