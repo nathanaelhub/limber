@@ -441,3 +441,12 @@ def queue_lines(result) -> List[str]:
         for it in items:
             lines.append(f"- {it.patient_id} | {it.description} | {it.target}")
     return lines
+
+
+def live_summary_line(session: Session) -> str:
+    """The one-line result shown on the live-session page when a stream stops (equals the stored summary)."""
+    line = (f"Session {session.id}: {session.total_reps or 0} reps, avg form {fmt_form(session.avg_form_score)}, "
+            f"avg ROM {fmt_rom(session.avg_rom)}, duration {fmt_seconds(session.duration_seconds)}")
+    if session.status != "completed":
+        line += f" | STATUS: {session.status}"
+    return line

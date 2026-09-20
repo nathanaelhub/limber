@@ -44,6 +44,8 @@ from src.utils import get_angle_from_keypoints, extract_keypoint, calculate_angl
 
 # Import core analysis engine for real video processing
 from analyze import main as analyze_video
+from analyze import load_config as load_exercise_config
+from src.live_session import LiveSession
 
 # Import observation logger helpers
 from src.ptlog.store import SessionStore, default_db_path
@@ -156,135 +158,94 @@ def init_session_state():
 # VIDEO PROCESSOR FOR LIVE POSE ESTIMATION
 # =============================================================================
 
-# Exercise configurations
-EXERCISE_CONFIGS = {
-    "Knee Extension": {"keypoints": [11, 13, 15], "up_angle": 170, "down_angle": 90},
-    "Shoulder Flexion": {"keypoints": [11, 5, 7], "up_angle": 170, "down_angle": 20},
-    "Squat": {"keypoints": [11, 13, 15], "up_angle": 170, "down_angle": 90},
-    "Hip Abduction": {"keypoints": [12, 11, 13], "up_angle": 45, "down_angle": 10},
-    "Push-up": {"keypoints": [5, 7, 9], "up_angle": 170, "down_angle": 90},
-}
-
 @st.cache_resource
 def load_pose_model():
     """Load YOLO pose model (cached)."""
     return YOLO("models/yolo11m-pose.pt")
 
 
-class PoseVideoProcessor(VideoProcessorBase):
-    """Video processor for real-time pose estimation."""
+@st.cache_data
+def _live_exercises():
+    """Display name -> configuration key, in configuration order (the engine's own exercise list)."""
+    return {cfg.name: key for key, cfg in load_exercise_config().items()}
 
-    def __init__(self):
-        self.model = load_pose_model()
-        self.exercise = "Knee Extension"
-        self.keypoints_indices = [11, 13, 15]
-        self.up_angle = 170
-        self.down_angle = 90
-        self.tolerance = 15
 
-        # State tracking
-        self.rep_count = 0
-        self.current_state = "neutral"
-        self.current_angle = 0
-        self.form_score = 0
-        self.angles_history = []
+class LiveVideoProcessor(VideoProcessorBase):
+    """Feeds browser frames to a LiveSession: the real engine, recorded in the canonical record.
 
-    def set_exercise(self, exercise_name):
-        """Set the exercise configuration."""
-        if exercise_name in EXERCISE_CONFIGS:
-            config = EXERCISE_CONFIGS[exercise_name]
-            self.exercise = exercise_name
-            self.keypoints_indices = config["keypoints"]
-            self.up_angle = config["up_angle"]
-            self.down_angle = config["down_angle"]
-            self.rep_count = 0
-            self.current_state = "neutral"
+    The page sets the stream's patient, exercise, target, and camera label through `configure()`;
+    the session is created on the first frame after that. Nothing here counts reps or scores form.
+    """
+
+    def __init__(self, infer=None):
+        self._infer_override = infer
+        self.model = None if infer is not None else load_pose_model()
+        self.patient_id = None
+        self.exercise_key = None
+        self.target_reps = None
+        self.camera_label = "Default"
+        self.db_path = None
+        self.live = None
+        self.store = None
+        self.session_id = None
+        self.error = None
+        self.last_frame = None
+
+    def configure(self, patient_id, exercise_key, target_reps, camera_label, db_path=None):
+        """Set what the next session records. The patient and camera are fixed once the session exists."""
+        if self.live is None:
+            self.patient_id = patient_id
+            self.exercise_key = exercise_key
+            self.camera_label = camera_label
+            self.db_path = db_path
+        self.target_reps = int(target_reps)
+
+    def _infer(self, img):
+        if self._infer_override is not None:
+            return self._infer_override(img)
+        results = self.model(img, imgsz=320, verbose=False)
+        keypoints = None
+        if results and len(results) > 0 and results[0].keypoints is not None and len(results[0].keypoints) > 0:
+            keypoints = results[0].keypoints.data[0].cpu().numpy()
+        return keypoints, (results[0].plot() if results else None)
+
+    def _ensure_live(self):
+        if self.live is not None or self.error is not None or not self.exercise_key:
+            return
+        try:
+            self.store = SessionStore(self.db_path or default_db_path(), check_same_thread=False).open()
+            live = LiveSession(self.store, self.patient_id, self.exercise_key, self.target_reps,
+                               self.camera_label, self._infer)
+            self.session_id = live.start()
+            self.live = live
+        except Exception as err:  # noqa: BLE001 — the stream keeps running; the page shows the message
+            self.error = str(err)
+
+    def process_image(self, img):
+        self._ensure_live()
+        if self.live is None:
+            return img
+        out = self.live.process(img)
+        self.last_frame = out
+        if self.live.error and not self.error:
+            self.error = self.live.error
+        return out
 
     def recv(self, frame):
-        """Process each video frame."""
         img = frame.to_ndarray(format="bgr24")
+        return av.VideoFrame.from_ndarray(self.process_image(img), format="bgr24")
 
-        # Run pose estimation
-        results = self.model(img, verbose=False)
-
-        # Get annotated frame with skeleton
-        annotated = results[0].plot() if results else img.copy()
-
-        # Extract keypoints and calculate angle
-        if results and len(results) > 0 and results[0].keypoints is not None:
-            if len(results[0].keypoints) > 0:
-                keypoints = results[0].keypoints.data[0].cpu().numpy()
-
-                # Calculate angle
-                angle = get_angle_from_keypoints(keypoints, self.keypoints_indices)
-
-                if angle is not None:
-                    self.current_angle = angle
-                    self.angles_history.append(angle)
-                    if len(self.angles_history) > 30:
-                        self.angles_history.pop(0)
-
-                    # State machine for rep counting
-                    prev_state = self.current_state
-                    ascending = self.up_angle > self.down_angle
-
-                    if ascending:
-                        if angle >= self.up_angle - self.tolerance:
-                            self.current_state = "up"
-                        elif angle <= self.down_angle + self.tolerance:
-                            if prev_state == "up":
-                                self.rep_count += 1
-                            self.current_state = "down"
-                    else:
-                        if angle <= self.up_angle + self.tolerance:
-                            if prev_state == "down":
-                                self.rep_count += 1
-                            self.current_state = "up"
-                        elif angle >= self.down_angle - self.tolerance:
-                            self.current_state = "down"
-
-                    # Calculate form score (simplified)
-                    if len(self.angles_history) > 5:
-                        smoothness = 100 - min(np.std(np.diff(self.angles_history[-10:])) * 2, 50)
-                        self.form_score = max(0, min(100, smoothness))
-
-                    # Draw angle visualization
-                    p1 = extract_keypoint(keypoints, self.keypoints_indices[0])
-                    vertex = extract_keypoint(keypoints, self.keypoints_indices[1])
-                    p2 = extract_keypoint(keypoints, self.keypoints_indices[2])
-
-                    if all(p is not None for p in [p1, vertex, p2]):
-                        v = tuple(vertex.astype(int))
-                        cv2.putText(annotated, f"{angle:.1f}", (v[0]+15, v[1]-15),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-
-        # Draw metrics panel on LEFT side (to avoid cutoff on right)
-        h, w = annotated.shape[:2]
-        panel_w = 220
-        panel_h = 160
-
-        # Semi-transparent background panel on left
-        overlay = annotated.copy()
-        cv2.rectangle(overlay, (0, 0), (panel_w, panel_h), (40, 40, 40), -1)
-        cv2.addWeighted(overlay, 0.7, annotated, 0.3, 0, annotated)
-
-        # Exercise name
-        cv2.putText(annotated, self.exercise, (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-        # Rep count (large)
-        cv2.putText(annotated, f"Reps: {self.rep_count}", (10, 65),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        # Angle
-        cv2.putText(annotated, f"Angle: {self.current_angle:.1f}", (10, 100),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        # Phase
-        cv2.putText(annotated, f"Phase: {self.current_state.upper()}", (10, 130),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        # Form score
-        cv2.putText(annotated, f"Form: {self.form_score:.0f}%", (10, 155),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-
-        return av.VideoFrame.from_ndarray(annotated, format="bgr24")
+    def on_ended(self):
+        """The stream stopped: end the session normally."""
+        live, store = self.live, self.store
+        if live is not None:
+            try:
+                live.end()
+            except Exception as err:  # noqa: BLE001
+                self.error = str(err)
+        if store is not None:
+            store.close()
+            self.store = None
 
 
 # =============================================================================
@@ -441,19 +402,36 @@ def page_home():
 # PAGE: LIVE SESSION
 # =============================================================================
 
+def _live_summary_block():
+    """After a stream: the stored summary of the session it recorded, with a way to open it."""
+    sid = st.session_state.get("live_session_id")
+    if sid is None:
+        return
+    with _open_store() as store:
+        try:
+            session = store.load_session(int(sid))
+        except PTLogError:
+            st.session_state.pop("live_session_id", None)
+            return
+    st.success(ptviews.live_summary_line(session))
+    if st.button("📋 Open in Sessions", key="live_open_session"):
+        st.session_state.sessions_scope = "All patients"
+        st.session_state.sessions_open = session.id
+        st.session_state.current_page = "sessions"
+        st.rerun()
+
+
 def page_live_session():
-    """Render the live session page with real webcam support."""
+    """Live session: the browser stream runs the real engine and is recorded as it happens."""
     st.markdown("## 📹 Live PT Session")
 
     # Hide webrtc default icons and fullscreen toolbar
     st.markdown("""
         <style>
-        /* Hide the fullscreen toolbar button */
         .stElementToolbar,
         [data-testid="stElementToolbar"] {
             display: none !important;
         }
-        /* Make video container cleaner */
         .stApp video {
             border-radius: 8px;
             border: 2px solid #333;
@@ -461,116 +439,77 @@ def page_live_session():
         </style>
     """, unsafe_allow_html=True)
 
-    # Exercise and camera selection
+    exercises = _live_exercises()
+    configs = load_exercise_config()
+    patient_id = st.session_state.get("patient_id") or "unassigned"
+
     col1, col2, col3 = st.columns([2, 1, 1])
-
     with col1:
-        exercise = st.selectbox(
-            "Select Exercise",
-            list(EXERCISE_CONFIGS.keys()),
-            key="exercise_select"
-        )
-
+        exercise = st.selectbox("Select Exercise", list(exercises.keys()), key="exercise_select")
+    exercise_key = exercises[exercise]
+    config = configs[exercise_key]
     with col2:
-        target_reps = st.number_input("Target Reps", min_value=1, max_value=50, value=10)
-
+        target_reps = st.number_input("Target Reps", min_value=1, max_value=100,
+                                      value=int(config.target_reps), key=f"target_reps_{exercise_key}")
     with col3:
-        camera_option = st.selectbox(
-            "Camera",
-            ["Default", "Front Camera", "Back Camera"],
-            key="camera_select",
-            help="Select which camera to use"
-        )
+        camera_option = st.selectbox("Camera", ["Default", "Front Camera", "Back Camera"],
+                                     key="camera_select", help="Select which camera to use")
 
     st.markdown("---")
+    st.info(f"**Instructions:** allow camera access, then press START. The session is recorded for "
+            f"**{patient_id}** as it happens; press STOP to end it. Sessions are saved automatically.")
 
-    # CLI quality note
-    st.warning("**💡 For best video quality**, use the command line: `python analyze.py webcam --exercise \"" + exercise + "\"`")
-
-    st.info("**Instructions:** Allow camera access when prompted. The pose estimation will start automatically. Press 'STOP' to end the session.")
-
-    # HD video constraints with camera selection
     video_config = {
         "width": {"min": 1280, "ideal": 1920},
         "height": {"min": 720, "ideal": 1080},
-        "frameRate": {"ideal": 30}
+        "frameRate": {"ideal": 30},
     }
-
-    # Add facing mode based on camera selection
     if camera_option == "Front Camera":
         video_config["facingMode"] = "user"
     elif camera_option == "Back Camera":
         video_config["facingMode"] = "environment"
 
-    video_constraints = {
-        "video": video_config,
-        "audio": False
-    }
-
-    # RTC configuration
-    rtc_config = {
-        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}],
-    }
-
-    # Create the webrtc streamer with pose estimation
     ctx = webrtc_streamer(
         key=f"pose-estimation-{camera_option}",  # Key changes with camera to force refresh
         mode=WebRtcMode.SENDRECV,
-        video_processor_factory=PoseVideoProcessor,
-        media_stream_constraints=video_constraints,
+        video_processor_factory=LiveVideoProcessor,
+        media_stream_constraints={"video": video_config, "audio": False},
         async_processing=True,
-        rtc_configuration=rtc_config,
-        video_html_attrs={
-            "style": {"width": "100%", "max-width": "1280px"},
-            "autoPlay": True,
-            "muted": True
-        }
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        video_html_attrs={"style": {"width": "100%", "max-width": "1280px"}, "autoPlay": True, "muted": True},
     )
 
-    # Update exercise config when selection changes
-    if ctx.video_processor:
-        ctx.video_processor.set_exercise(exercise)
+    processor = ctx.video_processor
+    playing = bool(ctx.state.playing)
+    if processor is not None:
+        processor.configure(patient_id, exercise_key, target_reps, camera_option)
+        if processor.session_id is not None:
+            st.session_state.live_session_id = processor.session_id
+        if processor.error:
+            st.error(f"Recording problem: {processor.error}")
+
+    if playing and processor is not None:
+        if processor.session_id is not None:
+            st.caption(f"Recording session {processor.session_id} for {processor.patient_id or 'unassigned'}")
+        else:
+            st.caption("Starting… the session begins with the first processed frame.")
+    else:
+        _live_summary_block()
 
     st.markdown("---")
-
-    # Info panel
-    col1, col2, col3 = st.columns(3)
-
+    col1, col2 = st.columns(2)
     with col1:
         st.markdown("### Exercise Info")
-        if exercise in EXERCISE_CONFIGS:
-            config = EXERCISE_CONFIGS[exercise]
-            st.write(f"**Keypoints:** {config['keypoints']}")
-            st.write(f"**Up Angle:** {config['up_angle']}°")
-            st.write(f"**Down Angle:** {config['down_angle']}°")
-
+        st.write(f"**Keypoints:** {config.keypoints}")
+        st.write(f"**Up Angle:** {config.up_angle}°")
+        st.write(f"**Down Angle:** {config.down_angle}°")
     with col2:
         st.markdown("### Target")
         st.metric("Target Reps", target_reps)
 
-    with col3:
-        st.markdown("### Tips")
-        tips = {
-            "Knee Extension": "Keep your back against the seat",
-            "Shoulder Flexion": "Don't arch your back",
-            "Squat": "Keep knees over toes",
-            "Hip Abduction": "Keep trunk stable",
-            "Push-up": "Maintain straight body line"
-        }
-        st.info(tips.get(exercise, "Maintain good form"))
-
-    # Controls
     st.markdown("---")
-    st.markdown("### Session Notes")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("📸 Save Screenshot"):
-            st.toast("Screenshot saved!")
-
-    with col2:
-        if st.button("💾 Save Session"):
-            st.toast("Session saved!")
+    if st.button("📸 Save Screenshot", key="live_screenshot"):
+        st.info("No frame to save. Start the stream first.")
 
 
 # =============================================================================
@@ -1165,6 +1104,8 @@ def page_sessions():
 
     ids = [r["id"] for r in rows]
     by_id = {r["id"]: r for r in rows}
+    if st.session_state.get("sessions_open") not in ids:
+        st.session_state.pop("sessions_open", None)      # e.g. a link to a session outside this list
     sid = st.selectbox("Open session", ids, key="sessions_open",
                        format_func=lambda i: f"#{i} · {by_id[i]['date']} · {by_id[i]['exercises']} · {by_id[i]['total_reps']} reps")
 

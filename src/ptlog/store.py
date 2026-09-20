@@ -261,16 +261,19 @@ def default_db_path() -> Path:
 class SessionStore:
     """The single writer and reader of the canonical record."""
 
-    def __init__(self, db_path: Path | str, clock: Callable[[], datetime] = datetime.now):
+    def __init__(self, db_path: Path | str, clock: Callable[[], datetime] = datetime.now,
+                 check_same_thread: bool = True):
         self.db_path = Path(db_path)
         self.clock = clock
+        # False only for the live web session, whose callbacks run on worker threads (the caller locks).
+        self.check_same_thread = check_same_thread
         self.conn: Optional[sqlite3.Connection] = None
 
     # ---------------------------------------------------------------- lifecycle
 
     def open(self) -> "SessionStore":
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+        self.conn = sqlite3.connect(str(self.db_path), timeout=5.0, check_same_thread=self.check_same_thread)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=FULL")
@@ -327,11 +330,14 @@ class SessionStore:
 
     def _recover_running_sessions(self) -> None:
         """Mark sessions left 'running' by an interruption (FR-011)."""
-        self._interrupt_running("recovered_on_open")
+        self._interrupt_running("recovered_on_open", skip_living_owner=True)
 
-    def _interrupt_running(self, reason: str) -> None:
-        rows = self.conn.execute("SELECT id, start_time FROM sessions WHERE status = 'running'").fetchall()
+    def _interrupt_running(self, reason: str, skip_living_owner: bool = False) -> None:
+        rows = self.conn.execute(
+            "SELECT id, start_time, source_extras FROM sessions WHERE status = 'running'").fetchall()
         for row in rows:
+            if skip_living_owner and _owner_alive(row["source_extras"]):
+                continue   # still being recorded by a living process (live web session)
             end_time = self._last_activity_time(row["id"]) or row["start_time"]
             self._finish_session(row["id"], status="interrupted", end_time=end_time, reason=reason)
 
@@ -485,6 +491,15 @@ class SessionStore:
             end_time = last if (last and _ts_key(last) > _ts_key(now)) else now   # never before the last event
             self._finish_session(session_id, status="completed", end_time=end_time)
         return self.load_session(session_id)
+
+    def interrupt_session(self, session_id: int, reason: str) -> None:
+        """Mark one running session interrupted; a no-op for a session already finished."""
+        row = self.conn.execute("SELECT status, start_time FROM sessions WHERE id = ?", (session_id,)).fetchone()
+        if row is None:
+            raise SessionNotFoundError(f"Session {session_id} not found")
+        if row["status"] == "running":
+            end_time = self._last_activity_time(session_id) or row["start_time"]
+            self._finish_session(session_id, status="interrupted", end_time=end_time, reason=reason)
 
     def record_export(self, session_id: int, fmt: str, path: Path | str) -> int:
         cur = self.conn.execute(
@@ -1068,6 +1083,25 @@ class SessionStore:
             WHERE s.patient_id = ? ORDER BY s.start_time DESC, s.id DESC LIMIT 1
             """, (patient_id,)).fetchone()
         return Review(row["session_id"], row["reviewed_at"], row["notes"], row["next_step"]) if row else None
+
+
+def _owner_alive(source_extras: Optional[str]) -> bool:
+    """True when the session's extras name the process recording it and that process is alive."""
+    try:
+        pid = int((json.loads(source_extras) if source_extras else {}).get("pid"))
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
 
 
 def _ts_key(ts: Optional[str]):

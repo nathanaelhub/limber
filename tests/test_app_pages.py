@@ -209,3 +209,66 @@ def test_tracker_page_discharged_and_patient_controls(seeded_env):
 def test_tracker_page_export(seeded_env):
     at = _tracker_page(seeded_env, "Export")
     assert "Roster (CSV)" in {b.label for b in at.get("download_button")}
+
+
+# ----------------------------------------------------------------------------- feature 004: live session page
+
+class _StubState:
+    def __init__(self, playing):
+        self.playing = playing
+
+
+class _StubCtx:
+    def __init__(self, playing=False, processor=None):
+        self.state = _StubState(playing)
+        self.video_processor = processor
+
+
+@pytest.fixture
+def stub_webrtc(monkeypatch):
+    """Replace the WebRTC component so the live page renders headlessly."""
+    import streamlit_webrtc
+    holder = {"ctx": _StubCtx(), "calls": []}
+
+    def fake_streamer(**kwargs):
+        holder["calls"].append(kwargs)
+        return holder["ctx"]
+
+    monkeypatch.setattr(streamlit_webrtc, "webrtc_streamer", fake_streamer)
+    return holder
+
+
+def _live_page(extra_state=None):
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "live"
+    at.session_state["patient_id"] = "P-017"
+    for k, v in (extra_state or {}).items():
+        at.session_state[k] = v
+    return at.run()
+
+
+def test_live_page_controls_come_from_the_configuration(seeded_env, stub_webrtc):
+    from analyze import load_config
+    at = _live_page()
+    assert not at.exception, [e.value for e in at.exception]
+    exercise = next(s for s in at.selectbox if s.key == "exercise_select")
+    assert list(exercise.options) == [c.name for c in load_config().values()]
+    assert any(s.key == "camera_select" for s in at.selectbox)
+    assert any(n.label == "Target Reps" for n in at.number_input)
+    labels = [b.label for b in at.button]
+    assert not any("Save Session" in label for label in labels)
+    assert any("Save Screenshot" in label for label in labels)
+    assert stub_webrtc["calls"], "the stream component must be created"
+
+
+def test_live_page_shows_stored_summary_and_opens_the_session(seeded_env, stub_webrtc):
+    with SessionStore(seeded_env).open() as store:
+        sid = store.list_sessions("P-017")[0].id
+    at = _live_page({"live_session_id": sid})
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(m.value for m in at.markdown) + " ".join(s.value for s in at.success)
+    assert f"Session {sid}" in text and "3 reps" in text
+    at.button(key="live_open_session").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["current_page"] == "sessions"
+    assert at.session_state["sessions_open"] == sid

@@ -1,0 +1,88 @@
+"""Feature 004 T003 — store support for a live web session (threads, pid-aware recovery, interrupt)."""
+
+import os
+import subprocess
+import sys
+import threading
+
+from src.ptlog.models import ExerciseSetInfo, RepEvent
+from src.ptlog.store import SessionStore
+
+KNEE = ExerciseSetInfo("knee_extension", "Knee Extension", "left", 10, 170.0, 90.0)
+
+
+def _status(db, sid):
+    with SessionStore(db) as s:
+        row = s.conn.execute("SELECT status, interrupted_reason FROM sessions WHERE id = ?", (sid,)).fetchone()
+    return row["status"], row["interrupted_reason"]
+
+
+def _dead_pid():
+    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    proc.wait()
+    return proc.pid
+
+
+def test_other_thread_can_write_when_flag_is_off(tmp_db):
+    store = SessionStore(tmp_db, check_same_thread=False).open()
+    sid = store.start_session("unassigned", "webcam", "Default")
+    set_id = store.open_set(sid, KNEE)
+    errors = []
+
+    def work():
+        try:
+            store.add_rep(set_id, RepEvent(1, 85.0, 172.0, 87.0, 2.0, 90.0, "2026-03-23T09:00:05", 60))
+        except Exception as err:  # noqa: BLE001
+            errors.append(err)
+
+    t = threading.Thread(target=work)
+    t.start()
+    t.join()
+    assert errors == []
+    assert store.end_session(sid).total_reps == 1
+    store.close()
+
+
+def test_running_session_of_living_process_survives_open(tmp_db):
+    store = SessionStore(tmp_db).open()
+    sid = store.start_session("unassigned", "webcam", "Default", {"pid": os.getpid()})
+    assert _status(tmp_db, sid) == ("running", None)
+    assert store.end_session(sid).status == "completed"
+    store.close()
+
+
+def test_running_session_of_dead_process_is_recovered(tmp_db):
+    store = SessionStore(tmp_db).open()
+    sid = store.start_session("unassigned", "webcam", "Default", {"pid": _dead_pid()})
+    store.close()
+    assert _status(tmp_db, sid) == ("interrupted", "recovered_on_open")
+
+
+def test_running_session_without_pid_is_recovered(tmp_db):
+    store = SessionStore(tmp_db).open()
+    sid = store.start_session("unassigned", "webcam", "0", {"camera_id": 0})
+    store.close()
+    assert _status(tmp_db, sid) == ("interrupted", "recovered_on_open")
+
+
+def test_start_session_supersedes_even_a_living_owner(tmp_db):
+    store = SessionStore(tmp_db).open()
+    first = store.start_session("unassigned", "webcam", "Default", {"pid": os.getpid()})
+    second = store.start_session("unassigned", "webcam", "Default", {"pid": os.getpid()})
+    assert store.load_session(first).status == "interrupted"
+    assert store.load_session(first).interrupted_reason == "superseded_by_new_session"
+    assert store.load_session(second).status == "running"
+    store.close()
+
+
+def test_interrupt_session(tmp_db):
+    store = SessionStore(tmp_db).open()
+    sid = store.start_session("unassigned", "webcam", "Default", {"pid": os.getpid()})
+    store.interrupt_session(sid, "stream_lost")
+    s = store.load_session(sid)
+    assert (s.status, s.interrupted_reason) == ("interrupted", "stream_lost")
+    done = store.start_session("unassigned", "webcam", "Default", {"pid": os.getpid()})
+    store.end_session(done)
+    store.interrupt_session(done, "stream_lost")
+    assert store.load_session(done).status == "completed"
+    store.close()
