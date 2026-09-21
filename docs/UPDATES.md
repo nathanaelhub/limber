@@ -69,6 +69,11 @@ browser stream. `analyze.py` is not edited. `LiveVideoProcessor` in `interfaces/
 the stream to it. The on-video panel is the engine's own: exercise, reps against target,
 angle (degrees), phase, form status, and up to two feedback messages.
 
+Browser streams are often smaller than 720p (WebRTC lowers the resolution under load), and the
+engine's panel is laid out in fixed pixels for 720p. `LiveSession` therefore draws the panel on a
+720p-scaled copy of smaller frames and scales back, so the panel keeps its share of the picture
+and no line is cut off. Frames of 720p or more are drawn exactly as the engine draws them.
+
 ### 2. What the PT does
 
 Select the patient in the sidebar, choose the exercise (the list now comes from `config.yaml`),

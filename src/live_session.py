@@ -35,6 +35,24 @@ def base_exercise(exercise_key: str) -> str:
     return exercise_key.replace("_right", "").replace("_left", "")
 
 
+PANEL_DESIGN_HEIGHT = 720   # the engine's panel uses fixed pixel sizes laid out for a 720p frame
+
+
+def _panel_at_design_size(frame: np.ndarray, metrics: Dict[str, Any]) -> np.ndarray:
+    """Draw the engine's panel so it takes the same share of the picture at any stream resolution.
+
+    Browser streams are often smaller than 720p (WebRTC lowers resolution under load); drawn
+    directly, the fixed-size panel would cover half the frame and lose its last lines. Smaller
+    frames are scaled up for drawing and back down, so the stream keeps its size."""
+    height, width = frame.shape[:2]
+    if height >= PANEL_DESIGN_HEIGHT:
+        return draw_metrics_panel(frame, metrics)
+    scale = PANEL_DESIGN_HEIGHT / height
+    enlarged = cv2.resize(frame, (int(round(width * scale)), PANEL_DESIGN_HEIGHT), interpolation=cv2.INTER_LINEAR)
+    enlarged = draw_metrics_panel(enlarged, metrics)
+    return cv2.resize(enlarged, (width, height), interpolation=cv2.INTER_AREA)
+
+
 class LiveSession:
     """One recorded live session. Every public method is safe to call from any thread."""
 
@@ -128,7 +146,7 @@ class LiveSession:
             self.recorder.observe(self.tracker, metrics, angle, self.frame_num, self.last_assessment)
 
             if self.draw:
-                annotated = draw_metrics_panel(annotated, metrics)
+                annotated = _panel_at_design_size(annotated, metrics)
             self.metrics = metrics
             self.last_frame = annotated
             return annotated

@@ -271,3 +271,34 @@ class TestSwitchAndReset:
         live.switch("squat")
         live.reset()
         assert store.load_session(sid).control_events == []
+
+
+class TestPanelOnSmallFrames:
+    """The engine's panel is laid out in fixed pixels for 720p; browser streams are often smaller."""
+
+    def test_panel_is_scaled_to_fit_a_360p_frame(self, store):
+        from tests.fixtures.poses import keypoints_for_angle
+        small = np.full((360, 640, 3), 128, dtype=np.uint8)
+        analyzer = QuietAnalyzer(FormStatus.WARNING, ["Keep knee aligned over toes", "Slow the lowering phase"])
+        live = LiveSession(store, "P-017", "knee_extension", 10, "Default", lambda f: keypoints_for_angle(120.0),
+                           form_analyzer_factory=lambda b: analyzer)
+        live.start()
+        out = live.process(small)
+        assert out.shape == small.shape                       # the stream keeps its size
+        # the panel occupies the same share of the width as on a 720p frame (300 of 1280), not 300 of 640
+        top_row = np.abs(out[3].astype(int) - 128).max(axis=1) > 10      # only the panel paints the top rows
+        first_panel_col = int(np.argmax(top_row))
+        assert 640 - 160 <= first_panel_col <= 640 - 140                 # 300/1280 of the width = 150 px
+        # and text ends well above the bottom edge: the last 10% of panel rows hold only the flat background
+        strip = out[-36:, -100:, :].astype(int)
+        assert strip.std(axis=(0, 1)).max() < 3
+
+    def test_720p_frames_are_drawn_exactly_as_the_engine_draws_them(self, store):
+        from analyze import draw_metrics_panel
+        from tests.fixtures.poses import keypoints_for_angle
+        big = np.full((720, 1280, 3), 128, dtype=np.uint8)
+        live = LiveSession(store, "P-017", "knee_extension", 10, "Default", lambda f: None,
+                           form_analyzer_factory=lambda b: QuietAnalyzer())
+        live.start()
+        out = live.process(big)
+        assert (out == draw_metrics_panel(big.copy(), live.metrics)).all()
