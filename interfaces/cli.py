@@ -507,9 +507,24 @@ def _review_thresholds(store, args, views):
     """List, set, and reset attention thresholds for a patient or for the installation."""
     from src.ptlog import thresholds as th
     pairs = _parse_threshold_pairs(args.set)
+    if args.history:
+        if args.installation == bool(args.patient):
+            raise ValueError("Usage: review thresholds <patient> --history | review thresholds --installation --history")
+        changes = store.threshold_history(None if args.installation else args.patient)
+        if args.json:
+            from dataclasses import asdict
+            print(json.dumps([asdict(c) for c in changes], indent=2))
+        else:
+            print_header(f"Threshold changes: {'installation' if args.installation else args.patient}")
+            for line in views.history_lines(changes):
+                print(line)
+        return 0
+    keys = None
     if args.installation:
         if args.patient:
             raise ValueError("Give a patient or --installation, not both")
+        if args.exercise:
+            raise ValueError("--exercise applies to a patient, not to --installation")
         if args.reset_all:
             raise ValueError("Use --restore-defaults with --installation")
         if pairs:
@@ -526,20 +541,31 @@ def _review_thresholds(store, args, views):
             raise ValueError("--restore-defaults applies to --installation; use --reset-all for a patient")
         if store.get_patient(args.patient) is None:
             raise PatientNotFoundError(f"Patient '{args.patient}' not found")
-        if pairs:
-            store.set_patient_thresholds(args.patient, pairs)
-        for key in args.reset or []:
-            store.reset_patient_threshold(args.patient, key)
-        if args.reset_all:
-            store.reset_patient_thresholds(args.patient)
-        effective = store.effective_thresholds(args.patient)
-        inherited, title = th.resolve(None, store.get_installation_thresholds()), args.patient
+        if args.exercise:
+            if pairs:
+                store.set_exercise_thresholds(args.patient, args.exercise, pairs)
+            for key in args.reset or []:
+                store.reset_exercise_threshold(args.patient, args.exercise, key)
+            if args.reset_all:
+                store.reset_exercise_thresholds(args.patient, args.exercise)
+            effective = store.effective_thresholds(args.patient, args.exercise)
+            inherited = store.effective_thresholds(args.patient)
+            title, keys = f"{args.patient} · {args.exercise}", th.EXERCISE_KEYS
+        else:
+            if pairs:
+                store.set_patient_thresholds(args.patient, pairs)
+            for key in args.reset or []:
+                store.reset_patient_threshold(args.patient, key)
+            if args.reset_all:
+                store.reset_patient_thresholds(args.patient)
+            effective = store.effective_thresholds(args.patient)
+            inherited, title = th.resolve(None, store.get_installation_thresholds()), args.patient
     if args.json:
         print(json.dumps({r["key"]: {"value": r["value"], "origin": r["origin"], "default": r["default"],
-                                     "unit": r["unit"]} for r in views.threshold_rows(effective, inherited)}, indent=2))
+                                     "unit": r["unit"]} for r in views.threshold_rows(effective, inherited, keys)}, indent=2))
     else:
         print_header(f"Attention thresholds: {title}")
-        for line in views.threshold_lines(effective, inherited):
+        for line in views.threshold_lines(effective, inherited, keys):
             print(line)
     return 0
 
@@ -1095,6 +1121,8 @@ Examples:
     rth.add_argument("--reset", nargs="+", metavar="KEY", default=None)
     rth.add_argument("--reset-all", action="store_true", help="Remove every override of the patient")
     rth.add_argument("--restore-defaults", action="store_true", help="With --installation: back to the built-in defaults")
+    rth.add_argument("--exercise", default=None, metavar="NAME", help="One exercise of the patient, by display name")
+    rth.add_argument("--history", action="store_true", help="List threshold changes, newest first")
     rth.add_argument("--json", action="store_true")
 
     rc = review_sub.add_parser("compare", help="Compare two sessions of one exercise side by side")

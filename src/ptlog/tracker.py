@@ -41,7 +41,8 @@ def _now(now: Optional[datetime]) -> datetime:
 
 
 def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = None,
-             thresholds: Optional[Thresholds] = None) -> PatientSnapshot:
+             thresholds: Optional[Thresholds] = None,
+             per_exercise: Optional[dict] = None) -> PatientSnapshot:
     """One load of the patient's sessions, reused for counts, flags, and adherence."""
     now = _now(now)
     today = now.date()
@@ -58,7 +59,7 @@ def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = No
     return PatientSnapshot(
         patient=patient, rows=rows, sessions=sessions, assignment=assignment,
         adherence=adherence_mod.compute(assignment, sessions, today),
-        flags=review._flags_from_sessions(store, patient.id, recent, now, thresholds),
+        flags=review._flags_from_sessions(store, patient.id, recent, now, thresholds, per_exercise),
         pending=store.pending_reviews(patient.id),
         latest_review=store.latest_review(patient.id),
         gap_days=thresholds.practice_gap, thresholds=thresholds,
@@ -105,9 +106,10 @@ def roster(store: SessionStore, now: Optional[datetime] = None, sort: str = "att
     """Every active patient with the FR-001 columns; the built-in patient only when it holds sessions."""
     now = _now(now)
     everyone = store.effective_thresholds_all()
+    by_exercise = store.effective_thresholds_by_exercise_all()
     rows: List[RosterRow] = []
     for patient in store.active_patients():
-        snap = snapshot(store, patient, now, everyone[patient.id])
+        snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}))
         if patient.is_builtin and not snap.rows:
             continue
         rows.append(row_from_snapshot(snap, now))
@@ -142,9 +144,10 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
     from .models import QUEUE_KINDS
     now = _now(now)
     everyone = store.effective_thresholds_all()
+    by_exercise = store.effective_thresholds_by_exercise_all()
     keyed = {kind: [] for kind in QUEUE_KINDS}
     for patient in store.active_patients():
-        snap = snapshot(store, patient, now, everyone[patient.id])
+        snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}))
         threshold = snap.thresholds.adherence
         if patient.is_builtin and not snap.rows:
             continue

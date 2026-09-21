@@ -458,12 +458,15 @@ def _origin_text(origin: str, default: int, builtin_only: bool = False) -> str:
     return "default" if origin == "default" else f"{origin}; default {default}"
 
 
-def threshold_rows(effective, inherited=None) -> List[Dict[str, Any]]:
-    """One row per threshold. `inherited` is the set the patient would use without overrides
-    (installation, else built-in); when omitted the built-in default is shown as the default."""
+def threshold_rows(effective, inherited=None, keys=None) -> List[Dict[str, Any]]:
+    """One row per threshold. `inherited` is the set that would apply without the overrides being
+    edited (for a patient: installation, else built-in; for an exercise: the patient's effective
+    set); when omitted the built-in default is shown. `keys` limits the rows (exercise level)."""
     from .thresholds import THRESHOLDS
     rows = []
     for key, d in THRESHOLDS.items():
+        if keys is not None and key not in keys:
+            continue
         default = inherited.value(key) if inherited is not None else d.default
         rows.append({"key": key, "name": d.name, "value": effective.value(key), "unit": d.unit,
                      "origin": effective.origin(key), "default": default, "meaning": d.meaning,
@@ -471,9 +474,32 @@ def threshold_rows(effective, inherited=None) -> List[Dict[str, Any]]:
     return rows
 
 
-def threshold_lines(effective, inherited=None) -> List[str]:
+def threshold_lines(effective, inherited=None, keys=None) -> List[str]:
     return [f"{r['name']}: {r['value']} {r['unit']} ({_origin_text(r['origin'], r['default'])}) - {r['meaning']}"
-            for r in threshold_rows(effective, inherited)]
+            for r in threshold_rows(effective, inherited, keys)]
+
+
+def history_rows(changes) -> List[Dict[str, Any]]:
+    """Threshold changes, as given (newest first): when, what it applies to, which threshold, old → new."""
+    from .thresholds import THRESHOLDS
+    rows = []
+    for c in changes:
+        d = THRESHOLDS.get(c.key)
+        show = lambda v: "default" if v is None else str(v)  # noqa: E731
+        rows.append({
+            "when": c.changed_at[:16].replace("T", " "),
+            "applies_to": c.exercise_name if c.scope == "exercise" else c.scope,
+            "threshold": d.name if d else c.key,
+            "change": f"{show(c.old_value)} → {show(c.new_value)} {d.unit if d else ''}".rstrip(),
+        })
+    return rows
+
+
+def history_lines(changes) -> List[str]:
+    rows = history_rows(changes)
+    if not rows:
+        return ["No threshold changes recorded."]
+    return [f"{r['when']} | {r['applies_to']} | {r['threshold']}: {r['change']}" for r in rows]
 
 
 def adherence_threshold_line(effective) -> str:

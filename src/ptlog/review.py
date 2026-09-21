@@ -113,8 +113,10 @@ def _exercise_order(sessions) -> List[str]:
     return names
 
 
-def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: datetime, thresholds=None):
-    """`thresholds` is the patient's effective set; resolved from the store when not supplied."""
+def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: datetime, thresholds=None,
+                         per_exercise=None):
+    """`thresholds` is the patient's effective set and `per_exercise` the sets of exercises with their
+    own overrides; both are resolved from the store when not supplied."""
     from . import flags as rules
     names = _exercise_order(sessions)
     series_by_exercise = {name: measure_series(sessions, name) for name in names}
@@ -122,7 +124,9 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
     starts = [(s.id, s.start_time) for s in sessions]
     if thresholds is None:
         thresholds = store.effective_thresholds(patient_id)
-    return rules.evaluate(series_by_exercise, goals, starts, thresholds, now)
+    if per_exercise is None:
+        per_exercise = store.effective_thresholds_by_exercise(patient_id)
+    return rules.evaluate(series_by_exercise, goals, starts, thresholds, now, per_exercise=per_exercise)
 
 
 # ------------------------------------------------------------------ comparison (US4)
@@ -192,10 +196,11 @@ def review_summary(store: SessionStore, patient_id: str, period: str = "all", no
             "latest_target": latest.target_reps if latest else None,
         })
     effective = store.effective_thresholds(patient_id)
+    by_exercise = store.effective_thresholds_by_exercise(patient_id)
     session_entries = [{"session": s, "measures": measures_for_session(s), "review": store.get_review(s.id)}
                        for s in reversed(sessions)]
     return ReviewSummary(
         patient_id=patient_id, period=period, period_start=since.isoformat() if since else None,
-        generated_at=now.isoformat(), gap_days=effective.practice_gap, trends=trends, thresholds=effective,
-        flags=_flags_from_sessions(store, patient_id, sessions, now, effective), goals=goals, sessions=session_entries,
+        generated_at=now.isoformat(), gap_days=effective.practice_gap, trends=trends, thresholds=effective, exercise_thresholds=by_exercise,
+        flags=_flags_from_sessions(store, patient_id, sessions, now, effective, by_exercise), goals=goals, sessions=session_entries,
     )

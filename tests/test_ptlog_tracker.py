@@ -385,3 +385,24 @@ class TestPerPatientThresholds:
         tracker.roster(store, now=D0)
         tracker.queue(store, now=D0)
         assert calls == {"one": 0, "all": 2}
+
+
+class TestExerciseThresholdsInRoster:
+    def test_roster_counts_the_exercise_flag_and_bulk_loads(self, fixed_store, caseload, monkeypatch):
+        store, clock = fixed_store
+        t = {"target_reps": 1}
+        caseload(store, clock, {"P-030": [(d, name, [(90, rom, 2.5)], t)
+                                          for d, rom in zip((8, 6, 4, 2), (85.0, 84.0, 86.0, 80.0))
+                                          for name in ("Knee Extension", "Squat")]})
+        for row in store.list_sessions("P-030"):
+            store.set_review(row.id, "continue")
+        flags_of = lambda: {r.patient_id: r.open_flags for r in tracker.roster(store, now=D0)}["P-030"]  # noqa: E731
+        assert flags_of() == 0
+        store.set_exercise_threshold("P-030", "Knee Extension", "rom_regression", 5)
+        assert flags_of() == 1
+        calls = {"n": 0}
+        real = store.effective_thresholds_by_exercise
+        monkeypatch.setattr(store, "effective_thresholds_by_exercise", lambda pid: calls.__setitem__("n", calls["n"] + 1) or real(pid))
+        tracker.roster(store, now=D0)
+        (item,) = tracker.queue(store, now=D0).items["attention_flag"]
+        assert "threshold 5 degrees" in item.description and calls["n"] == 0

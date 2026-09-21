@@ -148,3 +148,16 @@ class TestRosterRendering:
         assert r2["adherence"] == "44%" and r2["practice_gap"] == "yes" and r2["days_since_last"] == "2"
         cols = views.roster_columns()
         assert cols["adherence"] == views.metric_label("adherence_pct") and "count" in cols["pending_reviews"]
+
+
+def test_threshold_history_lines_and_rows():
+    from src.ptlog import views
+    from src.ptlog.models import ThresholdChange
+    changes = [ThresholdChange(2, "2026-03-23T09:16:00", "exercise", "P-017", "Knee Extension", "rom_regression", 5, None),
+               ThresholdChange(1, "2026-03-23T09:15:00", "installation", None, None, "adherence", None, 50)]
+    assert views.history_lines(changes) == [
+        "2026-03-23 09:16 | Knee Extension | ROM regression: 5 → default degrees",
+        "2026-03-23 09:15 | installation | Adherence: default → 50 percent"]
+    assert views.history_lines([]) == ["No threshold changes recorded."]
+    assert views.history_rows(changes)[1] == {"when": "2026-03-23 09:15", "applies_to": "installation",
+                                              "threshold": "Adherence", "change": "default → 50 percent"}

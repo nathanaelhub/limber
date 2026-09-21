@@ -1367,48 +1367,77 @@ def _threshold_table(rows):
         use_container_width=True, hide_index=True)
 
 
+def _history_table(changes, label):
+    with st.expander(label, expanded=bool(changes)):
+        if not changes:
+            st.caption("No threshold changes recorded.")
+            return
+        st.dataframe(pd.DataFrame(ptviews.history_rows(changes)).rename(columns={
+            "when": "When", "applies_to": "Applies to", "threshold": "Threshold", "change": "Change"}),
+            use_container_width=True, hide_index=True)
+
+
 def _thresholds_editor(pid):
-    """Per-patient attention thresholds: each with unit, meaning, default, and where its value comes from."""
+    """Attention thresholds for the whole patient or for one of the patient's exercises."""
     st.markdown("### Attention thresholds")
     flash = st.session_state.pop("thresholds_flash", None)
     if flash:
         st.success(flash)
     with _open_store() as store:
-        effective = store.effective_thresholds(pid)
-        inherited = ptthresholds.resolve(None, store.get_installation_thresholds())
-        overrides = store.get_patient_thresholds(pid)
-    rows = ptviews.threshold_rows(effective, inherited)
+        names = sorted(set(ptreview.exercise_names(store, pid)) | set(store.get_exercise_thresholds(pid)))
+    scope = st.selectbox("Applies to", ["Whole patient"] + names, key="thresholds_scope",
+                         help="Practice gap and adherence describe the whole patient; the other six can differ per exercise.")
+    exercise = None if scope == "Whole patient" else scope
+    with _open_store() as store:
+        effective = store.effective_thresholds(pid, exercise)
+        if exercise:
+            inherited = store.effective_thresholds(pid)
+            overrides = store.get_exercise_thresholds(pid).get(exercise, {})
+        else:
+            inherited = ptthresholds.resolve(None, store.get_installation_thresholds())
+            overrides = store.get_patient_thresholds(pid)
+    rows = ptviews.threshold_rows(effective, inherited, ptthresholds.EXERCISE_KEYS if exercise else None)
     _threshold_table(rows)
-    st.caption("Origin: patient = set for this patient; installation = this installation's value; "
-               "default = built-in. Flags, the roster, and exports use these values.")
+    st.caption("Origin: exercise = set for this exercise; patient = set for this patient; installation = this "
+               "installation's value; default = built-in. Flags, the roster, and exports use these values.")
+    prefix = f"threshold_{exercise}_" if exercise else "threshold_"
     cols = st.columns(4)
     entered = {}
     for i, r in enumerate(rows):
         with cols[i % 4]:
             entered[r["key"]] = st.number_input(
                 f"{r['name']} ({r['unit']})", min_value=r["minimum"], max_value=r["maximum"],
-                value=int(r["value"]), step=1, key=f"threshold_{r['key']}", help=r["meaning"])
+                value=int(r["value"]), step=1, key=f"{prefix}{r['key']}", help=r["meaning"])
     c1, c2 = st.columns(2)
     with c1:
         if st.button("Save thresholds", key="thresholds_save"):
-            # store a value only when it differs from what the patient would inherit, or already is an override
-            changed = {k: int(v) for k, v in entered.items()
-                       if int(v) != inherited.value(k) or k in overrides}
+            # store a value only when it differs from what would be inherited, or already is an override
+            changed = {k: int(v) for k, v in entered.items() if int(v) != inherited.value(k) or k in overrides}
             try:
                 with _open_store() as store:
-                    store.set_patient_thresholds(pid, changed)
+                    if exercise:
+                        store.set_exercise_thresholds(pid, exercise, changed)
+                    else:
+                        store.set_patient_thresholds(pid, changed)
                 st.session_state["thresholds_flash"] = (
                     "Thresholds saved." if changed else "No changes: every value equals the default.")
                 st.rerun()
             except PTLogError as exc:
                 st.error(str(exc))
     with c2:
-        if st.button("Reset all to defaults", key="thresholds_reset_all"):
+        label = f"Reset {exercise} to the patient's values" if exercise else "Reset all to defaults"
+        if st.button(label, key="thresholds_reset_all"):
             with _open_store() as store:
-                store.reset_patient_thresholds(pid)
-            for r in rows:
-                st.session_state.pop(f"threshold_{r['key']}", None)
+                if exercise:
+                    store.reset_exercise_thresholds(pid, exercise)
+                else:
+                    store.reset_patient_thresholds(pid)
+            for key in [k for k in st.session_state.keys() if str(k).startswith("threshold_")]:
+                st.session_state.pop(key, None)
             st.rerun()
+    with _open_store() as store:
+        changes = store.threshold_history(pid, limit=50)
+    _history_table(changes, "Change history")
 
 
 def _review_goals_settings(pid):
@@ -1579,6 +1608,9 @@ def _tracker_settings():
             for r in rows:
                 st.session_state.pop(f"install_threshold_{r['key']}", None)
             st.rerun()
+    with _open_store() as store:
+        changes = store.threshold_history(None, limit=50)
+    _history_table(changes, "Installation change history")
 
 
 def r_default(key):

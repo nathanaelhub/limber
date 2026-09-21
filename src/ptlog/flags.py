@@ -178,15 +178,17 @@ def practice_gap(session_starts: Sequence[Union[str, tuple]], gap_days: int, now
 
 def evaluate(series_by_exercise: Dict[str, List[SessionMeasure]], goals: Dict[str, Goal],
              session_starts: Sequence[Union[str, tuple]], thresholds: Union[Thresholds, int],
-             now: datetime) -> FlagResult:
+             now: datetime, per_exercise: Optional[Dict[str, Thresholds]] = None) -> FlagResult:
     """Run every rule per exercise, then the patient-level practice-gap rule.
 
+    `per_exercise` maps an exercise name to its own effective set (feature 006).
     `thresholds` is the patient's effective set; a bare int is accepted as the practice-gap
     value with built-in defaults for the rest (the pre-feature-005 call shape)."""
     if not isinstance(thresholds, Thresholds):
         from .thresholds import resolve
         thresholds = resolve({"practice_gap": int(thresholds)})
-    t = thresholds
+    patient_set = thresholds
+    per_exercise = per_exercise or {}
     result = FlagResult()
 
     def take(outcome):
@@ -197,6 +199,7 @@ def evaluate(series_by_exercise: Dict[str, List[SessionMeasure]], goals: Dict[st
         return outcome
 
     for exercise, series in series_by_exercise.items():
+        t = per_exercise.get(exercise, patient_set)      # the exercise's own set when it has overrides
         take(form_declining(series, t))
         regression = take(rom_regression(series, t))
         if not isinstance(regression, Flag):
@@ -204,5 +207,5 @@ def evaluate(series_by_exercise: Dict[str, List[SessionMeasure]], goals: Dict[st
         take(target_reps_not_reached(series, t))
         take(rising_partial_reps(series, t))
         result.flags.extend(safety_stops(series))
-    result.flags.extend(practice_gap(session_starts, t.practice_gap, now))
+    result.flags.extend(practice_gap(session_starts, patient_set.practice_gap, now))
     return result

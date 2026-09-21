@@ -416,3 +416,26 @@ class TestPatientThresholds:
         store.set_installation_threshold("rom_regression", 5)
         store.set_patient_threshold("P-020", "rom_regression", 10)
         assert self._rules(store) == ["rom_regression"] and self._rules(store, "P-020") == []
+
+
+class TestExerciseThresholds:
+    """Feature 006 US1: one exercise's override flags only that exercise."""
+
+    def _seed(self, store, clock, make_session):
+        store.add_patient("P-017")
+        for d, rom in zip((9, 7, 5, 3), (85.0, 84.0, 86.0, 80.0)):
+            for offset, name in ((0, "Knee Extension"), (1, "Squat")):
+                make_session(store, clock, "P-017", name, D0 - timedelta(days=d, hours=offset),
+                             [(90.0, rom, 2.4), (90.0, rom, 2.4)], target_reps=2)
+
+    def test_flags_and_summary(self, fixed_store, make_session):
+        store, clock = fixed_store
+        self._seed(store, clock, make_session)
+        assert review.flags_for(store, "P-017", "all", now=D0).flags == []
+        store.set_exercise_threshold("P-017", "Knee Extension", "rom_regression", 5)
+        (flag,) = review.flags_for(store, "P-017", "all", now=D0).flags
+        assert (flag.rule, flag.exercise, flag.values["threshold"]) == ("rom_regression", "Knee Extension", 5)
+        summary = review.review_summary(store, "P-017", "all", now=D0)
+        assert [f.exercise for f in summary.flags.flags] == ["Knee Extension"]
+        assert set(summary.exercise_thresholds) == {"Knee Extension"}
+        assert summary.exercise_thresholds["Knee Extension"].origin("rom_regression") == "exercise"

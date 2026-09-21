@@ -391,3 +391,31 @@ def test_tracker_installation_thresholds_editor(seeded_env):
     at.button(key="install_thresholds_restore").click().run()
     with SessionStore(seeded_env).open() as store:
         assert store.get_installation_thresholds() == {}
+
+
+# ----------------------------------------------------------------------------- feature 006
+
+def test_review_thresholds_for_one_exercise_and_history(seeded_env):
+    at = _review_page(seeded_env, "Goals & settings")
+    scope = next(s for s in at.selectbox if s.key == "thresholds_scope")
+    assert list(scope.options) == ["Whole patient", "Knee Extension"]
+    scope.set_value("Knee Extension").run()
+    assert not at.exception, [e.value for e in at.exception]
+    keys = [n.key for n in at.number_input if (n.key or "").startswith("threshold_")]
+    assert len(keys) == 6 and not any("adherence" in k or "practice_gap" in k for k in keys)
+    at.number_input(key="threshold_Knee Extension_rom_regression").set_value(5)
+    at.button(key="thresholds_save").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        assert store.get_exercise_thresholds("P-017") == {"Knee Extension": {"rom_regression": 5}}
+        assert store.get_patient_thresholds("P-017") == {}
+    history = next(d.value for d in at.dataframe if "Change" in d.value.columns)
+    assert list(history["Applies to"]) == ["Knee Extension"] and "default → 5 degrees" in history["Change"][0]
+
+
+def test_tracker_settings_shows_installation_history(seeded_env):
+    with SessionStore(seeded_env).open() as store:
+        store.set_installation_threshold("adherence", 50)
+    at = _tracker_page(seeded_env, "Settings")
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("Change" in d.value.columns and "default → 50 percent" in d.value["Change"][0] for d in at.dataframe)

@@ -468,6 +468,7 @@ class ReviewSummary:
     gap_days: int
     trends: Dict[str, Trend] = field(default_factory=dict)
     thresholds: Any = None        # the patient's effective attention thresholds (thresholds.Thresholds)
+    exercise_thresholds: Dict[str, Any] = field(default_factory=dict)   # exercises with their own overrides
     flags: FlagResult = field(default_factory=FlagResult)
     goals: List[Dict[str, Any]] = field(default_factory=list)      # {"goal": Goal, "latest_rom", "progress_pct", "latest_reps"}
     sessions: List[Dict[str, Any]] = field(default_factory=list)   # newest first: {"session", "measures", "review"}

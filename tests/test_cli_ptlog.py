@@ -552,3 +552,49 @@ class TestInstallationThresholds:
         assert run_cli(cli_env, "review", "thresholds", "P-017", "--restore-defaults").returncode == 1
         r = run_cli(cli_env, "review", "thresholds", "--installation", "--set", "adherence=101")
         assert r.returncode == 1 and "1-100 percent" in out(r)
+
+
+class TestExerciseThresholdsAndHistory:
+    """Feature 006: `review thresholds --exercise` and `--history`."""
+
+    def test_exercise_list_set_reset(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        run_cli(cli_env, "review", "thresholds", "P-017", "--set", "rom_regression=8")
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension")
+        lines = [line for line in r.stdout.splitlines() if "default" in line]
+        assert r.returncode == 0 and len(lines) == 6 and not any(line.startswith(("Practice gap", "Adherence")) for line in lines)
+        assert any(line.startswith("ROM regression: 8 degrees (patient") for line in lines)
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension", "--set", "rom_regression=5")
+        assert r.returncode == 0 and "ROM regression: 5 degrees (exercise; default 8)" in r.stdout
+        assert "ROM regression: 8 degrees (patient" in run_cli(cli_env, "review", "thresholds", "P-017").stdout
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension", "--reset", "rom_regression")
+        assert "ROM regression: 8 degrees (patient" in r.stdout
+        run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension", "--set", "form_drop=20")
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension", "--reset-all")
+        assert "(exercise" not in r.stdout and "ROM regression: 8 degrees (patient" in r.stdout      # patient value kept
+
+    def test_exercise_misuse(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension", "--set", "adherence=50")
+        assert r.returncode == 1 and "whole patient" in out(r)
+        assert run_cli(cli_env, "review", "thresholds", "--installation", "--exercise", "Squat").returncode == 1
+
+    def test_history(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--history")
+        assert r.returncode == 0 and "No threshold changes recorded." in r.stdout
+        run_cli(cli_env, "review", "thresholds", "P-017", "--set", "rom_regression=5")
+        run_cli(cli_env, "review", "thresholds", "P-017", "--set", "rom_regression=5")               # unchanged: no entry
+        run_cli(cli_env, "review", "thresholds", "P-017", "--exercise", "Knee Extension", "--set", "form_drop=12")
+        run_cli(cli_env, "review", "thresholds", "--installation", "--set", "adherence=50")
+        run_cli(cli_env, "review", "thresholds", "P-017", "--reset", "rom_regression")
+        lines = [l for l in run_cli(cli_env, "review", "thresholds", "P-017", "--history").stdout.splitlines() if " | " in l]
+        assert len(lines) == 4
+        assert lines[0].endswith("| patient | ROM regression: 5 → default degrees")
+        assert lines[1].endswith("| installation | Adherence: default → 50 percent")
+        assert lines[2].endswith("| Knee Extension | Form drop: default → 12 points")
+        assert lines[3].endswith("| patient | ROM regression: default → 5 degrees")
+        inst = [l for l in run_cli(cli_env, "review", "thresholds", "--installation", "--history").stdout.splitlines() if " | " in l]
+        assert len(inst) == 1 and "installation | Adherence" in inst[0]
+        d = json.loads(run_cli(cli_env, "review", "thresholds", "P-017", "--history", "--json").stdout)
+        assert d[0]["key"] == "rom_regression" and d[0]["new_value"] is None and d[0]["old_value"] == 5

@@ -201,3 +201,28 @@ class TestCustomThresholds:
         result = flags.evaluate({"Knee Extension": knee}, {}, starts, resolve({"practice_gap": 3}), now)
         (gap,) = result.flags
         assert gap.rule == "practice_gap" and gap.values["threshold"] == 3 and "threshold 3 days" in gap.message
+
+
+class TestPerExerciseThresholds:
+    """Feature 006: an exercise's own thresholds apply to that exercise only."""
+
+    def _two(self):
+        knee = series(rom=[85, 84, 86, 80], reps=[10, 10, 10, 10])
+        squat = [sm(m.session_id + 10, rom=m.avg_rom, reps=10, exercise="Squat", days=m.session_id) for m in knee]
+        starts = [(m.session_id, m.start_time) for m in knee + squat]
+        return {"Knee Extension": knee, "Squat": squat}, starts
+
+    def test_override_applies_to_one_exercise(self):
+        by_ex, starts = self._two()
+        now = D0 + timedelta(days=5)
+        base = Thresholds.defaults()
+        assert flags.evaluate(by_ex, {}, starts, base, now).flags == []
+        result = flags.evaluate(by_ex, {}, starts, base, now, per_exercise={"Knee Extension": resolve(None, None, {"rom_regression": 5})})
+        assert [(f.rule, f.exercise, f.values["threshold"]) for f in result.flags] == [("rom_regression", "Knee Extension", 5)]
+
+    def test_without_the_map_results_equal_feature_005(self):
+        by_ex, starts = self._two()
+        now = D0 + timedelta(days=5)
+        t = resolve({"rom_regression": 5})
+        assert flags.evaluate(by_ex, {}, starts, t, now) == flags.evaluate(by_ex, {}, starts, t, now, per_exercise={})
+        assert len(flags.evaluate(by_ex, {}, starts, t, now).flags) == 2
