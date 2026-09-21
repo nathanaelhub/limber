@@ -695,6 +695,63 @@ def cmd_review(args):
         return 2
 
 
+def cmd_portal(args):
+    """Home access for patients (feature 007): access codes, the access history, and the service."""
+    sub = args.portal_cmd
+    if sub == "serve":
+        from interfaces import patient_portal
+        argv = ["--host", args.host, "--port", str(args.port)]
+        for origin in args.public_origin or []:
+            argv += ["--public-origin", origin]
+        argv += ["--trust-proxy"] if args.trust_proxy else []
+        argv += ["--certfile", args.certfile] if args.certfile else []
+        argv += ["--keyfile", args.keyfile] if args.keyfile else []
+        argv += ["--insecure-http"] if args.insecure_http else []
+        return patient_portal.main(argv)
+
+    from src.portal import access
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            if sub == "code" and args.code_cmd == "create":
+                key = access.load_key(access.default_key_path(default_db_path()))
+                code, status = access.issue_code(store, key, args.patient, days=args.days)
+                print(f"Access code for {args.patient}: {code} (valid until {status.expires_at[:10]}).")
+                print("It is shown only once; a new code replaces it. For demo and study use only.")
+            elif sub == "code" and args.code_cmd == "revoke":
+                if store.get_patient(args.patient) is None:
+                    raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+                if access.revoke_code(store, args.patient):
+                    print(f"Home access revoked for {args.patient}; they are signed out.")
+                else:
+                    print(f"No active code for {args.patient}.")
+            elif sub == "code" and args.code_cmd == "list":
+                print_header("Home access")
+                for a in store.portal_list():
+                    state = f"active until {a.expires_at[:10]}" if a.state == "active" else a.state
+                    used = f"last used {a.last_used_at[:16].replace('T', ' ')}" if a.last_used_at else "never used"
+                    print(f"{a.patient_id:<14}{state:<26}{used if a.state != 'none' else ''}")
+            elif sub == "audit":
+                print_header("Home access history")
+                rows = store.portal_audit_list(args.patient, limit=args.limit)
+                if not rows:
+                    print("No access events recorded.")
+                for r in rows:
+                    parts = [r.at[:16].replace("T", " "), r.patient_id or "-", r.event]
+                    parts += [f"client {r.client}"] if r.client else []
+                    parts += [r.detail] if r.detail else []
+                    print(" | ".join(parts))
+            else:
+                print_error("Usage: portal {code {create,list,revoke}, audit, serve}")
+                return 1
+        return 0
+    except (PatientNotFoundError, PTLogError, ValueError) as e:
+        print_error(str(e))
+        return 1
+    except sqlite3.OperationalError as e:
+        print_error(f"Database error: {e}")
+        return 2
+
+
 def cmd_tracker(args):
     """Handle the tracker command group (caseload roster, programs, assignments, adherence, queue)."""
     from dataclasses import asdict
@@ -1199,6 +1256,28 @@ Examples:
     # Interactive mode
     subparsers.add_parser("interactive", help="Start interactive menu")
 
+    portal_parser = subparsers.add_parser("portal", help="Home access for patients: codes, access history, the patient service")
+    portal_sub = portal_parser.add_subparsers(dest="portal_cmd")
+    pcode = portal_sub.add_parser("code", help="Issue, list, or revoke a patient's access code")
+    pcode_sub = pcode.add_subparsers(dest="code_cmd")
+    pcc = pcode_sub.add_parser("create", help="Issue a code (replaces any earlier one); shown once")
+    pcc.add_argument("patient")
+    pcc.add_argument("--days", type=int, default=90, help="Days the code stays valid (1-365)")
+    pcode_sub.add_parser("list", help="Home access state of every patient")
+    pcr = pcode_sub.add_parser("revoke", help="Revoke a patient's code and sign them out")
+    pcr.add_argument("patient")
+    paud = portal_sub.add_parser("audit", help="Access history: codes, sign-ins, sessions")
+    paud.add_argument("--patient", default=None)
+    paud.add_argument("--limit", type=int, default=50)
+    pserve = portal_sub.add_parser("serve", help="Run the patient service (demo and study use only)")
+    pserve.add_argument("--host", default="127.0.0.1")
+    pserve.add_argument("--port", type=int, default=8600)
+    pserve.add_argument("--public-origin", action="append", default=[], metavar="URL")
+    pserve.add_argument("--trust-proxy", action="store_true")
+    pserve.add_argument("--certfile", default=None)
+    pserve.add_argument("--keyfile", default=None)
+    pserve.add_argument("--insecure-http", action="store_true")
+
     args = parser.parse_args()
 
     # Route to appropriate command
@@ -1220,6 +1299,8 @@ Examples:
         return cmd_review(args)
     elif args.command == "tracker":
         return cmd_tracker(args)
+    elif args.command == "portal":
+        return cmd_portal(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PT Assist · Sign in</title>
+  <link rel="stylesheet" href="/static/portal.css">
+</head>
+<body data-page="signin">
+  <main class="card">
+    <h1>PT Assist</h1>
+    <p class="lead">Your home exercise program</p>
+    <form id="signin" autocomplete="off">
+      <label for="code">Access code from your therapist</label>
+      <input id="code" name="code" inputmode="text" autocapitalize="characters" spellcheck="false"
+             placeholder="XXXX-XXXX-XXXX" maxlength="20" required>
+      <button type="submit">Sign in</button>
+      <p id="error" class="error" role="alert" hidden></p>
+    </form>
+    <section class="notice" aria-label="What is sent">
+      <h2>What this page sends</h2>
+      <ul>
+        <li>Your camera video <strong>never leaves</strong> this device. It is not recorded or uploaded.</li>
+        <li>During a session only the positions of 17 body points are sent, so your reps and form can be counted.</li>
+        <li>Your therapist sees your reps, range of motion, and form scores under your study ID, not your name.</li>
+      </ul>
+      <p class="small">This version is for demo and study use only.</p>
+    </section>
+  </main>
+  <script src="/static/portal.js"></script>
+</body>
+</html>

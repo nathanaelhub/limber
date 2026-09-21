@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PT Assist · Today</title>
+  <link rel="stylesheet" href="/static/portal.css">
+</head>
+<body data-page="today">
+  <header class="bar">
+    <span class="brand">PT Assist</span>
+    <nav><a href="/today" aria-current="page">Today</a><a href="/progress">Progress</a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <main class="card wide">
+    <h1 id="program-name">Today</h1>
+    <p id="message" class="lead" hidden></p>
+    <div id="week" class="stats" hidden>
+      <div><span id="week-done" class="big"></span><span class="unit">sessions this week</span></div>
+      <div><span id="streak" class="big"></span><span class="unit">week streak</span></div>
+    </div>
+    <ol id="exercises" class="exercises"></ol>
+    <ul id="notes" class="small"></ul>
+    <a id="start" class="button" href="/session" hidden>Start today's session</a>
+  </main>
+  <script src="/static/portal.js"></script>
+</body>
+</html>
