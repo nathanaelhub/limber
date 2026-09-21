@@ -46,6 +46,12 @@
 - Quickstart step 2: `PTASSIST_E2E=1` parity on videos/Squats.demo.video.mp4 passed with the real
   model: reps, partial reps, and summary equal the command-line runner's.
 - Quickstart step 4 is covered by the SIGKILL subprocess test in tests/test_live_interrupt.py.
-- Quickstart step 3 (browser and camera walkthrough) has NOT been run; it needs a person at a
-  camera. The app was started headless and answered its health check.
+- Quickstart step 3 was run automatically on 2026-09-20: Chrome with a fake camera fed from
+  videos/Squats.demo.video.mp4, driven by a throwaway script outside the repo. Result: session
+  created for P-017 8 s after START (source webcam, reference Default); 3 reps recorded within 6 s;
+  the session stayed `running` through several page reruns; Reset recorded (count 3); Switch
+  Squat -> Knee Extension recorded with two sets; screenshot PNG written under exports/; STOP ended
+  the session as completed; the page summary (9 reps, avg form 66.7/100, avg ROM 114.8 deg, 17.7 s)
+  equals the stored summary; Open in Sessions showed the session. Not covered: a physical camera
+  and a person exercising (the looped clip stands in), and the Front/Back camera choices.
 - The LiveVideoProcessor US1 tests were written after its code; all other tests came first.
