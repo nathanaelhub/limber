@@ -483,10 +483,10 @@ def _goal_text(g) -> str:
 
 def _print_trend(store, trend, patient_id, views):
     print(f"{'date':<17}{'session':>8}  {'reps/target':<12}{'avg form (0-100)':<18}{'avg ROM (°)':<13}"
-          f"{'avg rep (s)':<13}{'tempo sd (s)':<14}{'partial (%)':<13}status")
+          f"{'avg rep (s)':<13}{'tempo sd (s)':<14}{'partial (%)':<13}{'status':<13}recorded")
     for r in views.trend_table_rows(trend):
         print(f"{r['date']:<17}{r['session_id']:>8}  {r['reps']:<12}{r['avg_form']:<18}{r['avg_rom']:<13}"
-              f"{r['avg_duration']:<13}{r['tempo_sd']:<14}{r['partial_share']:<13}{r['status']}")
+              f"{r['avg_duration']:<13}{r['tempo_sd']:<14}{r['partial_share']:<13}{r['status']:<13}{r['origin']}")
     print()
     print("change first→latest:" if trend.enough_for_trend else "")
     for line in views.trend_summary_lines(trend):

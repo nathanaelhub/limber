@@ -37,10 +37,10 @@ suite needs no network, camera, model, or browser: `.venv/bin/python -m pytest t
 
 ## Phase 4: Capture origin (FR-020, SC-009; must land before home sessions are recorded)
 
-- [ ] T018 [P] Failing tests in tests/test_ptlog_origin.py and additions to review, flags, tracker, exports tests: `capture_origin`; `SessionMeasure.origin`; trends, changes, goal progress per origin; attention rules evaluated per origin with evidence naming it; a 12° gap between a home and a clinic session raises no ROM flag; comparing a home with a clinic session is refused; adherence, pending, practice gap count all sessions; with clinic sessions only, every result equals feature 006's
-- [ ] T019 Implement src/ptlog/origin.py and the per-origin evaluation in measures.py, review.py, flags use, tracker.py, views.py, exports
-- [ ] T020 [P] Failing page and CLI tests: origin shown in session lists, trends, flags, compare refusal
-- [ ] T021 Implement in interfaces/cli.py and interfaces/app.py; suite; checkpoint commit
+- [X] T018 [P] Failing tests in tests/test_ptlog_origin.py and additions to review, flags, tracker, exports tests: `capture_origin`; `SessionMeasure.origin`; trends, changes, goal progress per origin; attention rules evaluated per origin with evidence naming it; a 12° gap between a home and a clinic session raises no ROM flag; comparing a home with a clinic session is refused; adherence, pending, practice gap count all sessions; with clinic sessions only, every result equals feature 006's
+- [X] T019 Implement src/ptlog/origin.py and the per-origin evaluation in measures.py, review.py, flags use, tracker.py, views.py, exports
+- [X] T020 [P] Failing page and CLI tests: origin shown in session lists, trends, flags, compare refusal
+- [X] T021 Implement in interfaces/cli.py and interfaces/app.py; suite; checkpoint commit
 
 ## Phase 5: User Story 2 - Guided session at home (P1) 🎯 MVP part 2
 

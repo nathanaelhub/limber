@@ -1169,7 +1169,7 @@ def page_sessions():
         return
 
     table = pd.DataFrame(rows).rename(columns={
-        "id": "ID", "date": "Date", "patient_id": "Patient", "source": "Source", "exercises": "Exercises",
+        "id": "ID", "date": "Date", "patient_id": "Patient", "source": "Source", "origin": "Recorded", "exercises": "Exercises",
         "total_reps": ptviews.metric_label("total_reps"), "avg_form_score": ptviews.metric_label("avg_form_score"),
         "status": "Status"})
     st.dataframe(table, use_container_width=True, hide_index=True)
@@ -1259,7 +1259,7 @@ def _review_trends(pid):
         "date": "Date", "session_id": "Session", "reps": ptviews.metric_label("reps_completed"),
         "avg_form": ptviews.metric_label("avg_form"), "avg_rom": ptviews.metric_label("avg_rom"),
         "avg_duration": ptviews.metric_label("avg_duration"), "tempo_sd": ptviews.metric_label("tempo_sd"),
-        "partial_share": ptviews.metric_label("partial_share"), "status": "Status"})
+        "partial_share": ptviews.metric_label("partial_share"), "status": "Status", "origin": "Recorded"})
     st.dataframe(table, use_container_width=True, hide_index=True)
     chart = pd.DataFrame({
         "Date": [ptviews.date_minute(p.start_time) for p in t.points],

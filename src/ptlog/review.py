@@ -61,15 +61,26 @@ def trend(store: SessionStore, patient_id: str, exercise: str, period: str = "al
 
 
 def _trend_from_sessions(store: SessionStore, patient_id: str, exercise: str, period: str, sessions) -> Trend:
+    from .models import TrendPart
+    from .origin import ORIGINS
     points = measure_series(sessions, exercise)
     t = Trend(exercise=exercise, period=period, points=points)
-    if len(points) >= 2:
-        t.enough_for_trend = True
-        for name in MEASURES:
-            first, latest = getattr(points[0], name), getattr(points[-1], name)
-            t.summary[name] = {"first": first, "latest": latest, "change": _change(name, first, latest)}
     t.goal = store.get_goal(patient_id, exercise)
-    t.rom_progress_pct = rom_progress(t.goal, points)
+    for origin in ORIGINS:                                   # first-to-latest changes stay inside one origin
+        own = [m for m in points if m.origin == origin]
+        if not own:
+            continue
+        part = TrendPart(origin=origin, points=own, rom_progress_pct=rom_progress(t.goal, own))
+        if len(own) >= 2:
+            part.enough_for_trend = True
+            for name in MEASURES:
+                first, latest = getattr(own[0], name), getattr(own[-1], name)
+                part.summary[name] = {"first": first, "latest": latest, "change": _change(name, first, latest)}
+        t.by_origin[origin] = part
+    if points:
+        t.primary_origin = points[-1].origin
+        primary = t.by_origin[t.primary_origin]
+        t.summary, t.enough_for_trend, t.rom_progress_pct = primary.summary, primary.enough_for_trend, primary.rom_progress_pct
     return t
 
 
@@ -118,15 +129,32 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
     """`thresholds` is the patient's effective set and `per_exercise` the sets of exercises with their
     own overrides; both are resolved from the store when not supplied."""
     from . import flags as rules
-    names = _exercise_order(sessions)
-    series_by_exercise = {name: measure_series(sessions, name) for name in names}
+    from .models import FlagResult, NotEvaluated
+    from .origin import HOME, split_by_origin
     goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
-    starts = [(s.id, s.start_time) for s in sessions]
     if thresholds is None:
         thresholds = store.effective_thresholds(patient_id)
     if per_exercise is None:
         per_exercise = store.effective_thresholds_by_exercise(patient_id)
-    return rules.evaluate(series_by_exercise, goals, starts, thresholds, now, per_exercise=per_exercise)
+    result = FlagResult()
+    # Rules that compare sessions run once per capture origin (home and clinic range of motion are
+    # not comparable); each origin needs its own minimum number of sessions.
+    for origin, own in split_by_origin(sessions).items():
+        names = _exercise_order(own)
+        series_by_exercise = {name: measure_series(own, name) for name in names}
+        part = rules.evaluate(series_by_exercise, goals, [], thresholds, now, per_exercise=per_exercise)
+        if origin == HOME:
+            for f in part.flags:
+                f.values["origin"] = HOME
+                f.message = f"{f.message} [home sessions]"
+            part.not_evaluated = [NotEvaluated(n.rule, f"{n.exercise} (home)" if n.exercise else n.exercise,
+                                               n.needed, n.have) for n in part.not_evaluated]
+        result.flags.extend(part.flags)
+        result.not_evaluated.extend(part.not_evaluated)
+    # Practice is practice wherever it happened: the gap rule sees every session.
+    starts = [(s.id, s.start_time) for s in sessions]
+    result.flags.extend(rules.practice_gap(starts, thresholds.practice_gap, now))
+    return result
 
 
 # ------------------------------------------------------------------ comparison (US4)
@@ -159,6 +187,11 @@ def compare(store: SessionStore, session_a: int, session_b: int, exercise: Optio
             f"Comparisons are within one exercise; '{exercise}' is not recorded in both sessions "
             f"(shared: {', '.join(common) or 'none'}).")
     a, b = ma[exercise], mb[exercise]
+    if a.origin != b.origin:
+        raise ComparisonError(
+            f"Session {session_a} was recorded at the {a.origin} and session {session_b} at {b.origin}. "
+            f"Home and clinic sessions use different pose models, so their numbers are not compared; "
+            f"choose two sessions recorded in the same place.".replace("at the home", "at home").replace("at clinic", "in the clinic").replace("at the clinic", "in the clinic"))
     rows = []
     for name in MEASURES:
         va, vb = getattr(a, name), getattr(b, name)

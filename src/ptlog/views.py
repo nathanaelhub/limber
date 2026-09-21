@@ -143,6 +143,7 @@ def session_table_rows(store: SessionStore, patient_id: Optional[str] = None) ->
             "date": date_minute(r.start_time),
             "patient_id": r.patient_id,
             "source": r.source,
+            "origin": r.origin,
             "exercises": ", ".join(r.exercises),
             "total_reps": r.total_reps if r.total_reps is not None else 0,
             "avg_form_score": fmt_form(r.avg_form_score),
@@ -247,6 +248,7 @@ def trend_table_rows(trend) -> List[Dict[str, Any]]:
             "tempo_sd": fmt_measure("tempo_sd", m.tempo_sd),
             "partial_share": fmt_measure("partial_share", m.partial_share),
             "status": m.status,
+            "origin": m.origin,
         }
         for m in trend.points
     ]
@@ -264,8 +266,28 @@ def goal_line(goal, rom_progress_pct) -> Optional[str]:
     return "Goal: " + " | ".join(parts)
 
 
+ORIGIN_NOTE = ("Home and clinic sessions use different pose models, so their numbers are not compared "
+               "with each other.")
+
+
 def trend_summary_lines(trend) -> List[str]:
-    """First → latest (change) per measure, plus the goal line when a goal exists."""
+    """First → latest (change) per measure, plus the goal line when a goal exists. When the period
+    holds both clinic and home sessions, one block per origin: changes never cross origins."""
+    parts = getattr(trend, "by_origin", {}) or {}
+    if len(parts) > 1:
+        lines = [ORIGIN_NOTE]
+        for origin, part in parts.items():
+            lines.append(f"{origin.capitalize()} sessions ({len(part.points)}):")
+            lines += ["  " + line for line in _summary_lines(part.points, part.summary, part.enough_for_trend,
+                                                           trend.goal, part.rom_progress_pct)]
+        return lines
+    return _summary_lines(trend.points, trend.summary, trend.enough_for_trend, trend.goal, trend.rom_progress_pct)
+
+
+def _summary_lines(points, summary, enough, goal, rom_progress_pct) -> List[str]:
+    from types import SimpleNamespace
+    trend = SimpleNamespace(points=points, summary=summary, enough_for_trend=enough, goal=goal,
+                            rom_progress_pct=rom_progress_pct)
     lines: List[str] = []
     if not trend.enough_for_trend:
         lines.append("A trend needs at least two sessions.")

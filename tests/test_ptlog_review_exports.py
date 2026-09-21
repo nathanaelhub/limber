@@ -95,7 +95,7 @@ class TestReport:
 class TestCsv:
     HEADER = ("date,session_id,exercise,reps_completed,target_reps,avg_form_score_0_100,avg_rom_degrees,"
               "avg_rep_duration_seconds,tempo_consistency_seconds,partial_rep_share_percent,interrupted,"
-              "review_status,next_step,reviewed_at,thresholds_in_use")
+              "review_status,next_step,reviewed_at,thresholds_in_use,recorded")
 
     def test_rows(self, patient_history):
         store, _, ids = patient_history
@@ -166,10 +166,10 @@ class TestThresholdsInExports:
     def test_csv_column(self, patient_history):
         store, _, _ = patient_history
         rows = to_review_csv(review.review_summary(store, "P-017", "all", now=D0)).strip().split("\r\n")
-        assert rows[0].endswith(",reviewed_at,thresholds_in_use")
-        cell = rows[1].rsplit(",", 1)[1]
+        assert rows[0].endswith(",reviewed_at,thresholds_in_use,recorded")
+        cell = rows[1].rsplit(",", 2)[1]
         assert cell.startswith("practice_gap=30 (patient); form_drop=10; rom_regression=10;") and cell.endswith("adherence=60")
-        assert all(r.rsplit(",", 1)[1] == cell for r in rows[1:])
+        assert all(r.rsplit(",", 2)[1] == cell and r.endswith(",clinic") for r in rows[1:])
 
 
 class TestExerciseThresholdsInExports:

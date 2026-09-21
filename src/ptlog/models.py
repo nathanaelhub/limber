@@ -286,6 +286,7 @@ class SessionSummaryRow:
     exercises: List[str]
     total_reps: Optional[int]
     avg_form_score: Optional[float]
+    origin: str = "clinic"           # clinic | home (recorded through the patient portal)
 
 
 @dataclass
@@ -404,6 +405,7 @@ class SessionMeasure:
     partial_count: int               # count
     partial_share: Optional[float]   # percent
     safety_stops: List[tuple] = field(default_factory=list)   # (timestamp, message)
+    origin: str = "clinic"            # clinic | home (feature 007); never compare across origins
 
 
 @dataclass
@@ -430,6 +432,16 @@ class FlagResult:
 
 
 @dataclass
+class TrendPart:
+    """One capture origin's share of a trend."""
+    origin: str
+    points: List["SessionMeasure"] = field(default_factory=list)
+    summary: Dict[str, Dict[str, Optional[float]]] = field(default_factory=dict)
+    rom_progress_pct: Optional[int] = None
+    enough_for_trend: bool = False
+
+
+@dataclass
 class Trend:
     exercise: str
     period: str
@@ -438,6 +450,11 @@ class Trend:
     goal: Optional[Goal] = None
     rom_progress_pct: Optional[int] = None
     enough_for_trend: bool = False
+    # Feature 007: numbers are compared within one capture origin only. `by_origin` holds a part per
+    # origin; summary, rom_progress_pct, and enough_for_trend above are those of `primary_origin`
+    # (the origin of the latest session), never a first-to-latest change across origins.
+    by_origin: Dict[str, "TrendPart"] = field(default_factory=dict)
+    primary_origin: str = "clinic"
 
 
 @dataclass

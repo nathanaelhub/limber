@@ -10,6 +10,7 @@ from __future__ import annotations
 import statistics
 from typing import Dict, List
 
+from .origin import capture_origin
 from .models import ExerciseSet, Session, SessionMeasure
 
 
@@ -43,6 +44,7 @@ def measures_for_session(session: Session) -> Dict[str, SessionMeasure]:
             partial_count=partials,
             partial_share=round(partials / attempts * 100, 1) if attempts else None,
             safety_stops=stops,
+            origin=capture_origin(session),
         )
     return result
 
