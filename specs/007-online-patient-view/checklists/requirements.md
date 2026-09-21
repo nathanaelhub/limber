@@ -39,7 +39,10 @@
   second nominal with a floor of 12.
 - The constitution was amended to 1.1.0 for this feature (networked-feature guarantees; the
   patient portal as the one patient-facing interface).
-- The frame-rate figures in Assumptions come from a replay experiment run outside the repository;
-  the browser-model comparison (SC-008) is still to be run during planning.
+- The frame-rate figures in Assumptions come from a replay experiment run outside the repository.
+- Spec changed during planning (2026-09-21): the browser-model comparison showed identical rep
+  counts but range of motion differing by 3 to 24 degrees between models, so SC-008's 5-degree
+  requirement was replaced, FR-020 and SC-009 were added (home and clinic sessions are never
+  compared with each other), and the Assumptions carry the measured numbers.
 - The spec names one change to an earlier feature: 004's "one running session per installation"
   becomes "one running session per patient" (FR-012).

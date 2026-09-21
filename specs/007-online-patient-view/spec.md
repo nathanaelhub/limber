@@ -239,6 +239,13 @@ service from a phone securely.
   that this version is for demo and study use.
 - **FR-018**: The pose model files MUST be served by the patient service itself, not fetched from
   third parties by the patient's browser.
+- **FR-020**: Home and clinic sessions MUST NOT be mixed when numbers are compared across
+  sessions. Trends, first-to-latest changes, goal progress, session comparison, and every attention
+  rule that compares sessions MUST be evaluated separately for sessions recorded in the clinic and
+  sessions recorded at home, each needing its own minimum number of sessions, in the therapist's
+  views and the patient's. Every place that lists sessions MUST show where each was recorded.
+  Counts that do not compare measurements (sessions per week, adherence, done today, pending
+  reviews, practice gap) use all sessions.
 - **FR-019**: With the patient service not in use, every existing therapist feature MUST behave as
   before, except the change in FR-012.
 
@@ -269,18 +276,32 @@ service from a phone securely.
 - **SC-006**: A first-time patient can sign in and start today's session in under two minutes.
 - **SC-007**: Every number shown to a patient has a unit and a plain-language meaning.
 - **SC-008**: On the two sample clips, the browser pose model yields the same rep counts as the
-  clinic model and average range of motion within 5 degrees; the measured difference is documented.
+  clinic model, and the measured differences in range of motion and form score are documented.
+  (Measured 2026-09-21: rep counts identical; see Assumptions. An earlier draft required range of
+  motion within 5 degrees; the measurement showed that is not achievable, which led to FR-020.)
+- **SC-009**: 0 attention flags and 0 trend changes are computed across a mix of home and clinic
+  sessions.
 
 ## Assumptions
 
 - **Study use only** in this version; real clinic patients need a compliance review first.
-- **Home numbers differ slightly from clinic numbers.** Measured on the two sample clips
+- **Home range-of-motion numbers are not comparable with clinic numbers.** The browser's pose
+  model (MoveNet) was run on every frame of the two sample clips and its body points replayed
+  through the engine next to the clinic model's (2026-09-21). Rep counts were identical (4 and 4)
+  at 30 and 15 frames per second, average form score differed by 0.6 to 2.1 points, and rep
+  duration by 0.0 s. Average range of motion differed by model: squat 117.3° (clinic) against
+  111.9° (Lightning) and 114.7° (Thunder); push-up 84.9° against 98.0° and 108.9°. The joint angle
+  differed frame by frame by 5° to 9° on average (95th percentile 12° to 19°). There is no ground
+  truth in these clips, so this says the models disagree, not which one is right. Because the
+  range-of-motion regression rule fires at 10°, FR-020 keeps home and clinic sessions apart.
+  Lightning is the default model (closer on push-ups, lighter on phones).
+- **The lower home frame rate has a smaller effect.** Measured on the two sample clips
   (2026-09-21) by replaying the clinic model's body points through the engine at lower rates: at
   15 frames per second rep counts were identical, average range of motion moved by at most 2.3°,
   average form score fell by 1.3 to 1.9 points, and rep duration rose by 0.04 s. At 10 frames per
   second squat range of motion read 6.9° low, which is why 12 is the floor. The sample is small
-  (two clips, fast reps). The difference caused by the browser's pose model is measured separately
-  (SC-008). Progress therefore says where each session was recorded.
+  (two clips, fast reps). The difference caused by the browser's pose model is described
+  above. Progress therefore says where each session was recorded.
 - **One machine**: the patient service and the therapist app share one record on one machine;
   permanent hosting is a later decision.
 - **Reaching it from a phone** needs a secure connection; the recommended path is a temporary
