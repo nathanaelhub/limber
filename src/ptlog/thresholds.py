@@ -12,7 +12,7 @@ from typing import Dict, List, Mapping, Optional
 
 from .models import ThresholdValidationError
 
-ORIGINS = ("patient", "installation", "default")
+ORIGINS = ("exercise", "patient", "installation", "default")
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,18 @@ _DEFS = [
                  "Mark the patient for attention when adherence to the assigned program is below this."),
 ]
 THRESHOLDS: Dict[str, ThresholdDef] = {d.key: d for d in _DEFS}
+
+
+# Practice gap and adherence describe the whole patient; every other threshold can differ per exercise.
+EXERCISE_KEYS: List[str] = [k for k in THRESHOLDS if k not in ("practice_gap", "adherence")]
+
+
+def validate_exercise_key(key: str, value) -> int:
+    """Like `validate`, for a threshold set on one exercise of a patient."""
+    if key in THRESHOLDS and key not in EXERCISE_KEYS:
+        raise ThresholdValidationError(
+            f"{THRESHOLDS[key].name} applies to the whole patient and cannot be set for one exercise")
+    return validate(key, value)
 
 
 def validate(key: str, value) -> int:
@@ -98,12 +110,16 @@ class Thresholds:
 
 
 def resolve(patient: Optional[Mapping[str, int]] = None,
-            installation: Optional[Mapping[str, int]] = None) -> Thresholds:
-    """Patient override, else installation value, else built-in default. Unknown stored keys are ignored."""
-    patient, installation = patient or {}, installation or {}
+            installation: Optional[Mapping[str, int]] = None,
+            exercise: Optional[Mapping[str, int]] = None) -> Thresholds:
+    """Exercise override (exercise-level keys only), else patient override, else installation value,
+    else built-in default. Unknown stored keys are ignored."""
+    patient, installation, exercise = patient or {}, installation or {}, exercise or {}
     values, origins = {}, {}
     for key, d in THRESHOLDS.items():
-        if key in patient:
+        if key in exercise and key in EXERCISE_KEYS:
+            values[key], origins[key] = int(exercise[key]), "exercise"
+        elif key in patient:
             values[key], origins[key] = int(patient[key]), "patient"
         elif key in installation:
             values[key], origins[key] = int(installation[key]), "installation"

@@ -36,7 +36,7 @@ def test_fresh_store_is_v4_with_both_tables(tmp_db):
     with SessionStore(tmp_db).open() as s:
         tables = {r[0] for r in s.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         versions = [r[0] for r in s.conn.execute("SELECT version FROM schema_version ORDER BY version")]
-    assert SCHEMA_VERSION == 4 and versions == [v for v, _ in MIGRATIONS] and versions[-1] == 4
+    assert SCHEMA_VERSION >= 4 and versions == [v for v, _ in MIGRATIONS] and versions[-1] == SCHEMA_VERSION
     assert {"patient_thresholds", "installation_thresholds", "review_settings", "tracker_settings"} <= tables
 
 
@@ -123,3 +123,111 @@ def test_overrides_follow_delete_and_id_change(store):
     assert store.get_patient_thresholds("P-117") == {"form_drop": 8}
     store.delete_patient("P-020")
     assert store.conn.execute("SELECT COUNT(*) FROM patient_thresholds WHERE patient_id = 'P-020'").fetchone()[0] == 0
+
+
+# ----------------------------------------------------------------------------- feature 006
+
+def _v4_file(path):
+    conn = sqlite3.connect(str(path))
+    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")
+    for version, sql in MIGRATIONS:
+        if version > 4:
+            break
+        conn.executescript(sql)
+        conn.execute("INSERT INTO schema_version VALUES (?, '2026-03-01T00:00:00')", (version,))
+    conn.execute("INSERT INTO patients (id, label, notes, created_at, is_builtin) VALUES ('P-017', NULL, NULL, '2026-03-01', 0)")
+    conn.execute("INSERT INTO patient_thresholds VALUES ('P-017', 'form_drop', 8)")
+    conn.execute("INSERT INTO installation_thresholds VALUES ('adherence', 50)")
+    conn.commit()
+    conn.close()
+
+
+def test_v5_tables_and_upgrade_keeps_values_with_empty_history(tmp_db):
+    _v4_file(tmp_db)
+    with SessionStore(tmp_db).open() as s:
+        tables = {r[0] for r in s.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        assert SCHEMA_VERSION == 5 and {"exercise_thresholds", "threshold_changes"} <= tables
+        assert s.get_patient_thresholds("P-017") == {"form_drop": 8} and s.get_installation_thresholds() == {"adherence": 50}
+        assert s.threshold_history("P-017") == [] and s.threshold_history(None) == []
+
+
+def test_exercise_overrides(store):
+    store.set_patient_threshold("P-017", "rom_regression", 8)
+    assert store.set_exercise_threshold("P-017", "Knee Extension", "rom_regression", "5") == 5
+    store.set_exercise_thresholds("P-017", "Squat", {"form_drop": 15, "rom_plateau": 5})
+    assert store.get_exercise_thresholds("P-017") == {"Knee Extension": {"rom_regression": 5},
+                                                      "Squat": {"form_drop": 15, "rom_plateau": 5}}
+    knee = store.effective_thresholds("P-017", "Knee Extension")
+    assert (knee.rom_regression, knee.origin("rom_regression")) == (5, "exercise")
+    assert store.effective_thresholds("P-017", "Hip Abduction").rom_regression == 8
+    assert store.effective_thresholds("P-017").rom_regression == 8
+    by_ex = store.effective_thresholds_by_exercise("P-017")
+    assert set(by_ex) == {"Knee Extension", "Squat"} and by_ex["Squat"].form_drop == 15 and by_ex["Squat"].rom_regression == 8
+    assert store.effective_thresholds_by_exercise_all()["P-017"]["Knee Extension"].rom_regression == 5
+    assert store.effective_thresholds_by_exercise_all().get("P-020", {}) == {}
+    assert store.reset_exercise_threshold("P-017", "Squat", "form_drop") is True
+    assert store.reset_exercise_thresholds("P-017", "Squat") == 1
+    assert store.get_exercise_thresholds("P-017") == {"Knee Extension": {"rom_regression": 5}}
+
+
+def test_exercise_validation_writes_nothing(store):
+    for key, value in (("adherence", 50), ("practice_gap", 5), ("rom_regression", 0), ("speed", 1)):
+        with pytest.raises(ThresholdValidationError):
+            store.set_exercise_threshold("P-017", "Knee Extension", key, value)
+    with pytest.raises(ThresholdValidationError):
+        store.set_exercise_thresholds("P-017", "Knee Extension", {"rom_regression": 5, "adherence": 50})
+    with pytest.raises(ThresholdValidationError):
+        store.set_exercise_threshold("P-017", "  ", "rom_regression", 5)
+    with pytest.raises(PatientNotFoundError):
+        store.set_exercise_threshold("P-404", "Knee Extension", "rom_regression", 5)
+    assert store.get_exercise_thresholds("P-017") == {} and store.threshold_history("P-017") == []
+
+
+def test_patient_reset_all_removes_exercise_overrides_and_cascades(store):
+    store.set_patient_threshold("P-017", "form_drop", 8)
+    store.set_exercise_threshold("P-017", "Knee Extension", "rom_regression", 5)
+    store.set_exercise_threshold("P-020", "Squat", "rom_regression", 6)
+    assert store.reset_patient_thresholds("P-017") == 2
+    assert store.get_exercise_thresholds("P-017") == {} and store.get_patient_thresholds("P-017") == {}
+    store.conn.execute("UPDATE patients SET id = 'P-120' WHERE id = 'P-020'")
+    store.conn.commit()
+    assert store.get_exercise_thresholds("P-120") == {"Squat": {"rom_regression": 6}}
+    assert [c.patient_id for c in store.threshold_history("P-120")] == ["P-120"]
+    store.delete_patient("P-120")
+    assert store.conn.execute("SELECT COUNT(*) FROM exercise_thresholds").fetchone()[0] == 0
+    assert store.conn.execute("SELECT COUNT(*) FROM threshold_changes WHERE patient_id = 'P-120'").fetchone()[0] == 0
+
+
+def test_history_of_set_change_reset(tmp_db, fake_clock):
+    with SessionStore(tmp_db, clock=fake_clock).open() as s:
+        s.add_patient("P-017")
+        for value in (5, 6, 6):
+            s.set_patient_threshold("P-017", "rom_regression", value)
+            fake_clock.advance(60)
+        s.reset_patient_threshold("P-017", "rom_regression")
+        s.reset_patient_threshold("P-017", "rom_regression")             # nothing stored: no entry
+        h = s.threshold_history("P-017")
+        assert [(c.scope, c.key, c.old_value, c.new_value) for c in h] == [
+            ("patient", "rom_regression", 6, None), ("patient", "rom_regression", 5, 6), ("patient", "rom_regression", None, 5)]
+        assert h[0].changed_at > h[1].changed_at > h[2].changed_at and h[0].exercise_name is None
+
+
+def test_history_covers_every_writer(store):
+    store.set_patient_thresholds("P-017", {"form_drop": 8, "rom_plateau": 4})
+    store.set_patient_thresholds("P-017", {"form_drop": 8, "rom_plateau": 5})         # only rom_plateau changed
+    store.set_exercise_threshold("P-017", "Knee Extension", "rom_regression", 5)
+    store.set_gap_days("P-017", 10)
+    store.set_adherence_threshold(50)
+    store.set_installation_threshold("form_drop", 9)
+    store.reset_patient_thresholds("P-017")                                            # 3 patient keys + 1 exercise key
+    store.restore_builtin_thresholds()                                                 # 2 installation keys
+    patient = store.threshold_history("P-017")
+    install = store.threshold_history(None)
+    assert len(install) == 4 and {c.scope for c in install} == {"installation"}
+    assert len([c for c in patient if c.scope == "installation"]) == 4                 # shown to the patient too
+    own = [c for c in patient if c.scope != "installation"]
+    assert len(own) == 3 + 1 + 1 + 4
+    ex = [c for c in own if c.scope == "exercise"]
+    assert [(c.exercise_name, c.old_value, c.new_value) for c in ex] == [("Knee Extension", 5, None), ("Knee Extension", None, 5)]
+    assert store.threshold_history("P-020") == install                                 # another patient sees only installation rows
+    assert len(store.threshold_history("P-017", limit=2)) == 2

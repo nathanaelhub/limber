@@ -62,3 +62,29 @@ def test_defaults():
     assert resolve(None, None).values == d.values
     with pytest.raises(AttributeError):
         d.nonexistent
+
+
+# ----------------------------------------------------------------------------- feature 006: exercise layer
+
+def test_exercise_level_keys():
+    from src.ptlog.thresholds import EXERCISE_KEYS, validate_exercise_key
+    assert EXERCISE_KEYS == ["form_drop", "rom_regression", "rom_plateau", "target_reps_sessions",
+                             "partial_share", "partial_rise"]
+    assert validate_exercise_key("rom_regression", "5") == 5
+    for key in ("practice_gap", "adherence"):
+        with pytest.raises(ThresholdValidationError) as err:
+            validate_exercise_key(key, 5)
+        assert "whole patient" in str(err.value)
+    with pytest.raises(ThresholdValidationError):
+        validate_exercise_key("speed", 5)
+    with pytest.raises(ThresholdValidationError):
+        validate_exercise_key("rom_regression", 0)
+
+
+def test_exercise_layer_wins_and_is_named():
+    t = resolve({"rom_regression": 8, "form_drop": 12}, {"rom_plateau": 4}, exercise={"rom_regression": 5, "adherence": 1})
+    assert (t.rom_regression, t.origin("rom_regression")) == (5, "exercise")
+    assert (t.form_drop, t.origin("form_drop")) == (12, "patient")
+    assert (t.rom_plateau, t.origin("rom_plateau")) == (4, "installation")
+    assert (t.adherence, t.origin("adherence")) == (60, "default")          # not an exercise-level key: ignored
+    assert resolve({"rom_regression": 8}, None).origin("rom_regression") == "patient"

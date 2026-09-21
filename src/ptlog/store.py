@@ -20,6 +20,8 @@ from .privacy import validate_label, validate_notes, validate_patient_id
 from . import thresholds
 from .models import (
     PTLogError,
+    ThresholdChange,
+    ThresholdValidationError,
     ADHERENCE_THRESHOLD_DEFAULT,
     GAP_DAYS_DEFAULT,
     Assignment,
@@ -52,7 +54,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -263,11 +265,34 @@ INSERT OR IGNORE INTO installation_thresholds (key, value)
     SELECT 'adherence', adherence_threshold FROM tracker_settings WHERE adherence_threshold <> 60;
 """
 
+# v5 (feature 006): per-exercise threshold overrides and the history of threshold changes.
+SCHEMA_V5_SQL = """
+CREATE TABLE IF NOT EXISTS exercise_thresholds (
+    patient_id     TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    exercise_name  TEXT NOT NULL,
+    key            TEXT NOT NULL,
+    value          INTEGER NOT NULL CHECK (typeof(value) = 'integer'),
+    PRIMARY KEY (patient_id, exercise_name, key)
+);
+CREATE TABLE IF NOT EXISTS threshold_changes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    changed_at     TEXT NOT NULL,
+    scope          TEXT NOT NULL CHECK (scope IN ('patient', 'exercise', 'installation')),
+    patient_id     TEXT REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    exercise_name  TEXT,
+    key            TEXT NOT NULL,
+    old_value      INTEGER,
+    new_value      INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_threshold_changes_patient ON threshold_changes(patient_id, id);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
     (3, SCHEMA_V3_SQL),
     (4, SCHEMA_V4_SQL),
+    (5, SCHEMA_V5_SQL),
 ]
 
 
@@ -936,84 +961,216 @@ class SessionStore:
         if self.get_patient(patient_id) is None:
             raise PatientNotFoundError(f"Patient '{patient_id}' not found")
 
+    def _log_change(self, scope: str, patient_id: Optional[str], exercise_name: Optional[str],
+                    key: str, old: Optional[int], new: Optional[int]) -> None:
+        """One history row per effective change; the caller commits it together with the change."""
+        if old == new:
+            return
+        self.conn.execute(
+            "INSERT INTO threshold_changes (changed_at, scope, patient_id, exercise_name, key, old_value, new_value) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)", (self._now(), scope, patient_id, exercise_name, key, old, new))
+
+    def _known_key(self, key: str) -> None:
+        if key not in thresholds.THRESHOLDS:
+            thresholds.validate(key, 0)                       # raises with the list of known keys
+
+    # patient level
+
     def get_patient_thresholds(self, patient_id: str) -> Dict[str, int]:
         rows = self.conn.execute(
             "SELECT key, value FROM patient_thresholds WHERE patient_id = ? ORDER BY key", (patient_id,)).fetchall()
         return {r["key"]: int(r["value"]) for r in rows}
 
-    def set_patient_threshold(self, patient_id: str, key: str, value) -> int:
-        number = thresholds.validate(key, value)
-        self._require_patient(patient_id)
-        self.conn.execute("INSERT OR REPLACE INTO patient_thresholds (patient_id, key, value) VALUES (?, ?, ?)",
-                          (patient_id, key, number))
-        self.conn.commit()
-        return number
-
     def set_patient_thresholds(self, patient_id: str, values: Dict[str, Any]) -> Dict[str, int]:
         """Validate every pair, then write them all (nothing is written when one is invalid)."""
         checked = {key: thresholds.validate(key, value) for key, value in values.items()}
         self._require_patient(patient_id)
-        self.conn.executemany("INSERT OR REPLACE INTO patient_thresholds (patient_id, key, value) VALUES (?, ?, ?)",
-                              [(patient_id, k, v) for k, v in checked.items()])
+        stored = self.get_patient_thresholds(patient_id)
+        for key, number in checked.items():
+            self.conn.execute("INSERT OR REPLACE INTO patient_thresholds (patient_id, key, value) VALUES (?, ?, ?)",
+                              (patient_id, key, number))
+            self._log_change("patient", patient_id, None, key, stored.get(key), number)
         self.conn.commit()
         return checked
 
+    def set_patient_threshold(self, patient_id: str, key: str, value) -> int:
+        return self.set_patient_thresholds(patient_id, {key: value})[key]
+
     def reset_patient_threshold(self, patient_id: str, key: str) -> bool:
-        thresholds.validate(key, thresholds.THRESHOLDS[key].default if key in thresholds.THRESHOLDS else 0)
+        self._known_key(key)
         self._require_patient(patient_id)
-        cur = self.conn.execute("DELETE FROM patient_thresholds WHERE patient_id = ? AND key = ?", (patient_id, key))
+        old = self.get_patient_thresholds(patient_id).get(key)
+        if old is None:
+            return False
+        self.conn.execute("DELETE FROM patient_thresholds WHERE patient_id = ? AND key = ?", (patient_id, key))
+        self._log_change("patient", patient_id, None, key, old, None)
         self.conn.commit()
-        return cur.rowcount > 0
+        return True
 
     def reset_patient_thresholds(self, patient_id: str) -> int:
+        """Remove every override of the patient, exercise overrides included. Returns how many were removed."""
         self._require_patient(patient_id)
-        cur = self.conn.execute("DELETE FROM patient_thresholds WHERE patient_id = ?", (patient_id,))
+        removed = 0
+        for key, old in self.get_patient_thresholds(patient_id).items():
+            self._log_change("patient", patient_id, None, key, old, None)
+            removed += 1
+        for exercise_name, values in self.get_exercise_thresholds(patient_id).items():
+            for key, old in values.items():
+                self._log_change("exercise", patient_id, exercise_name, key, old, None)
+                removed += 1
+        self.conn.execute("DELETE FROM patient_thresholds WHERE patient_id = ?", (patient_id,))
+        self.conn.execute("DELETE FROM exercise_thresholds WHERE patient_id = ?", (patient_id,))
         self.conn.commit()
-        return cur.rowcount
+        return removed
+
+    # exercise level (feature 006)
+
+    @staticmethod
+    def _exercise_name(exercise_name: str) -> str:
+        name = (exercise_name or "").strip()
+        if not name or len(name) > 80:
+            raise ThresholdValidationError("Exercise name must be 1-80 characters")
+        return name
+
+    def get_exercise_thresholds(self, patient_id: str) -> Dict[str, Dict[str, int]]:
+        rows = self.conn.execute(
+            "SELECT exercise_name, key, value FROM exercise_thresholds WHERE patient_id = ? ORDER BY exercise_name, key",
+            (patient_id,)).fetchall()
+        result: Dict[str, Dict[str, int]] = {}
+        for r in rows:
+            result.setdefault(r["exercise_name"], {})[r["key"]] = int(r["value"])
+        return result
+
+    def set_exercise_thresholds(self, patient_id: str, exercise_name: str, values: Dict[str, Any]) -> Dict[str, int]:
+        checked = {key: thresholds.validate_exercise_key(key, value) for key, value in values.items()}
+        name = self._exercise_name(exercise_name)
+        self._require_patient(patient_id)
+        stored = self.get_exercise_thresholds(patient_id).get(name, {})
+        for key, number in checked.items():
+            self.conn.execute(
+                "INSERT OR REPLACE INTO exercise_thresholds (patient_id, exercise_name, key, value) VALUES (?, ?, ?, ?)",
+                (patient_id, name, key, number))
+            self._log_change("exercise", patient_id, name, key, stored.get(key), number)
+        self.conn.commit()
+        return checked
+
+    def set_exercise_threshold(self, patient_id: str, exercise_name: str, key: str, value) -> int:
+        return self.set_exercise_thresholds(patient_id, exercise_name, {key: value})[key]
+
+    def reset_exercise_threshold(self, patient_id: str, exercise_name: str, key: str) -> bool:
+        self._known_key(key)
+        self._require_patient(patient_id)
+        name = self._exercise_name(exercise_name)
+        old = self.get_exercise_thresholds(patient_id).get(name, {}).get(key)
+        if old is None:
+            return False
+        self.conn.execute("DELETE FROM exercise_thresholds WHERE patient_id = ? AND exercise_name = ? AND key = ?",
+                          (patient_id, name, key))
+        self._log_change("exercise", patient_id, name, key, old, None)
+        self.conn.commit()
+        return True
+
+    def reset_exercise_thresholds(self, patient_id: str, exercise_name: str) -> int:
+        self._require_patient(patient_id)
+        name = self._exercise_name(exercise_name)
+        stored = self.get_exercise_thresholds(patient_id).get(name, {})
+        for key, old in stored.items():
+            self._log_change("exercise", patient_id, name, key, old, None)
+        self.conn.execute("DELETE FROM exercise_thresholds WHERE patient_id = ? AND exercise_name = ?", (patient_id, name))
+        self.conn.commit()
+        return len(stored)
+
+    # installation level
 
     def get_installation_thresholds(self) -> Dict[str, int]:
         rows = self.conn.execute("SELECT key, value FROM installation_thresholds ORDER BY key").fetchall()
         return {r["key"]: int(r["value"]) for r in rows}
 
-    def set_installation_threshold(self, key: str, value) -> int:
-        number = thresholds.validate(key, value)
-        self.conn.execute("INSERT OR REPLACE INTO installation_thresholds (key, value) VALUES (?, ?)", (key, number))
-        self.conn.commit()
-        return number
-
     def set_installation_thresholds(self, values: Dict[str, Any]) -> Dict[str, int]:
         checked = {key: thresholds.validate(key, value) for key, value in values.items()}
-        self.conn.executemany("INSERT OR REPLACE INTO installation_thresholds (key, value) VALUES (?, ?)",
-                              list(checked.items()))
+        stored = self.get_installation_thresholds()
+        for key, number in checked.items():
+            self.conn.execute("INSERT OR REPLACE INTO installation_thresholds (key, value) VALUES (?, ?)", (key, number))
+            self._log_change("installation", None, None, key, stored.get(key), number)
         self.conn.commit()
         return checked
 
+    def set_installation_threshold(self, key: str, value) -> int:
+        return self.set_installation_thresholds({key: value})[key]
+
     def reset_installation_threshold(self, key: str) -> bool:
-        thresholds.validate(key, thresholds.THRESHOLDS[key].default if key in thresholds.THRESHOLDS else 0)
-        cur = self.conn.execute("DELETE FROM installation_thresholds WHERE key = ?", (key,))
+        self._known_key(key)
+        old = self.get_installation_thresholds().get(key)
+        if old is None:
+            return False
+        self.conn.execute("DELETE FROM installation_thresholds WHERE key = ?", (key,))
+        self._log_change("installation", None, None, key, old, None)
         self.conn.commit()
-        return cur.rowcount > 0
+        return True
 
     def restore_builtin_thresholds(self) -> int:
         """Remove every installation value; patient overrides are untouched."""
-        cur = self.conn.execute("DELETE FROM installation_thresholds")
+        stored = self.get_installation_thresholds()
+        for key, old in stored.items():
+            self._log_change("installation", None, None, key, old, None)
+        self.conn.execute("DELETE FROM installation_thresholds")
         self.conn.commit()
-        return cur.rowcount
+        return len(stored)
 
-    def effective_thresholds(self, patient_id: str) -> "thresholds.Thresholds":
+    # resolution
+
+    def effective_thresholds(self, patient_id: str, exercise_name: Optional[str] = None) -> "thresholds.Thresholds":
+        """The set in use for the patient, or for one of the patient's exercises."""
         self._require_patient(patient_id)
-        return thresholds.resolve(self.get_patient_thresholds(patient_id), self.get_installation_thresholds())
+        exercise = self.get_exercise_thresholds(patient_id).get(exercise_name) if exercise_name else None
+        return thresholds.resolve(self.get_patient_thresholds(patient_id), self.get_installation_thresholds(), exercise)
+
+    def effective_thresholds_by_exercise(self, patient_id: str) -> Dict[str, "thresholds.Thresholds"]:
+        """Only exercises that have an override; every other exercise uses `effective_thresholds(patient)`."""
+        self._require_patient(patient_id)
+        patient, installation = self.get_patient_thresholds(patient_id), self.get_installation_thresholds()
+        return {name: thresholds.resolve(patient, installation, values)
+                for name, values in self.get_exercise_thresholds(patient_id).items()}
+
+    def _all_patient_values(self) -> Dict[str, Dict[str, int]]:
+        per_patient: Dict[str, Dict[str, int]] = {}
+        for r in self.conn.execute("SELECT patient_id, key, value FROM patient_thresholds"):
+            per_patient.setdefault(r["patient_id"], {})[r["key"]] = int(r["value"])
+        return per_patient
 
     def effective_thresholds_all(self) -> Dict[str, "thresholds.Thresholds"]:
         """The set in use for every patient, from two queries (roster and queue)."""
         installation = self.get_installation_thresholds()
-        per_patient: Dict[str, Dict[str, int]] = {}
-        for r in self.conn.execute("SELECT patient_id, key, value FROM patient_thresholds"):
-            per_patient.setdefault(r["patient_id"], {})[r["key"]] = int(r["value"])
+        per_patient = self._all_patient_values()
         shared = thresholds.resolve(None, installation)
         ids = [r[0] for r in self.conn.execute("SELECT id FROM patients")]
         return {pid: (thresholds.resolve(per_patient[pid], installation) if pid in per_patient else shared)
                 for pid in ids}
+
+    def effective_thresholds_by_exercise_all(self) -> Dict[str, Dict[str, "thresholds.Thresholds"]]:
+        """Exercise-specific sets for every patient that has any, from one pass over each table."""
+        installation = self.get_installation_thresholds()
+        per_patient = self._all_patient_values()
+        raw: Dict[str, Dict[str, Dict[str, int]]] = {}
+        for r in self.conn.execute("SELECT patient_id, exercise_name, key, value FROM exercise_thresholds"):
+            raw.setdefault(r["patient_id"], {}).setdefault(r["exercise_name"], {})[r["key"]] = int(r["value"])
+        return {pid: {name: thresholds.resolve(per_patient.get(pid), installation, values) for name, values in ex.items()}
+                for pid, ex in raw.items()}
+
+    def threshold_history(self, patient_id: Optional[str], limit: Optional[int] = None) -> List[ThresholdChange]:
+        """Newest first. For a patient: the patient's and their exercises' changes plus installation
+        changes (they alter the patient's effective values). For None: installation changes only."""
+        if patient_id is None:
+            sql, args = "SELECT * FROM threshold_changes WHERE scope = 'installation' ORDER BY id DESC", ()
+        else:
+            self._require_patient(patient_id)
+            sql = "SELECT * FROM threshold_changes WHERE patient_id = ? OR scope = 'installation' ORDER BY id DESC"
+            args = (patient_id,)
+        if limit:
+            sql += f" LIMIT {int(limit)}"
+        return [ThresholdChange(id=r["id"], changed_at=r["changed_at"], scope=r["scope"], patient_id=r["patient_id"],
+                                exercise_name=r["exercise_name"], key=r["key"], old_value=r["old_value"],
+                                new_value=r["new_value"]) for r in self.conn.execute(sql, args)]
 
     def sessions_in_period(self, patient_id: str, since: Optional[datetime]) -> List[Session]:
         """Full session graphs for a patient, oldest first, started at or after `since` (all when None)."""

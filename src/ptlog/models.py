@@ -493,6 +493,19 @@ METRIC_DEFINITIONS.update({
 })
 
 
+@dataclass
+class ThresholdChange:
+    """One change of a stored attention threshold. None = no stored value (the inherited value applies)."""
+    id: int
+    changed_at: str                      # ISO 8601
+    scope: str                           # patient | exercise | installation
+    patient_id: Optional[str]
+    exercise_name: Optional[str]
+    key: str
+    old_value: Optional[int]
+    new_value: Optional[int]
+
+
 class ThresholdValidationError(PTLogError):
     """An attention threshold key is unknown or its value is outside the allowed range."""
 
