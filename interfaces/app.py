@@ -88,11 +88,11 @@ EXERCISE_KEY_MAP = {
 
 # Page configuration
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
-LIMBR_MARK_SVG = (ASSETS_DIR / "limbr-mark.svg").read_text()
+LIMBER_MARK_SVG = (ASSETS_DIR / "limber-mark.svg").read_text()
 
 st.set_page_config(
-    page_title="Limbr · Therapist",
-    page_icon=str(ASSETS_DIR / "limbr-icon-64.png"),
+    page_title="Limber · Therapist",
+    page_icon=str(ASSETS_DIR / "limber-icon-64.png"),
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -100,7 +100,7 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    /* Limbr brand: teal #0E6B64, coral #F2684A, ink #16302C, warm off-white #FAF8F4 */
+    /* Limber brand: teal #0E6B64, coral #F2684A, ink #16302C, warm off-white #FAF8F4 */
     html, body, [class*="css"], .stApp {
         font-family: "Sora", "Outfit", "Poppins", "Avenir Next", "Segoe UI", system-ui, sans-serif;
     }
@@ -143,10 +143,10 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #EDEAE2; }
     .stButton > button { border-radius: 14px; border-color: #EDEAE2; }
     .stButton > button:hover { border-color: #0E6B64; color: #0E6B64; }
-    .limbr-lockup { display: flex; align-items: center; justify-content: center; gap: 0.6rem; padding: 6px 0 2px; }
-    .limbr-lockup svg { width: 46px; height: 46px; }
-    .limbr-lockup span { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.04em; color: #16302C; }
-    .limbr-tag { text-align: center; color: #728280; font-size: 0.85rem; margin-bottom: 4px; }
+    .limber-lockup { display: flex; align-items: center; justify-content: center; gap: 0.6rem; padding: 6px 0 2px; }
+    .limber-lockup svg { width: 46px; height: 46px; }
+    .limber-lockup span { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.04em; color: #16302C; }
+    .limber-tag { text-align: center; color: #728280; font-size: 0.85rem; margin-bottom: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -298,8 +298,8 @@ class LiveVideoProcessor(VideoProcessorBase):
 def render_sidebar():
     """Render the sidebar navigation."""
     with st.sidebar:
-        st.markdown(f'''<div class="limbr-lockup">{LIMBR_MARK_SVG}<span>Limbr</span></div>
-            <div class="limbr-tag">Physical therapy, between visits · therapist</div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="limber-lockup">{LIMBER_MARK_SVG}<span>Limber</span></div>
+            <div class="limber-tag">Physical therapy, between visits · therapist</div>''', unsafe_allow_html=True)
         st.markdown("---")
 
         # Navigation
@@ -338,7 +338,7 @@ def render_sidebar():
         st.toggle("Show Technical Details", key="show_technical")
 
         st.markdown("---")
-        st.caption("Limbr v1.0 · therapist app")
+        st.caption("Limber v1.0 · therapist app")
         st.caption("Powered by YOLO11 Pose Estimation")
 
 
@@ -348,7 +348,7 @@ def render_sidebar():
 
 def page_home():
     """Render the home dashboard page."""
-    st.markdown('<p class="main-header">Limbr</p>',
+    st.markdown('<p class="main-header">Limber</p>',
                 unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Physical therapy, between visits · exercise monitoring powered by computer vision</p>',
                 unsafe_allow_html=True)
@@ -1681,7 +1681,7 @@ def _tracker_export():
 def page_how_it_works():
     """Render the educational page explaining the technology."""
     st.markdown("## 📚 How It Works")
-    st.markdown("*Understanding the AI behind Limbr*")
+    st.markdown("*Understanding the AI behind Limber*")
 
     # Navigation tabs
     tab1, tab2, tab3, tab4 = st.tabs([

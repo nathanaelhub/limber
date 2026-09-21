@@ -180,8 +180,8 @@ class TestPagesAndHeaders:
 
     def test_brand(self, client):
         html = client.get("/").text
-        assert "Limbr" in html and "/static/limbr-mark.svg" in html and "PT Assist" not in html
-        mark = client.get("/static/limbr-mark.svg")
+        assert "Limber" in html and "/static/limber-mark.svg" in html and "PT Assist" not in html
+        mark = client.get("/static/limber-mark.svg")
         assert mark.status_code == 200 and "#0E6B64" in mark.text and "#F2684A" in mark.text
         assert client.get("/favicon.ico").headers["content-type"] == "image/png"
 

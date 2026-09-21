@@ -1,4 +1,4 @@
-// Limbr patient portal: sign-in and today's program. Rendering only; every rule lives on the server.
+// Limber patient portal: sign-in and today's program. Rendering only; every rule lives on the server.
 (function () {
   "use strict";
   var page = document.body.getAttribute("data-page");

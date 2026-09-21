@@ -1,4 +1,4 @@
-# Limbr brand theme for the therapist app (colors from the brand sheets).
+# Limber brand theme for the therapist app (colors from the brand sheets).
 [theme]
 base = "light"
 primaryColor = "#0E6B64"

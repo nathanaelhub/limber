@@ -1,8 +1,8 @@
-# Limbr
+# Limber
 
 *Physical therapy, between visits.* (Formerly "PT Assist"; the repository folder keeps that name.)
 
-<img src="interfaces/assets/limbr-lockup.svg" alt="Limbr" width="220">
+<img src="interfaces/assets/limber-lockup.svg" alt="Limber" width="220">
 
 An intelligent exercise monitoring system using YOLO11 pose estimation to provide real-time feedback on physical therapy exercises.
 

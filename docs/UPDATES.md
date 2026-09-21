@@ -2,16 +2,17 @@
 
 ---
 
-## Brand — 2026-09-21 — The app is now Limbr
+## Brand — 2026-09-21 — The app is now Limber
 
-The product name is **Limbr** ("physical therapy, between visits"). Brand sheets supplied by the
-owner set the palette (teal `#0E6B64`, coral `#F2684A`, ink `#16302C`, warm off-white `#FAF8F4`)
+The product name is **Limber** ("physical therapy, between visits"). The brand sheets supplied by
+the owner spell the wordmark "Limbr"; the owner confirmed the name is Limber, so the wordmark here
+uses that spelling in the sheets' style. The sheets set the palette (teal `#0E6B64`, coral `#F2684A`, ink `#16302C`, warm off-white `#FAF8F4`)
 and the mark: a bending limb with a coral joint on a rounded teal square.
 
 - `interfaces/assets/`: the mark and lockup as SVG, and PNG icons rendered from the same geometry.
-- Therapist app: Limbr lockup in the sidebar, page icon, titles, and a theme in `.streamlit/config.toml`.
+- Therapist app: Limber lockup in the sidebar, page icon, titles, and a theme in `.streamlit/config.toml`.
 - Patient portal: logo header, "Today's plan" with a progress bar and check-circle exercise cards,
-  after the "Inside Limbr" design. Fonts fall back to the system's rounded sans, because the portal
+  after the "Inside Limber" design. Fonts fall back to the system's rounded sans, because the portal
   loads nothing from other sites.
 - Code, database, environment variables (`PTASSIST_DB`), and folder names keep their existing names.
 

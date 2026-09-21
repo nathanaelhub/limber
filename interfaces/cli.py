@@ -1055,7 +1055,7 @@ def interactive_menu():
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
-        description="Limbr (AI physical therapy assistant) - Command Line Interface",
+        description="Limber (AI physical therapy assistant) - Command Line Interface",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
