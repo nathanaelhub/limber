@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-21
 
-**Status**: Draft (not approved; nothing is built; no cloud resource has been created)
+**Status**: Clarified 2026-09-21 (owner accepted the recommended decisions); nothing is built; no cloud resource has been created
 
 **Input**: User description: "Continue with the patient platform cloud infrastructure build."
 This replaces the owner's earlier choice in feature 007 ("build now, run on one machine, decide
@@ -108,18 +108,19 @@ front page is down.
 - **SC-004**: A redeploy loses no data.
 - **SC-005**: An external scan shows only ports 80 (redirect) and 443 open.
 
-## Decisions only the owner can make (max 3)
+## Decisions (owner accepted the recommendations on 2026-09-21)
 
-1. **[NEEDS CLARIFICATION: provider and who pays]** Options: (a) a small university-managed server
-   (best fit for study data and later compliance; needs an IT contact); (b) a single small cloud
-   virtual machine, roughly 10 to 25 US dollars a month, that you pay for; (c) a container platform
-   with a persistent volume (simple deploys, similar cost). I cannot create any of these without
-   your account and your go-ahead.
-2. **[NEEDS CLARIFICATION: address]** A domain or subdomain is needed for a trusted certificate.
-   Does the university provide one, or will you register one?
-3. **[NEEDS CLARIFICATION: the clinic's camera features]** Should the therapist's Live Session and
-   video analysis stay on the clinic machine (simplest), or must they also work from the cloud
-   (needs a larger host, or moving them to the browser pose model)?
+1. **Provider**: build provider-neutral (one container, one persistent volume, one instance), so it
+   runs the same on a university-managed server or a small cloud virtual machine. The recommended
+   home is a university-managed server, because study data and a later compliance review are
+   simplest there; a small cloud machine (about 10 to 25 US dollars a month) is the fallback.
+   **Creating the host still needs the owner**: an IT contact or a cloud account, and a go-ahead to
+   spend. No cloud resource is created by the build.
+2. **Address**: a university subdomain when IT provides one; otherwise a registered domain. The
+   build takes the public address as configuration, so this does not block it.
+3. **The clinic's camera features** (Live Session with YOLO, video analysis) stay on the clinic
+   machine. The cloud host runs the front page, the patient view, and the therapist's review,
+   tracker, and inbox pages.
 
 ## Assumptions
 

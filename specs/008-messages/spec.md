@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-21
 
-**Status**: Draft (not approved; nothing is built)
+**Status**: Clarified 2026-09-21 (owner accepted the recommended decisions); nothing is built yet
 
 **Input**: User description: "For the doctor side have it like an inbox for a direct communication
 channel." A therapist gets an inbox in the therapist app; each patient gets a conversation with
@@ -124,17 +124,15 @@ text looks like it contains a name, phone number, email address, or date of birt
 - **SC-003**: 100% of message text is rendered as plain text (no markup execution).
 - **SC-004**: The therapist can see who is waiting for a reply from any page (sidebar count).
 
-## Open questions for the owner (max 3)
+## Decisions (owner accepted the recommendations on 2026-09-21)
 
-1. **[NEEDS CLARIFICATION: free text and privacy]** Free-text messages are the first place a
-   patient can type identifying or clinical details. For study use, is warn-and-allow (FR-008)
-   acceptable, or should messages that match a privacy pattern be blocked outright?
-2. **[NEEDS CLARIFICATION: who is "the doctor"]** Today there is one therapist password per
-   installation, so every message is from "your therapist". Do you need named therapists (several
-   accounts, each with their own inbox and patients) now, or is one shared inbox enough for v1?
-3. **[NEEDS CLARIFICATION: notifications]** Should the therapist be notified outside the app (for
-   example by email) when a patient writes? That would send data to an email provider and store an
-   email address, which the constitution currently forbids.
+1. **Free text and privacy**: warn and allow. Text that looks like a name, date of birth, record
+   number, phone number, or email address triggers a warning before sending; the writer may edit or
+   send anyway, and that choice is recorded. The therapist can remove any message afterwards.
+2. **Who is "the doctor"**: one shared therapist inbox in this version. Named therapist accounts
+   are a later feature.
+3. **Notifications**: none outside the app. The unread count inside Limber is the only signal, so
+   no email address is stored and nothing is sent to an email provider.
 
 ## Assumptions
 

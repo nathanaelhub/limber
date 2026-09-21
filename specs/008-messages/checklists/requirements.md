@@ -7,4 +7,4 @@
 - [x] Requirements testable; success criteria measurable
 - [x] Edge cases, dependencies, and assumptions identified
 - [x] Constitution Principle III addressed (networked feature)
-- [ ] No [NEEDS CLARIFICATION] markers remain (three owner decisions are open; run /speckit-clarify)
+- [x] No [NEEDS CLARIFICATION] markers remain (owner accepted the recommended decisions on 2026-09-21)
