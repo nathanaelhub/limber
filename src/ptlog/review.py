@@ -113,13 +113,16 @@ def _exercise_order(sessions) -> List[str]:
     return names
 
 
-def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: datetime):
+def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: datetime, thresholds=None):
+    """`thresholds` is the patient's effective set; resolved from the store when not supplied."""
     from . import flags as rules
     names = _exercise_order(sessions)
     series_by_exercise = {name: measure_series(sessions, name) for name in names}
     goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
     starts = [(s.id, s.start_time) for s in sessions]
-    return rules.evaluate(series_by_exercise, goals, starts, store.get_gap_days(patient_id), now)
+    if thresholds is None:
+        thresholds = store.effective_thresholds(patient_id)
+    return rules.evaluate(series_by_exercise, goals, starts, thresholds, now)
 
 
 # ------------------------------------------------------------------ comparison (US4)

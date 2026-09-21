@@ -384,3 +384,35 @@ class TestCompare:
         rows = {r.name: r for r in review.compare(store, a, b).rows}
         assert rows["avg_rom"].a is None and rows["avg_rom"].change is None and rows["avg_rom"].pct_change is None
         assert rows["reps_completed"].a == 0 and rows["reps_completed"].change == 1 and rows["reps_completed"].pct_change is None
+
+
+class TestPatientThresholds:
+    """Feature 005 US1: flags use the patient's effective thresholds."""
+
+    def _seed(self, store, clock, make_session, patient="P-017"):
+        store.add_patient(patient)
+        for d, rom in zip((9, 7, 5, 3), (85.0, 84.0, 86.0, 80.0)):          # latest is 6 degrees below the best
+            make_session(store, clock, patient, "Knee Extension", D0 - timedelta(days=d),
+                         [(90.0, rom, 2.4), (90.0, rom, 2.4)], target_reps=2)
+
+    def _rules(self, store, patient="P-017"):
+        return [f.rule for f in review.flags_for(store, patient, "all", now=D0).flags]
+
+    def test_override_set_and_reset(self, fixed_store, make_session):
+        store, clock = fixed_store
+        self._seed(store, clock, make_session)
+        assert self._rules(store) == []
+        store.set_patient_threshold("P-017", "rom_regression", 5)
+        (flag,) = review.flags_for(store, "P-017", "all", now=D0).flags
+        assert flag.rule == "rom_regression" and flag.values["threshold"] == 5 and "threshold 5 degrees" in flag.message
+        assert [f.rule for f in review.review_summary(store, "P-017", "all", now=D0).flags.flags] == ["rom_regression"]
+        store.reset_patient_threshold("P-017", "rom_regression")
+        assert self._rules(store) == []
+
+    def test_installation_value_applies_without_an_override(self, fixed_store, make_session):
+        store, clock = fixed_store
+        self._seed(store, clock, make_session)
+        self._seed(store, clock, make_session, patient="P-020")
+        store.set_installation_threshold("rom_regression", 5)
+        store.set_patient_threshold("P-020", "rom_regression", 10)
+        assert self._rules(store) == ["rom_regression"] and self._rules(store, "P-020") == []

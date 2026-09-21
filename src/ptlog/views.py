@@ -450,3 +450,27 @@ def live_summary_line(session: Session) -> str:
     if session.status != "completed":
         line += f" | STATUS: {session.status}"
     return line
+
+
+# ----------------------------------------------------------------------------- attention thresholds (feature 005)
+
+def _origin_text(origin: str, default: int, builtin_only: bool = False) -> str:
+    return "default" if origin == "default" else f"{origin}; default {default}"
+
+
+def threshold_rows(effective, inherited=None) -> List[Dict[str, Any]]:
+    """One row per threshold. `inherited` is the set the patient would use without overrides
+    (installation, else built-in); when omitted the built-in default is shown as the default."""
+    from .thresholds import THRESHOLDS
+    rows = []
+    for key, d in THRESHOLDS.items():
+        default = inherited.value(key) if inherited is not None else d.default
+        rows.append({"key": key, "name": d.name, "value": effective.value(key), "unit": d.unit,
+                     "origin": effective.origin(key), "default": default, "meaning": d.meaning,
+                     "minimum": d.minimum, "maximum": d.maximum})
+    return rows
+
+
+def threshold_lines(effective, inherited=None) -> List[str]:
+    return [f"{r['name']}: {r['value']} {r['unit']} ({_origin_text(r['origin'], r['default'])}) - {r['meaning']}"
+            for r in threshold_rows(effective, inherited)]

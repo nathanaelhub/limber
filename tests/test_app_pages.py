@@ -349,3 +349,21 @@ def test_live_page_screenshot_saves_the_current_frame(seeded_env, stub_webrtc, t
     assert not at.exception, [e.value for e in at.exception]
     (png,) = list((tmp_path / "exports").glob("P-017_*.png"))
     assert any(png.name in s.value for s in at.success)
+
+
+# ----------------------------------------------------------------------------- feature 005: attention thresholds
+
+def test_review_page_thresholds_editor(seeded_env):
+    at = _review_page(seeded_env, "Goals & settings")
+    assert not at.exception, [e.value for e in at.exception]
+    table = at.dataframe[0].value
+    assert list(table["Threshold"])[:3] == ["Practice gap", "Form drop", "ROM regression"]
+    assert set(table["Origin"]) == {"default"}
+    at.number_input(key="threshold_rom_regression").set_value(5)
+    at.button(key="thresholds_save").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        assert store.get_patient_thresholds("P-017") == {"rom_regression": 5}     # only the changed value is stored
+    at.button(key="thresholds_reset_all").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.get_patient_thresholds("P-017") == {}

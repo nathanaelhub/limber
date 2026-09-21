@@ -475,3 +475,41 @@ class TestTrackerExport:
         text = path.read_text()
         assert text.startswith("patient_id,label,program,program_status,days_since_last_session,")
         assert "P-017" in text and "P-019" not in text
+
+
+class TestReviewThresholds:
+    """Feature 005 US1: `review thresholds <patient>`."""
+
+    def test_list_shows_value_unit_origin_default_and_meaning(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "thresholds", "P-017")
+        assert r.returncode == 0, out(r)
+        lines = [line for line in r.stdout.splitlines() if " (default" in line or "; default" in line]
+        assert len(lines) == 8
+        assert any(line.startswith("ROM regression: 10 degrees (default)") and "previous three" in line for line in lines)
+        d = json.loads(run_cli(cli_env, "review", "thresholds", "P-017", "--json").stdout)
+        assert d["rom_regression"] == {"value": 10, "origin": "default", "default": 10, "unit": "degrees"}
+
+    def test_set_reset_and_flags_follow(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        assert "practice_gap" in run_cli(cli_env, "review", "flags", "P-017", "--json").stdout
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--set", "practice_gap=30", "rom_regression=5")
+        assert r.returncode == 0, out(r)
+        assert "Practice gap: 30 days (patient; default 7)" in r.stdout
+        assert "ROM regression: 5 degrees (patient; default 10)" in r.stdout
+        assert "practice_gap" not in run_cli(cli_env, "review", "flags", "P-017", "--json").stdout
+        assert "Gap threshold: 30 days" in run_cli(cli_env, "review", "settings", "P-017").stdout
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--reset", "practice_gap")
+        assert "Practice gap: 7 days (default)" in r.stdout and "ROM regression: 5 degrees (patient" in r.stdout
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--reset-all")
+        assert r.returncode == 0 and "(patient" not in r.stdout
+
+    def test_invalid_values_change_nothing(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        r = run_cli(cli_env, "review", "thresholds", "P-017", "--set", "rom_regression=5", "form_drop=0")
+        assert r.returncode == 1 and "1-50 points" in out(r)
+        assert "(patient" not in run_cli(cli_env, "review", "thresholds", "P-017").stdout
+        for bad in ("speed=3", "form_drop", "form_drop=abc"):
+            assert run_cli(cli_env, "review", "thresholds", "P-017", "--set", bad).returncode == 1
+        assert run_cli(cli_env, "review", "thresholds", "ghost").returncode == 1
+        assert run_cli(cli_env, "review", "thresholds").returncode == 1          # a patient or --installation is required

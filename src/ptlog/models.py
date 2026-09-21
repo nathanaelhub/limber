@@ -492,6 +492,10 @@ METRIC_DEFINITIONS.update({
 })
 
 
+class ThresholdValidationError(PTLogError):
+    """An attention threshold key is unknown or its value is outside the allowed range."""
+
+
 class ProgramValidationError(PTLogError):
     """An exercise key is unknown or a program has no exercises."""
 

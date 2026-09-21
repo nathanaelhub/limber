@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from .privacy import validate_label, validate_notes, validate_patient_id
+from . import thresholds
 from .models import (
     PTLogError,
     ADHERENCE_THRESHOLD_DEFAULT,
@@ -51,7 +52,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -243,10 +244,30 @@ CREATE TABLE IF NOT EXISTS tracker_settings (
 INSERT OR IGNORE INTO tracker_settings (id, adherence_threshold) VALUES (1, 60);
 """
 
+# v4 (feature 005): attention thresholds. The old per-patient gap and installation adherence
+# settings are copied; their tables stay in place and are no longer read.
+SCHEMA_V4_SQL = """
+CREATE TABLE IF NOT EXISTS patient_thresholds (
+    patient_id  TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    key         TEXT NOT NULL,
+    value       INTEGER NOT NULL CHECK (typeof(value) = 'integer'),
+    PRIMARY KEY (patient_id, key)
+);
+CREATE TABLE IF NOT EXISTS installation_thresholds (
+    key    TEXT PRIMARY KEY,
+    value  INTEGER NOT NULL CHECK (typeof(value) = 'integer')
+);
+INSERT OR IGNORE INTO patient_thresholds (patient_id, key, value)
+    SELECT patient_id, 'practice_gap', gap_days FROM review_settings;
+INSERT OR IGNORE INTO installation_thresholds (key, value)
+    SELECT 'adherence', adherence_threshold FROM tracker_settings WHERE adherence_threshold <> 60;
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
     (3, SCHEMA_V3_SQL),
+    (4, SCHEMA_V4_SQL),
 ]
 
 
@@ -903,17 +924,96 @@ class SessionStore:
         return cur.rowcount > 0
 
     def get_gap_days(self, patient_id: str) -> int:
-        row = self.conn.execute("SELECT gap_days FROM review_settings WHERE patient_id = ?", (patient_id,)).fetchone()
-        return int(row["gap_days"]) if row else GAP_DAYS_DEFAULT
+        """The practice-gap threshold in use for the patient (days)."""
+        return self.effective_thresholds(patient_id).practice_gap
 
     def set_gap_days(self, patient_id: str, days: int) -> int:
+        return self.set_patient_threshold(patient_id, "practice_gap", days)
+
+    # ---------------------------------------------------------------- attention thresholds (feature 005)
+
+    def _require_patient(self, patient_id: str) -> None:
         if self.get_patient(patient_id) is None:
             raise PatientNotFoundError(f"Patient '{patient_id}' not found")
-        if not (1 <= int(days) <= 90):
-            raise PTLogError("gap threshold must be between 1 and 90 days")
-        self.conn.execute("INSERT OR REPLACE INTO review_settings (patient_id, gap_days) VALUES (?, ?)", (patient_id, int(days)))
+
+    def get_patient_thresholds(self, patient_id: str) -> Dict[str, int]:
+        rows = self.conn.execute(
+            "SELECT key, value FROM patient_thresholds WHERE patient_id = ? ORDER BY key", (patient_id,)).fetchall()
+        return {r["key"]: int(r["value"]) for r in rows}
+
+    def set_patient_threshold(self, patient_id: str, key: str, value) -> int:
+        number = thresholds.validate(key, value)
+        self._require_patient(patient_id)
+        self.conn.execute("INSERT OR REPLACE INTO patient_thresholds (patient_id, key, value) VALUES (?, ?, ?)",
+                          (patient_id, key, number))
         self.conn.commit()
-        return int(days)
+        return number
+
+    def set_patient_thresholds(self, patient_id: str, values: Dict[str, Any]) -> Dict[str, int]:
+        """Validate every pair, then write them all (nothing is written when one is invalid)."""
+        checked = {key: thresholds.validate(key, value) for key, value in values.items()}
+        self._require_patient(patient_id)
+        self.conn.executemany("INSERT OR REPLACE INTO patient_thresholds (patient_id, key, value) VALUES (?, ?, ?)",
+                              [(patient_id, k, v) for k, v in checked.items()])
+        self.conn.commit()
+        return checked
+
+    def reset_patient_threshold(self, patient_id: str, key: str) -> bool:
+        thresholds.validate(key, thresholds.THRESHOLDS[key].default if key in thresholds.THRESHOLDS else 0)
+        self._require_patient(patient_id)
+        cur = self.conn.execute("DELETE FROM patient_thresholds WHERE patient_id = ? AND key = ?", (patient_id, key))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def reset_patient_thresholds(self, patient_id: str) -> int:
+        self._require_patient(patient_id)
+        cur = self.conn.execute("DELETE FROM patient_thresholds WHERE patient_id = ?", (patient_id,))
+        self.conn.commit()
+        return cur.rowcount
+
+    def get_installation_thresholds(self) -> Dict[str, int]:
+        rows = self.conn.execute("SELECT key, value FROM installation_thresholds ORDER BY key").fetchall()
+        return {r["key"]: int(r["value"]) for r in rows}
+
+    def set_installation_threshold(self, key: str, value) -> int:
+        number = thresholds.validate(key, value)
+        self.conn.execute("INSERT OR REPLACE INTO installation_thresholds (key, value) VALUES (?, ?)", (key, number))
+        self.conn.commit()
+        return number
+
+    def set_installation_thresholds(self, values: Dict[str, Any]) -> Dict[str, int]:
+        checked = {key: thresholds.validate(key, value) for key, value in values.items()}
+        self.conn.executemany("INSERT OR REPLACE INTO installation_thresholds (key, value) VALUES (?, ?)",
+                              list(checked.items()))
+        self.conn.commit()
+        return checked
+
+    def reset_installation_threshold(self, key: str) -> bool:
+        thresholds.validate(key, thresholds.THRESHOLDS[key].default if key in thresholds.THRESHOLDS else 0)
+        cur = self.conn.execute("DELETE FROM installation_thresholds WHERE key = ?", (key,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def restore_builtin_thresholds(self) -> int:
+        """Remove every installation value; patient overrides are untouched."""
+        cur = self.conn.execute("DELETE FROM installation_thresholds")
+        self.conn.commit()
+        return cur.rowcount
+
+    def effective_thresholds(self, patient_id: str) -> "thresholds.Thresholds":
+        self._require_patient(patient_id)
+        return thresholds.resolve(self.get_patient_thresholds(patient_id), self.get_installation_thresholds())
+
+    def effective_thresholds_all(self) -> Dict[str, "thresholds.Thresholds"]:
+        """The set in use for every patient, from two queries (roster and queue)."""
+        installation = self.get_installation_thresholds()
+        per_patient: Dict[str, Dict[str, int]] = {}
+        for r in self.conn.execute("SELECT patient_id, key, value FROM patient_thresholds"):
+            per_patient.setdefault(r["patient_id"], {})[r["key"]] = int(r["value"])
+        shared = thresholds.resolve(None, installation)
+        ids = [r[0] for r in self.conn.execute("SELECT id FROM patients")]
+        return {pid: (thresholds.resolve(per_patient[pid], installation) if pid in per_patient else shared)
+                for pid in ids}
 
     def sessions_in_period(self, patient_id: str, since: Optional[datetime]) -> List[Session]:
         """Full session graphs for a patient, oldest first, started at or after `since` (all when None)."""
@@ -1070,15 +1170,11 @@ class SessionStore:
         return result
 
     def get_adherence_threshold(self) -> int:
-        row = self.conn.execute("SELECT adherence_threshold FROM tracker_settings WHERE id = 1").fetchone()
-        return int(row[0]) if row else ADHERENCE_THRESHOLD_DEFAULT
+        """The installation's adherence threshold (percent); patients may override it."""
+        return thresholds.resolve(None, self.get_installation_thresholds()).adherence
 
     def set_adherence_threshold(self, value: int) -> int:
-        if not (1 <= int(value) <= 100):
-            raise PTLogError("adherence threshold must be between 1 and 100 percent")
-        self.conn.execute("INSERT OR REPLACE INTO tracker_settings (id, adherence_threshold) VALUES (1, ?)", (int(value),))
-        self.conn.commit()
-        return int(value)
+        return self.set_installation_threshold("adherence", value)
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(

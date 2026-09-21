@@ -123,3 +123,81 @@ class TestEvaluate:
         assert not any(r == "practice_gap" for r, _ in rules)
         assert NotEvaluated("form_declining", "Squat", 4, 2) in result.not_evaluated
         assert NotEvaluated("target_reps_not_reached", "Squat", 3, 2) in result.not_evaluated
+
+
+# ----------------------------------------------------------------------------- feature 005: configurable thresholds
+
+from src.ptlog.thresholds import THRESHOLDS, Thresholds, resolve  # noqa: E402
+
+GOAL = Goal("P", "Knee Extension", 110.0, None, "")
+
+
+def _strip(result):
+    return [(f.rule, f.exercise, f.session_ids, {k: v for k, v in f.values.items() if k != "threshold"})
+            for f in result.flags], result.not_evaluated
+
+
+class TestNoOverrideRegression:
+    """FR-010: built-in defaults give the same flags as before the feature (an int gap is still accepted)."""
+
+    def test_defaults_equal_the_legacy_call(self):
+        knee = series(form=[90, 86, 81, 75], rom=[85, 84, 86, 70], reps=[5, 6, 7, 6], partial=[5, 5, 5, 30])
+        squat = series(rom=[80, 81, 80.5, 81.5], reps=[10, 10, 10, 10])
+        squat = [sm(m.session_id + 10, rom=m.avg_rom, reps=10, exercise="Squat", days=m.session_id + 12) for m in squat]
+        args = ({"Knee Extension": knee, "Squat": squat}, {"Squat": Goal("P", "Squat", 100.0, None, "")},
+                [(m.session_id, m.start_time) for m in knee + squat])
+        now = D0 + timedelta(days=40)
+        legacy, new = flags.evaluate(*args, 7, now), flags.evaluate(*args, Thresholds.defaults(), now)
+        assert _strip(legacy) == _strip(new)
+        assert {f.rule for f in new.flags} == {"form_declining", "rom_regression", "target_reps_not_reached",
+                                               "rising_partial_reps", "rom_plateau", "practice_gap"}
+
+
+class TestCustomThresholds:
+    def _stated(self, flag, key, value):
+        assert flag.values["threshold"] == value
+        assert f"threshold {value} {THRESHOLDS[key].unit}" in flag.message
+
+    def test_form_drop(self):
+        s = series(form=[90, 88, 89, 81])                       # 9 below the best, not strictly falling
+        assert flags.form_declining(s) is None
+        self._stated(flags.form_declining(s, resolve({"form_drop": 8})), "form_drop", 8)
+        assert flags.form_declining(series(form=[90, 88, 89, 78]), resolve({"form_drop": 15})) is None
+
+    def test_rom_regression(self):
+        s = series(rom=[85, 84, 86, 80])                        # 6 degrees below the best
+        assert flags.rom_regression(s) is None
+        self._stated(flags.rom_regression(s, resolve({"rom_regression": 5})), "rom_regression", 5)
+        self._stated(flags.rom_regression(series(rom=[85, 84, 86, 70])), "rom_regression", 10)
+
+    def test_rom_plateau(self):
+        s = series(rom=[80, 82, 83, 84])                        # changed by 4 degrees
+        assert flags.rom_plateau(s, GOAL) is None
+        self._stated(flags.rom_plateau(s, GOAL, resolve({"rom_plateau": 6})), "rom_plateau", 6)
+
+    def test_target_reps_sessions(self):
+        s = series(reps=[10, 6, 7])
+        assert flags.target_reps_not_reached(s) is None
+        two = flags.target_reps_not_reached(s, resolve({"target_reps_sessions": 2}))
+        self._stated(two, "target_reps_sessions", 2)
+        assert two.session_ids == [2, 3] and "last 2 sessions" in two.message
+        four = flags.target_reps_not_reached(series(reps=[5, 6, 7]), resolve({"target_reps_sessions": 4}))
+        assert four == NotEvaluated("target_reps_not_reached", "Knee Extension", 4, 3)
+
+    def test_partial_share_and_rise(self):
+        s = series(partial=[10, 10, 10, 18])
+        assert flags.rising_partial_reps(s) is None
+        t = resolve({"partial_share": 15, "partial_rise": 5})
+        f = flags.rising_partial_reps(s, t)
+        assert f.values["threshold"] == {"partial_share": 15, "partial_rise": 5}
+        assert "threshold 15 percent" in f.message and "5 percentage points" in f.message
+        assert flags.rising_partial_reps(s, resolve({"partial_share": 15})) is None      # rise still 10
+
+    def test_practice_gap_through_evaluate(self):
+        knee = series(form=[90, 90])                            # days 1 and 2
+        starts = [(m.session_id, m.start_time) for m in knee]
+        now = D0 + timedelta(days=6)                            # 4 days since the last session
+        assert [f.rule for f in flags.evaluate({"Knee Extension": knee}, {}, starts, Thresholds.defaults(), now).flags] == []
+        result = flags.evaluate({"Knee Extension": knee}, {}, starts, resolve({"practice_gap": 3}), now)
+        (gap,) = result.flags
+        assert gap.rule == "practice_gap" and gap.values["threshold"] == 3 and "threshold 3 days" in gap.message

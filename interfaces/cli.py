@@ -493,6 +493,57 @@ def _print_trend(store, trend, patient_id, views):
         print(f"  {line}")
 
 
+def _parse_threshold_pairs(pairs):
+    values = {}
+    for pair in pairs or []:
+        key, sep, value = pair.partition("=")
+        if not sep or not key or value == "":
+            raise ValueError(f"Expected KEY=VALUE, got '{pair}'")
+        values[key.strip()] = value.strip()
+    return values
+
+
+def _review_thresholds(store, args, views):
+    """List, set, and reset attention thresholds for a patient or for the installation."""
+    from src.ptlog import thresholds as th
+    pairs = _parse_threshold_pairs(args.set)
+    if args.installation:
+        if args.patient:
+            raise ValueError("Give a patient or --installation, not both")
+        if args.reset_all:
+            raise ValueError("Use --restore-defaults with --installation")
+        if pairs:
+            store.set_installation_thresholds(pairs)
+        for key in args.reset or []:
+            store.reset_installation_threshold(key)
+        if args.restore_defaults:
+            store.restore_builtin_thresholds()
+        effective, inherited, title = th.resolve(None, store.get_installation_thresholds()), None, "installation"
+    else:
+        if not args.patient:
+            raise ValueError("Usage: review thresholds <patient> | review thresholds --installation")
+        if args.restore_defaults:
+            raise ValueError("--restore-defaults applies to --installation; use --reset-all for a patient")
+        if store.get_patient(args.patient) is None:
+            raise PatientNotFoundError(f"Patient '{args.patient}' not found")
+        if pairs:
+            store.set_patient_thresholds(args.patient, pairs)
+        for key in args.reset or []:
+            store.reset_patient_threshold(args.patient, key)
+        if args.reset_all:
+            store.reset_patient_thresholds(args.patient)
+        effective = store.effective_thresholds(args.patient)
+        inherited, title = th.resolve(None, store.get_installation_thresholds()), args.patient
+    if args.json:
+        print(json.dumps({r["key"]: {"value": r["value"], "origin": r["origin"], "default": r["default"],
+                                     "unit": r["unit"]} for r in views.threshold_rows(effective, inherited)}, indent=2))
+    else:
+        print_header(f"Attention thresholds: {title}")
+        for line in views.threshold_lines(effective, inherited):
+            print(line)
+    return 0
+
+
 def cmd_review(args):
     """Handle the review command group."""
     from dataclasses import asdict
@@ -565,6 +616,8 @@ def cmd_review(args):
                 if args.gap_days is not None:
                     store.set_gap_days(args.patient, args.gap_days)
                 print(f"Gap threshold: {store.get_gap_days(args.patient)} days")
+            elif sub == "thresholds":
+                return _review_thresholds(store, args, views)
             elif sub == "compare":
                 comp = review.compare(store, args.session_a, args.session_b, args.exercise)
                 if args.json:
@@ -605,7 +658,7 @@ def cmd_review(args):
                 for fmt in fmts:
                     print(write_review_export(store, args.patient, args.period, fmt, args.out))
             else:
-                print_error("Usage: review {trends,session,mark,pending,flags,settings,compare,goals,goal,export}")
+                print_error("Usage: review {trends,session,mark,pending,flags,settings,thresholds,compare,goals,goal,export}")
                 return 1
         return 0
     except (PatientNotFoundError, SessionNotFoundError, PTLogError, ValueError) as e:
@@ -1030,6 +1083,15 @@ Examples:
     rg = review_sub.add_parser("settings", help="Show or set the patient's practice-gap threshold")
     rg.add_argument("patient")
     rg.add_argument("--gap-days", type=int, default=None, help="Days without practice that raise a flag (1-90)")
+
+    rth = review_sub.add_parser("thresholds", help="Show, set, or reset attention thresholds for a patient or the installation")
+    rth.add_argument("patient", nargs="?", default=None)
+    rth.add_argument("--installation", action="store_true", help="Work on the installation values instead of a patient")
+    rth.add_argument("--set", nargs="+", metavar="KEY=VALUE", default=None)
+    rth.add_argument("--reset", nargs="+", metavar="KEY", default=None)
+    rth.add_argument("--reset-all", action="store_true", help="Remove every override of the patient")
+    rth.add_argument("--restore-defaults", action="store_true", help="With --installation: back to the built-in defaults")
+    rth.add_argument("--json", action="store_true")
 
     rc = review_sub.add_parser("compare", help="Compare two sessions of one exercise side by side")
     rc.add_argument("session_a", type=int)

@@ -43,7 +43,7 @@ class TestMigration3:
             tables = {r[0] for r in store.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             assert store.get_review(1).next_step == "continue" and store.get_goal("P-017", "Knee Extension").target_rom == 120.0
             assert [tuple(r) for r in store.conn.execute("SELECT adherence_threshold FROM tracker_settings")] == [(60,)]
-        assert versions == [1, 2, 3] and {"assignments", "discharges", "tracker_settings"} <= tables
+        assert versions == [v for v, _ in MIGRATIONS] and {"assignments", "discharges", "tracker_settings"} <= tables
 
 
 class TestModels:

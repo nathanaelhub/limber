@@ -55,6 +55,7 @@ from src.ptlog.models import PTLogError
 from src.ptlog import review as ptreview
 from src.ptlog import tracker as pttracker
 from src.ptlog import programs as ptprograms
+from src.ptlog import thresholds as ptthresholds
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -1359,19 +1360,59 @@ def _review_compare(pid):
     st.dataframe(table, use_container_width=True, hide_index=True)
 
 
-def _review_goals_settings(pid):
-    st.markdown("### Practice gap threshold")
+def _threshold_table(rows):
+    st.dataframe(pd.DataFrame([{
+        "Threshold": r["name"], "Value": f"{r['value']} {r['unit']}", "Origin": r["origin"],
+        "Default": f"{r['default']} {r['unit']}", "Meaning": r["meaning"]} for r in rows]),
+        use_container_width=True, hide_index=True)
+
+
+def _thresholds_editor(pid):
+    """Per-patient attention thresholds: each with unit, meaning, default, and where its value comes from."""
+    st.markdown("### Attention thresholds")
+    flash = st.session_state.pop("thresholds_flash", None)
+    if flash:
+        st.success(flash)
     with _open_store() as store:
-        current = store.get_gap_days(pid)
-    days = st.number_input("Practice gap threshold (days without a session that raises a flag)",
-                           min_value=1, max_value=90, value=int(current), key="review_gap_days")
-    if st.button("Save gap threshold", key="review_gap_save"):
-        try:
+        effective = store.effective_thresholds(pid)
+        inherited = ptthresholds.resolve(None, store.get_installation_thresholds())
+        overrides = store.get_patient_thresholds(pid)
+    rows = ptviews.threshold_rows(effective, inherited)
+    _threshold_table(rows)
+    st.caption("Origin: patient = set for this patient; installation = this installation's value; "
+               "default = built-in. Flags, the roster, and exports use these values.")
+    cols = st.columns(4)
+    entered = {}
+    for i, r in enumerate(rows):
+        with cols[i % 4]:
+            entered[r["key"]] = st.number_input(
+                f"{r['name']} ({r['unit']})", min_value=r["minimum"], max_value=r["maximum"],
+                value=int(r["value"]), step=1, key=f"threshold_{r['key']}", help=r["meaning"])
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Save thresholds", key="thresholds_save"):
+            # store a value only when it differs from what the patient would inherit, or already is an override
+            changed = {k: int(v) for k, v in entered.items()
+                       if int(v) != inherited.value(k) or k in overrides}
+            try:
+                with _open_store() as store:
+                    store.set_patient_thresholds(pid, changed)
+                st.session_state["thresholds_flash"] = (
+                    "Thresholds saved." if changed else "No changes: every value equals the default.")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+    with c2:
+        if st.button("Reset all to defaults", key="thresholds_reset_all"):
             with _open_store() as store:
-                store.set_gap_days(pid, int(days))
-            st.success(f"Gap threshold: {int(days)} days")
-        except PTLogError as exc:
-            st.error(str(exc))
+                store.reset_patient_thresholds(pid)
+            for r in rows:
+                st.session_state.pop(f"threshold_{r['key']}", None)
+            st.rerun()
+
+
+def _review_goals_settings(pid):
+    _thresholds_editor(pid)
     st.markdown("### Goals")
     with _open_store() as store:
         names = ptreview.exercise_names(store, pid)
