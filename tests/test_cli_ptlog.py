@@ -524,3 +524,31 @@ class TestAdherenceThresholdShown:
         assert "Attention threshold: 50% (patient)" in r.stdout
         d = json.loads(run_cli(cli_env, "tracker", "adherence", "P-017", "--json").stdout)
         assert d["threshold"] == {"value": 50, "origin": "patient"}
+
+
+class TestInstallationThresholds:
+    """Feature 005 US3: `review thresholds --installation`."""
+
+    def test_set_list_reset_restore(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        run_cli(cli_env, "review", "thresholds", "P-017", "--set", "form_drop=12")
+        r = run_cli(cli_env, "review", "thresholds", "--installation", "--set", "form_drop=8", "adherence=50")
+        assert r.returncode == 0, out(r)
+        assert "Form drop: 8 points (installation; default 10)" in r.stdout
+        assert "Adherence threshold: 50%" in run_cli(cli_env, "tracker", "settings").stdout
+        patient = run_cli(cli_env, "review", "thresholds", "P-017").stdout
+        assert "Form drop: 12 points (patient; default 8)" in patient          # the default a reset would give
+        assert "Adherence: 50 percent (installation; default 50)" in patient
+        r = run_cli(cli_env, "review", "thresholds", "--installation", "--reset", "adherence")
+        assert "Adherence: 60 percent (default)" in r.stdout and "Form drop: 8 points (installation" in r.stdout
+        r = run_cli(cli_env, "review", "thresholds", "--installation", "--restore-defaults")
+        assert r.returncode == 0 and "(installation" not in r.stdout
+        assert "Form drop: 12 points (patient; default 10)" in run_cli(cli_env, "review", "thresholds", "P-017").stdout
+
+    def test_misuse_is_rejected(self, cli_env, tmp_db):
+        seed_review_history(tmp_db)
+        assert run_cli(cli_env, "review", "thresholds", "P-017", "--installation").returncode == 1
+        assert run_cli(cli_env, "review", "thresholds", "--installation", "--reset-all").returncode == 1
+        assert run_cli(cli_env, "review", "thresholds", "P-017", "--restore-defaults").returncode == 1
+        r = run_cli(cli_env, "review", "thresholds", "--installation", "--set", "adherence=101")
+        assert r.returncode == 1 and "1-100 percent" in out(r)

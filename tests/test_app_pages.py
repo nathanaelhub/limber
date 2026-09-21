@@ -185,7 +185,7 @@ def test_tracker_page_adherence(seeded_env):
 def test_tracker_page_queue(seeded_env):
     at = _tracker_page(seeded_env, "Queue")
     assert at.warning or at.info or at.success
-    assert any("threshold" in n.label.lower() for n in at.number_input)
+    assert any("threshold" in c.value.lower() for c in at.caption)   # the control moved to Settings (feature 005)
 
 
 def test_tracker_page_discharged_and_patient_controls(seeded_env):
@@ -377,3 +377,17 @@ def test_tracker_adherence_states_the_threshold(seeded_env):
     at = _tracker_page(seeded_env, "Adherence")
     assert not at.exception
     assert any("Attention threshold: 50% (patient)" in m.value for m in at.markdown)
+
+
+def test_tracker_installation_thresholds_editor(seeded_env):
+    at = _tracker_page(seeded_env, "Settings")
+    assert not at.exception, [e.value for e in at.exception]
+    at.number_input(key="install_threshold_form_drop").set_value(8)
+    at.button(key="install_thresholds_save").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        assert store.get_installation_thresholds() == {"form_drop": 8}
+        assert store.effective_thresholds("P-017").origin("form_drop") == "installation"
+    at.button(key="install_thresholds_restore").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.get_installation_thresholds() == {}

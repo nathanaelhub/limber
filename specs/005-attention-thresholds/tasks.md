@@ -42,8 +42,8 @@ Suite: `.venv/bin/python -m pytest tests`.
 
 ## Phase 5: User Story 3 - Installation defaults (P3)
 
-- [ ] T020 [P] [US3] Write failing CLI tests for `review thresholds --installation` (list, `--set`, `--reset`, `--restore-defaults`, patient overrides untouched, origin `installation` in a patient listing) and a page test for the Tracker installation editor
-- [ ] T021 [US3] Implement in interfaces/cli.py and interfaces/app.py (replaces the single adherence control; `tracker settings --adherence-threshold` keeps working); checkpoint commit
+- [X] T020 [P] [US3] Write failing CLI tests for `review thresholds --installation` (list, `--set`, `--reset`, `--restore-defaults`, patient overrides untouched, origin `installation` in a patient listing) and a page test for the Tracker installation editor
+- [X] T021 [US3] Implement in interfaces/cli.py and interfaces/app.py (replaces the single adherence control; `tracker settings --adherence-threshold` keeps working); checkpoint commit
 
 ## Phase 6: User Story 4 - Thresholds in exports (P4)
 

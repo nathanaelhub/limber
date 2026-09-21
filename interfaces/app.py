@@ -1476,7 +1476,7 @@ def _review_export(pid):
 # PAGE: TRACKER (caseload roster, queue, adherence, discharged, export)
 # =============================================================================
 
-TRACKER_SECTIONS = ["Roster", "Queue", "Adherence", "Discharged", "Export"]
+TRACKER_SECTIONS = ["Roster", "Queue", "Adherence", "Discharged", "Export", "Settings"]
 
 
 def page_tracker():
@@ -1489,6 +1489,8 @@ def page_tracker():
         _tracker_adherence()
     elif section == "Queue":
         _tracker_queue()
+    elif section == "Settings":
+        _tracker_settings()
     elif section == "Discharged":
         _tracker_discharged()
     elif section == "Export":
@@ -1539,18 +1541,54 @@ def _tracker_adherence():
     st.caption(ptviews.metric_definition("adherence_pct"))
 
 
+def _tracker_settings():
+    """Installation-wide attention thresholds; patients without an override use these."""
+    st.markdown("### Installation thresholds")
+    flash = st.session_state.pop("install_thresholds_flash", None)
+    if flash:
+        st.success(flash)
+    with _open_store() as store:
+        stored = store.get_installation_thresholds()
+    effective = ptthresholds.resolve(None, stored)
+    rows = ptviews.threshold_rows(effective)
+    _threshold_table(rows)
+    st.caption("Patients with their own value (Review → Goals & settings) are not affected by changes here.")
+    cols = st.columns(4)
+    entered = {}
+    for i, r in enumerate(rows):
+        with cols[i % 4]:
+            entered[r["key"]] = st.number_input(
+                f"{r['name']} ({r['unit']})", min_value=r["minimum"], max_value=r["maximum"],
+                value=int(r["value"]), step=1, key=f"install_threshold_{r['key']}", help=r["meaning"])
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Save installation thresholds", key="install_thresholds_save"):
+            changed = {k: int(v) for k, v in entered.items() if int(v) != r_default(k) or k in stored}
+            try:
+                with _open_store() as store:
+                    store.set_installation_thresholds(changed)
+                st.session_state["install_thresholds_flash"] = (
+                    "Installation thresholds saved." if changed else "No changes: every value is the built-in default.")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+    with c2:
+        if st.button("Restore built-in defaults", key="install_thresholds_restore"):
+            with _open_store() as store:
+                store.restore_builtin_thresholds()
+            for r in rows:
+                st.session_state.pop(f"install_threshold_{r['key']}", None)
+            st.rerun()
+
+
+def r_default(key):
+    return ptthresholds.THRESHOLDS[key].default
+
+
 def _tracker_queue():
     with _open_store() as store:
-        current = store.get_adherence_threshold()
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        threshold = st.number_input("Adherence threshold (percent below which a patient is queued)",
-                                    min_value=1, max_value=100, value=int(current), key="tracker_threshold")
-    with c2:
-        if st.button("Save threshold", key="tracker_threshold_save"):
-            with _open_store() as store:
-                store.set_adherence_threshold(int(threshold))
-            st.success(f"Adherence threshold: {int(threshold)}%")
+        st.caption(f"Adherence attention threshold: {store.get_adherence_threshold()}% for the installation "
+                   "(change it under Settings; a patient's own value is set in Review → Goals & settings).")
     with _open_store() as store:
         q = pttracker.queue(store)
     if q.count == 0:
