@@ -105,6 +105,10 @@ exercise, target reps, and camera, and press START. The page runs the same engin
 line and records the session as it happens; STOP shows the stored summary with a link to the
 session. Switch exercise, Reset reps, and Save Screenshot work while streaming.
 
+**Try it with simulated data:** `python scripts/seed_demo.py` writes an invented caseload (pseudonymous
+IDs only) to `data/demo.db`; run the app on it with `PTASSIST_DB=data/demo.db streamlit run interfaces/app.py`.
+The script refuses to write into the real record.
+
 **Where data lives:** every session is written to one local SQLite file, `data/ptassist.db`
 (set `PTASSIST_DB=/path/to/file.db` to use another location). Exports default to `exports/`.
 Both folders are ignored by git. Patients are identified only by a pseudonymous ID; names,
