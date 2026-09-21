@@ -550,6 +550,34 @@ class AuditEntry:
     detail: Optional[str] = None
 
 
+# --------------------------------------------------------------------------------------
+# Messages (feature 008)
+# --------------------------------------------------------------------------------------
+
+@dataclass
+class Message:
+    """One plain-text message in a patient's conversation with the therapist."""
+    id: int
+    patient_id: str
+    sender: str                      # patient | therapist
+    body: str                        # "" once removed
+    sent_at: str
+    read_at: Optional[str] = None    # when the other side first saw it
+    removed: bool = False
+    warned: bool = False             # sent after the writer was warned that it looks identifying
+
+
+@dataclass
+class ConversationSummary:
+    """One row of the therapist's inbox."""
+    patient_id: str
+    enabled: bool
+    unread: int
+    first_line: str
+    last_sender: Optional[str]
+    last_at: Optional[str]
+
+
 @dataclass
 class ThresholdChange:
     """One change of a stored attention threshold. None = no stored value (the inherited value applies)."""

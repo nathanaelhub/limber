@@ -95,12 +95,35 @@ def done_today_keys(store: SessionStore, patient_id: str, now: datetime) -> set:
     return adherence_mod._exercises_with_counted_reps(sessions)
 
 
+def messages_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
+    """Whether the patient has a conversation with their therapist, and how much of it is unread."""
+    from src.portal import messages
+    enabled = messages.is_enabled(store, patient_id)
+    return {"enabled": enabled, "unread": messages.unread_count(store, patient_id, viewer="patient") if enabled else 0}
+
+
+def message_json(m) -> Dict[str, Any]:
+    return {"id": m.id, "from": "you" if m.sender == "patient" else "therapist", "text": m.body,
+            "sent_at": m.sent_at[:16], "removed": m.removed}
+
+
+def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
+    """The patient's own conversation, oldest first; opening it marks the therapist's messages read."""
+    from src.portal import messages
+    _require(store, patient_id)
+    enabled = messages.is_enabled(store, patient_id)
+    thread = messages.thread(store, patient_id, viewer="patient") if enabled else []
+    return {"patient_id": patient_id, "enabled": enabled, "notice": messages.NOT_FOR_EMERGENCIES,
+            "messages": [message_json(m) for m in thread]}
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     _require(store, patient_id)
     now = now or datetime.now()
     today = now.date()
     view: Dict[str, Any] = {"patient_id": patient_id, "date": today.isoformat(), "program": None, "exercises": [],
-                            "week": None, "streak_weeks": None, "message": None}
+                            "week": None, "streak_weeks": None, "message": None,
+                            "messages": messages_badge(store, patient_id)}
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         view["message"] = NO_PROGRAM

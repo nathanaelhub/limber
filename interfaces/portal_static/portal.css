@@ -75,3 +75,15 @@ button.secondary:hover { color: #fff; }
 .chart { width: 100%; max-width: 26rem; height: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; }
 .definitions dt { font-weight: 700; color: var(--ink); margin-top: .6rem; }
 .definitions dd { margin: 0; }
+.badge { display: inline-block; min-width: 1.3rem; margin-left: .35rem; padding: 0 .4rem; font-size: .78rem; font-weight: 700; line-height: 1.3rem; text-align: center; color: #fff; background: var(--coral); border-radius: 999px; }
+.emergency { margin: 0 0 1.2rem; padding: .8rem 1rem; color: var(--ink); background: #FDECE7; border: 1px solid #F8C9BC; border-radius: 14px; font-size: .95rem; }
+.thread { list-style: none; margin: 0 0 1.2rem; padding: 0; display: grid; gap: .7rem; }
+.bubble { max-width: 85%; padding: .7rem .95rem; border-radius: 18px; border: 1px solid var(--line); background: var(--bg); }
+.bubble.mine { justify-self: end; color: #fff; background: var(--teal); border-color: var(--teal); }
+.bubble.removed { opacity: .6; font-style: italic; }
+.bubble p { margin: 0; }
+.bubble-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble-meta { margin-top: .3rem !important; font-size: .78rem; opacity: .75; }
+textarea { width: 100%; padding: .85rem 1rem; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; resize: vertical; }
+textarea:focus { outline: 3px solid rgba(14, 107, 100, .25); border-color: var(--teal); }
+.warn { margin: .7rem 0 0; padding: .7rem .9rem; background: #FFF6E2; border: 1px solid #F1DDA8; border-radius: 12px; }

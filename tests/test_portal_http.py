@@ -141,12 +141,18 @@ class TestOnlyOwnData:
                 yield from self._walk(v)
 
     def test_no_leak_on_any_route(self, client, seeded):
+        from src.portal import messages as conversation
+        with SessionStore(seeded[0]).open() as s:
+            for pid in ("P-017", "P-018"):
+                conversation.set_enabled(s, pid, True)
+            conversation.send(s, "P-018", "patient", "a private note from the other patient")
+            conversation.send(s, "P-017", "therapist", "well done this week")
         login(client, seeded[1]["P-017"])
-        for route in ("/api/today", "/api/health", "/", "/today"):
+        for route in ("/api/today", "/api/health", "/", "/today", "/api/progress", "/progress", "/api/messages", "/messages"):
             r = client.get(route)
             text = r.text
             assert "P-018" not in text and "P-019" not in text, route
-            for secret in ("Post-op knee", "prefers mornings", "hip hiking", "Shoulder"):
+            for secret in ("Post-op knee", "prefers mornings", "hip hiking", "Shoulder", "other patient"):
                 assert secret not in text, (route, secret)
             if r.headers["content-type"].startswith("application/json"):
                 assert not (set(self._walk(r.json())) & FORBIDDEN_KEYS), route
@@ -208,3 +214,54 @@ class TestProgress:
         assert "P-018" not in r.text and "hip hiking" not in r.text and "Post-op" not in r.text
         page = client.get("/progress").text
         assert 'id="progress"' in page and "Coming soon" not in page
+
+
+# ----------------------------------------------------------------------------- feature 008: the patient's conversation
+
+from src.portal import messages as pmsg  # noqa: E402
+
+
+def _post_message(client, text, confirm=False):
+    return client.post("/api/messages", json={"text": text, "confirm": confirm}, headers={"Origin": ORIGIN})
+
+
+class TestMessages:
+    def test_need_a_sign_in(self, client):
+        assert client.get("/api/messages").status_code == 401
+        assert _post_message(client, "hello").status_code == 401
+
+    def test_off_by_default(self, client, seeded):
+        login(client, seeded[1]["P-017"])
+        assert client.get("/api/messages").json()["enabled"] is False
+        assert client.get("/api/today").json()["messages"] == {"enabled": False, "unread": 0}
+        assert _post_message(client, "hello").status_code == 403
+
+    def test_send_read_warn_and_confirm(self, client, seeded):
+        db, codes = seeded
+        with SessionStore(db).open() as s:
+            pmsg.set_enabled(s, "P-017", True)
+            pmsg.set_enabled(s, "P-018", True)
+            pmsg.send(s, "P-017", "therapist", "How did the stairs go?")
+            pmsg.send(s, "P-018", "therapist", "A note for someone else entirely")
+        login(client, codes["P-017"])
+        assert client.get("/api/today").json()["messages"] == {"enabled": True, "unread": 1}
+        r = _post_message(client, "Better today <3")
+        assert r.status_code == 201 and r.json()["text"] == "Better today <3" and r.json()["from"] == "you"
+        body = client.get("/api/messages").json()
+        assert [(m["from"], m["text"]) for m in body["messages"]] == [("therapist", "How did the stairs go?"), ("you", "Better today <3")]
+        assert body["notice"].startswith("Not for emergencies") and body["patient_id"] == "P-017"
+        assert client.get("/api/today").json()["messages"]["unread"] == 0                # reading marked it
+        assert "someone else" not in client.get("/api/messages").text and "P-018" not in client.get("/api/messages").text
+        warned = _post_message(client, "call me on 615-555-0142")
+        assert warned.status_code == 409 and warned.json()["reasons"] == ["phone number"]
+        assert _post_message(client, "call me on 615-555-0142", confirm=True).status_code == 201
+        assert _post_message(client, "").status_code == 400 and _post_message(client, "x" * 2001).status_code == 400
+        assert client.post("/api/messages", json={"text": "hi"}, headers={"Origin": "https://evil.example"}).status_code == 403
+        with SessionStore(db).open() as s:
+            assert pmsg.unread_count(s, "P-017", viewer="therapist") == 2
+
+    def test_page_always_shows_the_notice(self, client, seeded):
+        assert client.get("/messages", follow_redirects=False).status_code == 303
+        login(client, seeded[1]["P-017"])
+        html = client.get("/messages").text
+        assert "Not for emergencies" in html and 'id="thread"' in html

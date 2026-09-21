@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Messages</title>
+</head>
+<body data-page="messages">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" aria-current="page">Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <main class="card wide">
+    <h1>Messages</h1>
+    <p class="lead">Your conversation with your therapist</p>
+    <p class="emergency" role="note">Not for emergencies. Your therapist reads messages during working hours. If this is urgent, call your clinic or emergency services.</p>
+    <p id="messages-off" class="lead" hidden>Messages are not turned on for you. Ask your therapist at your next visit.</p>
+    <ol id="thread" class="thread" aria-live="polite"></ol>
+    <form id="compose" hidden>
+      <label for="text">Write to your therapist</label>
+      <textarea id="text" rows="3" maxlength="2000" required></textarea>
+      <p id="warn" class="warn" role="alert" hidden></p>
+      <div class="actions">
+        <button id="send" type="submit">Send</button>
+        <button id="send-anyway" type="button" class="secondary" hidden>Send anyway</button>
+      </div>
+      <p id="compose-error" class="error" role="alert" hidden></p>
+      <p class="small">Please do not include your name, phone number, or other personal details.</p>
+    </form>
+  </main>
+  <script src="/static/portal.js"></script>
+  <script src="/static/messages.js"></script>
+</body>
+</html>

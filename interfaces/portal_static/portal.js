@@ -64,8 +64,20 @@
     });
   }
 
-  if (page === "session" || page === "progress") {
-    api("/api/today").then(function (res) { if (res.status === 401) { window.location.href = "/"; } else { text("patient-id", res.data.patient_id); } });
+  // the Messages link appears only when the therapist has turned messaging on for this patient
+  function messagesLink(badge) {
+    var link = document.getElementById("nav-messages"), count = document.getElementById("nav-unread");
+    if (!link || !badge) { return; }
+    link.hidden = !badge.enabled && page !== "messages";
+    if (count) { count.hidden = !badge.unread; count.textContent = String(badge.unread); }
+  }
+
+  if (page === "session" || page === "progress" || page === "messages") {
+    api("/api/today").then(function (res) {
+      if (res.status === 401) { window.location.href = "/"; return; }
+      text("patient-id", res.data.patient_id);
+      if (page !== "messages") { messagesLink(res.data.messages); }
+    });
   }
 
   if (page === "today") {
@@ -73,6 +85,7 @@
       if (res.status === 401) { window.location.href = "/"; return; }
       var d = res.data;
       text("patient-id", d.patient_id);
+      messagesLink(d.messages);
       if (!d.program) { var m = text("message", d.message); m.hidden = false; return; }
       text("program-name", d.program.name);
       var done = d.exercises.filter(function (e) { return e.done_today; }).length;

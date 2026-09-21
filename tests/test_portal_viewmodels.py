@@ -10,7 +10,7 @@ from src.ptlog.models import AdherenceWeek
 
 D0 = datetime(2026, 3, 23, 9, 15, 0)
 REP = [(90.0, 80.0, 2.4)]
-ALLOWED_TODAY = {"patient_id", "date", "program", "exercises", "week", "streak_weeks", "message", "notes"}
+ALLOWED_TODAY = {"patient_id", "date", "program", "exercises", "week", "streak_weeks", "message", "notes", "messages"}
 FORBIDDEN = ("flag", "review", "next_step", "threshold", "label")
 
 

@@ -20,6 +20,7 @@ from .privacy import validate_label, validate_notes, validate_patient_id
 from . import thresholds
 from .models import (
     PTLogError,
+    Message,
     AccessStatus,
     AuditEntry,
     PortalError,
@@ -58,7 +59,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -344,6 +345,34 @@ CREATE TABLE IF NOT EXISTS admin_audit (
 );
 """
 
+# v8 (feature 008): one conversation per patient with the therapist.
+SCHEMA_V8_SQL = """
+CREATE TABLE IF NOT EXISTS conversations (
+    patient_id  TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    enabled     INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    updated_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id  TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    sender      TEXT NOT NULL CHECK (sender IN ('patient', 'therapist')),
+    body        TEXT NOT NULL,
+    sent_at     TEXT NOT NULL,
+    read_at     TEXT,
+    removed_at  TEXT,
+    warned      INTEGER NOT NULL DEFAULT 0 CHECK (warned IN (0, 1))
+);
+CREATE INDEX IF NOT EXISTS idx_messages_patient ON messages(patient_id, id);
+CREATE TABLE IF NOT EXISTS message_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    patient_id  TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    event       TEXT NOT NULL CHECK (event IN ('enabled', 'disabled', 'sent', 'sent_despite_warning', 'read', 'removed')),
+    sender      TEXT,
+    message_id  INTEGER
+);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -352,6 +381,7 @@ MIGRATIONS: List[tuple] = [
     (5, SCHEMA_V5_SQL),
     (6, SCHEMA_V6_SQL),
     (7, SCHEMA_V7_SQL),
+    (8, SCHEMA_V8_SQL),
 ]
 
 
@@ -1550,6 +1580,96 @@ class SessionStore:
     def admin_audit_list(self, limit: int = 200) -> List[dict]:
         rows = self.conn.execute(f"SELECT at, event, client FROM admin_audit ORDER BY id DESC LIMIT {int(limit)}").fetchall()
         return [{"at": r["at"], "event": r["event"], "client": r["client"]} for r in rows]
+
+    # messages (feature 008); the rules live in src/portal/messages.py
+
+    @staticmethod
+    def _message(row) -> Message:
+        removed = row["removed_at"] is not None
+        return Message(id=row["id"], patient_id=row["patient_id"], sender=row["sender"],
+                       body="" if removed else row["body"], sent_at=row["sent_at"], read_at=row["read_at"],
+                       removed=removed, warned=bool(row["warned"]))
+
+    def message_event(self, patient_id: str, event: str, sender: Optional[str] = None, message_id: Optional[int] = None) -> None:
+        """History of what happened in a conversation. Never the text."""
+        self.conn.execute("INSERT INTO message_events (at, patient_id, event, sender, message_id) VALUES (?, ?, ?, ?, ?)",
+                          (self._now(), patient_id, event, sender, message_id))
+
+    def message_events(self, patient_id: str, limit: int = 200) -> List[dict]:
+        rows = self.conn.execute(
+            f"SELECT at, event, sender, message_id FROM message_events WHERE patient_id = ? ORDER BY id DESC LIMIT {int(limit)}",
+            (patient_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def conversation_enabled(self, patient_id: str) -> bool:
+        row = self.conn.execute("SELECT enabled FROM conversations WHERE patient_id = ?", (patient_id,)).fetchone()
+        return bool(row and row["enabled"])
+
+    def conversation_set_enabled(self, patient_id: str, enabled: bool) -> None:
+        self._require_patient(patient_id)
+        self.conn.execute(
+            "INSERT INTO conversations (patient_id, enabled, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(patient_id) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at",
+            (patient_id, 1 if enabled else 0, self._now()))
+        self.message_event(patient_id, "enabled" if enabled else "disabled")
+        self.conn.commit()
+
+    def message_add(self, patient_id: str, sender: str, body: str, warned: bool) -> Message:
+        cur = self.conn.execute(
+            "INSERT INTO messages (patient_id, sender, body, sent_at, warned) VALUES (?, ?, ?, ?, ?)",
+            (patient_id, sender, body, self._now(), 1 if warned else 0))
+        self.message_event(patient_id, "sent", sender, cur.lastrowid)
+        if warned:
+            self.message_event(patient_id, "sent_despite_warning", sender, cur.lastrowid)
+        self.conn.execute("UPDATE conversations SET updated_at = ? WHERE patient_id = ?", (self._now(), patient_id))
+        self.conn.commit()
+        return self._message(self.conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+    def message_count_since(self, patient_id: str, sender: str, since: datetime) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM messages WHERE patient_id = ? AND sender = ? AND sent_at > ?",
+                                 (patient_id, sender, since.isoformat())).fetchone()[0]
+
+    def message_thread(self, patient_id: str) -> List[Message]:
+        rows = self.conn.execute("SELECT * FROM messages WHERE patient_id = ? ORDER BY id", (patient_id,)).fetchall()
+        return [self._message(r) for r in rows]
+
+    def messages_mark_read(self, patient_id: str, from_sender: str) -> int:
+        cur = self.conn.execute(
+            "UPDATE messages SET read_at = ? WHERE patient_id = ? AND sender = ? AND read_at IS NULL",
+            (self._now(), patient_id, from_sender))
+        if cur.rowcount:
+            self.message_event(patient_id, "read", "therapist" if from_sender == "patient" else "patient")
+        self.conn.commit()
+        return cur.rowcount
+
+    def messages_unread(self, from_sender: str, patient_id: Optional[str] = None) -> Dict[str, int]:
+        """Unread messages written by `from_sender`, per patient (removed messages do not count)."""
+        sql = "SELECT patient_id, COUNT(*) AS n FROM messages WHERE sender = ? AND read_at IS NULL AND removed_at IS NULL"
+        args: tuple = (from_sender,)
+        if patient_id is not None:
+            sql, args = sql + " AND patient_id = ?", (from_sender, patient_id)
+        return {r["patient_id"]: int(r["n"]) for r in self.conn.execute(sql + " GROUP BY patient_id", args)}
+
+    def message_remove(self, message_id: int) -> bool:
+        row = self.conn.execute("SELECT patient_id, removed_at FROM messages WHERE id = ?", (message_id,)).fetchone()
+        if row is None or row["removed_at"] is not None:
+            return False
+        self.conn.execute("UPDATE messages SET body = '', removed_at = ? WHERE id = ?", (self._now(), message_id))
+        self.message_event(row["patient_id"], "removed", "therapist", message_id)
+        self.conn.commit()
+        return True
+
+    def conversation_rows(self) -> List[dict]:
+        """Every non-built-in patient with messaging state and the latest message, for the inbox."""
+        rows = self.conn.execute("""
+            SELECT p.id AS patient_id, COALESCE(c.enabled, 0) AS enabled,
+                   m.id AS last_id, m.sender AS last_sender, m.body AS last_body, m.sent_at AS last_at,
+                   m.removed_at AS last_removed
+            FROM patients p
+            LEFT JOIN conversations c ON c.patient_id = p.id
+            LEFT JOIN messages m ON m.id = (SELECT MAX(id) FROM messages WHERE patient_id = p.id)
+            WHERE p.is_builtin = 0""").fetchall()
+        return [dict(r) for r in rows]
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(

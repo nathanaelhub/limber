@@ -32,7 +32,7 @@ from starlette.routing import Mount, Route, WebSocketRoute  # noqa: E402
 from starlette.websockets import WebSocket, WebSocketDisconnect  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
-from src.portal import access, admin, frames, live, viewmodels  # noqa: E402
+from src.portal import access, admin, frames, live, messages, viewmodels  # noqa: E402
 from src.ptlog.models import PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
@@ -166,6 +166,41 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             if patient_id is None:
                 return _json({"error": "Please sign in."}, 401)
             return _json(viewmodels.progress_view(store, patient_id, now=clock()))
+
+    def messages_get(request: Request):
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json(viewmodels.messages_view(store, patient_id))
+
+    async def messages_post(request: Request):
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+
+        def work():
+            with open_store() as store:
+                patient_id = signed_in(request, store)
+                if patient_id is None:
+                    return _json({"error": "Please sign in."}, 401)
+                try:
+                    sent = messages.send(store, patient_id, "patient", body.get("text"), confirm=body.get("confirm") is True)
+                    return _json(viewmodels.message_json(sent), 201)
+                except messages.NeedsConfirmation as warn:
+                    return _json({"error": str(warn), "reasons": warn.reasons}, 409)
+                except messages.MessagingOff as off:
+                    return _json({"error": str(off)}, 403)
+                except messages.TooManyMessages as many:
+                    return _json({"error": str(many)}, 429)
+                except PTLogError as err:
+                    return _json({"error": str(err)}, 400)
+        return await run_in_threadpool(work)
 
     def health(_request: Request):
         with open_store() as store:
@@ -310,10 +345,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/today", inner_page("today")),
         Route("/session", inner_page("session")),
         Route("/progress", inner_page("progress")),
+        Route("/messages", inner_page("messages")),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
         Route("/api/progress", progress),
+        Route("/api/messages", messages_get, methods=["GET"]),
+        Route("/api/messages", messages_post, methods=["POST"]),
         Route("/api/health", health),
         Route("/api/admin/login", admin_login, methods=["POST"]),
         Route("/favicon.ico", lambda _r: FileResponse(static_dir / "favicon.png")),
