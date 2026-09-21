@@ -178,6 +178,13 @@ class TestPagesAndHeaders:
         for phrase in ("never leaves", "body points", "demo and study"):
             assert phrase in html, phrase
 
+    def test_brand(self, client):
+        html = client.get("/").text
+        assert "Limbr" in html and "/static/limbr-mark.svg" in html and "PT Assist" not in html
+        mark = client.get("/static/limbr-mark.svg")
+        assert mark.status_code == 200 and "#0E6B64" in mark.text and "#F2684A" in mark.text
+        assert client.get("/favicon.ico").headers["content-type"] == "image/png"
+
     def test_pages_load_nothing_from_other_sites(self):
         """FR-018: every script, style, and model file comes from the service itself."""
         from interfaces import patient_portal
@@ -186,4 +193,5 @@ class TestPagesAndHeaders:
             assert not re.findall(r"""(?:src|href)=["'](?:https?:)?//""", html), page.name
             assert "<script>" not in html and "onclick=" not in html, page.name      # no inline script (CSP)
         for script in patient_portal.STATIC_DIR.glob("*.js"):
-            assert not re.findall(r"""["']https?://""", script.read_text()), script.name
+            text = script.read_text().replace('"http://www.w3.org/2000/svg"', "")     # an XML namespace, never fetched
+            assert not re.findall(r"""["']https?://""", text), script.name

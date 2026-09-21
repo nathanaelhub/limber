@@ -87,9 +87,12 @@ EXERCISE_KEY_MAP = {
 }
 
 # Page configuration
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+LIMBR_MARK_SVG = (ASSETS_DIR / "limbr-mark.svg").read_text()
+
 st.set_page_config(
-    page_title="AI PT Assistant",
-    page_icon="🏃",
+    page_title="Limbr · Therapist",
+    page_icon=str(ASSETS_DIR / "limbr-icon-64.png"),
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -97,38 +100,53 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1E88E5;
+    /* Limbr brand: teal #0E6B64, coral #F2684A, ink #16302C, warm off-white #FAF8F4 */
+    html, body, [class*="css"], .stApp {
+        font-family: "Sora", "Outfit", "Poppins", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    }
+    h1, h2, h3 { letter-spacing: -0.02em; color: #16302C; }
+    p.main-header, .main-header {
+        font-size: 2.6rem !important;
+        line-height: 1.1;
+        font-weight: 800 !important;
+        letter-spacing: -0.03em;
+        color: #16302C;
         margin-bottom: 0.5rem;
     }
-    .sub-header {
-        font-size: 1.2rem;
-        color: #666;
+    p.sub-header, .sub-header {
+        font-size: 1.15rem !important;
+        color: #728280;
         margin-bottom: 2rem;
     }
     .metric-card {
-        background-color: #f0f2f6;
+        background-color: #FFFFFF;
+        border: 1px solid #EDEAE2;
         padding: 1rem;
-        border-radius: 0.5rem;
+        border-radius: 18px;
         text-align: center;
     }
     .metric-value {
         font-size: 2rem;
-        font-weight: bold;
-        color: #1E88E5;
+        font-weight: 800;
+        color: #0E6B64;
     }
     .metric-label {
         font-size: 0.9rem;
-        color: #666;
+        color: #728280;
     }
-    .form-good { color: #28a745; }
-    .form-warning { color: #ffc107; }
-    .form-poor { color: #dc3545; }
+    .form-good { color: #0E6B64; }
+    .form-warning { color: #C98A1B; }
+    .form-poor { color: #F2684A; }
     .stProgress > div > div > div > div {
-        background-color: #1E88E5;
+        background-color: #0E6B64;
     }
+    [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #EDEAE2; }
+    .stButton > button { border-radius: 14px; border-color: #EDEAE2; }
+    .stButton > button:hover { border-color: #0E6B64; color: #0E6B64; }
+    .limbr-lockup { display: flex; align-items: center; justify-content: center; gap: 0.6rem; padding: 6px 0 2px; }
+    .limbr-lockup svg { width: 46px; height: 46px; }
+    .limbr-lockup span { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.04em; color: #16302C; }
+    .limbr-tag { text-align: center; color: #728280; font-size: 0.85rem; margin-bottom: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -280,12 +298,8 @@ class LiveVideoProcessor(VideoProcessorBase):
 def render_sidebar():
     """Render the sidebar navigation."""
     with st.sidebar:
-        st.markdown("""
-            <div style="text-align: center; padding: 10px 0;">
-                <div style="font-size: 3rem;">🏥</div>
-                <div style="font-size: 1.4rem; font-weight: bold;">PT Assistant</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'''<div class="limbr-lockup">{LIMBR_MARK_SVG}<span>Limbr</span></div>
+            <div class="limbr-tag">Physical therapy, between visits · therapist</div>''', unsafe_allow_html=True)
         st.markdown("---")
 
         # Navigation
@@ -324,7 +338,7 @@ def render_sidebar():
         st.toggle("Show Technical Details", key="show_technical")
 
         st.markdown("---")
-        st.caption("AI PT Assistant v1.0")
+        st.caption("Limbr v1.0 · therapist app")
         st.caption("Powered by YOLO11 Pose Estimation")
 
 
@@ -334,9 +348,9 @@ def render_sidebar():
 
 def page_home():
     """Render the home dashboard page."""
-    st.markdown('<p class="main-header">AI Physical Therapy Assistant</p>',
+    st.markdown('<p class="main-header">Limbr</p>',
                 unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Intelligent exercise monitoring powered by computer vision</p>',
+    st.markdown('<p class="sub-header">Physical therapy, between visits · exercise monitoring powered by computer vision</p>',
                 unsafe_allow_html=True)
 
     # Quick stats — pull real data from observation logs
@@ -476,7 +490,7 @@ def page_live_session():
         }
         .stApp video {
             border-radius: 8px;
-            border: 2px solid #333;
+            border: 2px solid #16302C;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1667,7 +1681,7 @@ def _tracker_export():
 def page_how_it_works():
     """Render the educational page explaining the technology."""
     st.markdown("## 📚 How It Works")
-    st.markdown("*Understanding the AI behind your PT Assistant*")
+    st.markdown("*Understanding the AI behind Limbr*")
 
     # Navigation tabs
     tab1, tab2, tab3, tab4 = st.tabs([

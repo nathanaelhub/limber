@@ -103,7 +103,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
 
     def check_post(request: Request) -> Optional[JSONResponse]:
         if (request.headers.get("origin") or "").rstrip("/") not in origins:
-            return _json({"error": "This request did not come from the PT Assist page."}, 403)
+            return _json({"error": "This request did not come from the Limbr page."}, 403)
         if not request.headers.get("content-type", "").lower().startswith("application/json"):
             return _json({"error": "Send JSON."}, 415)
         return None
@@ -179,7 +179,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
         Route("/api/health", health),
-        Route("/favicon.ico", lambda _r: Response(status_code=204)),
+        Route("/favicon.ico", lambda _r: FileResponse(static_dir / "favicon.png")),
         Mount("/static", StaticFiles(directory=str(static_dir)), name="static"),
     ]
     app = Starlette(routes=routes)
@@ -202,7 +202,7 @@ def serve_problem(host: str, certfile: Optional[str], keyfile: Optional[str], in
 
 
 def main(argv: Optional[list] = None) -> int:
-    parser = argparse.ArgumentParser(description="PT Assist patient portal (demo and study use only)")
+    parser = argparse.ArgumentParser(description="Limbr patient portal (demo and study use only)")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8600)
     parser.add_argument("--public-origin", action="append", default=[], metavar="URL",
@@ -226,7 +226,7 @@ def main(argv: Optional[list] = None) -> int:
     if not pose_assets_present(STATIC_DIR):
         print("Pose assets are not installed; sessions will say setup is incomplete. Run: "
               "python scripts/fetch_portal_assets.py")
-    print(f"PT Assist patient portal on {scheme}://{args.host}:{args.port}  (demo and study use only)")
+    print(f"Limbr patient portal on {scheme}://{args.host}:{args.port}  (demo and study use only)")
     import uvicorn
     uvicorn.run(app, host=args.host, port=args.port, ssl_certfile=args.certfile, ssl_keyfile=args.keyfile,
                 log_level="warning", ws_max_size=4096)

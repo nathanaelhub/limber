@@ -2,6 +2,21 @@
 
 ---
 
+## Brand — 2026-09-21 — The app is now Limbr
+
+The product name is **Limbr** ("physical therapy, between visits"). Brand sheets supplied by the
+owner set the palette (teal `#0E6B64`, coral `#F2684A`, ink `#16302C`, warm off-white `#FAF8F4`)
+and the mark: a bending limb with a coral joint on a rounded teal square.
+
+- `interfaces/assets/`: the mark and lockup as SVG, and PNG icons rendered from the same geometry.
+- Therapist app: Limbr lockup in the sidebar, page icon, titles, and a theme in `.streamlit/config.toml`.
+- Patient portal: logo header, "Today's plan" with a progress bar and check-circle exercise cards,
+  after the "Inside Limbr" design. Fonts fall back to the system's rounded sans, because the portal
+  loads nothing from other sites.
+- Code, database, environment variables (`PTASSIST_DB`), and folder names keep their existing names.
+
+---
+
 ## Update 8 — 2026-09-21 — Per-Exercise Thresholds and Change History
 
 Feature spec: `specs/006-threshold-refinements/`. Schema moved to version 5 (`exercise_thresholds`,

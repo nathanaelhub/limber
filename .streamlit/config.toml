@@ -1,0 +1,8 @@
+# Limbr brand theme for the therapist app (colors from the brand sheets).
+[theme]
+base = "light"
+primaryColor = "#0E6B64"
+backgroundColor = "#FAF8F4"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#16302C"
+font = "sans serif"
