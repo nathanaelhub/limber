@@ -695,6 +695,44 @@ def cmd_review(args):
         return 2
 
 
+def cmd_deploy(args):
+    """Hosting helpers (feature 009): start-up checks, first-boot setup, encrypted backups, restore."""
+    from pathlib import Path as _Path
+    from src.deploy import backup, preflight
+    sub = args.deploy_cmd
+    db = default_db_path()
+    try:
+        if sub == "preflight":
+            assets = _Path(args.assets_dir) if args.assets_dir else _Path(__file__).resolve().parent / "portal_static" / "vendor"
+            checks = preflight.run(db, assets, args.public_origin, args.therapist_url)
+            for c in checks:
+                print(f"{'ok  ' if c.ok else 'FAIL'}  {c.name}: {c.detail}")
+            failed = [c for c in checks if not c.ok]
+            print("Limber is ready to start." if not failed else f"{len(failed)} check(s) failed; Limber must not start like this.")
+            return 0 if not failed else 1
+        if sub == "init":
+            done = preflight.initialise(db, _Path(args.password_file) if args.password_file else None)
+            print("; ".join(done) if done else "Nothing to do: the server key and the therapist password already exist.")
+            return 0
+        key = backup.load_backup_key(_Path(args.key_file))
+        if sub == "backup":
+            out = backup.create(db, _Path(args.dest), key, keep=args.keep)
+            ok = backup.verify(out, key)
+            print(f"{'Backup written and verified' if ok else 'Backup written but FAILED verification'}: {out}")
+            return 0 if ok else 1
+        if sub == "restore":
+            if not backup.verify(_Path(args.file), key):
+                print_error("That backup cannot be decrypted with this key, or it is damaged. Nothing was changed.")
+                return 1
+            print(f"Restored to {backup.restore(_Path(args.file), db, key, force=args.force)}")
+            return 0
+        print_error("Usage: deploy {preflight,init,backup,restore}")
+        return 1
+    except (PTLogError, OSError) as e:
+        print_error(str(e))
+        return 1
+
+
 def cmd_messages(args):
     """Conversations with patients (feature 008). Message text is plain text and is never logged."""
     from src.portal import messages
@@ -1333,6 +1371,23 @@ Examples:
     # Interactive mode
     subparsers.add_parser("interactive", help="Start interactive menu")
 
+    dep_parser = subparsers.add_parser("deploy", help="Hosting: start-up checks, first-boot setup, encrypted backups")
+    dep_sub = dep_parser.add_subparsers(dest="deploy_cmd")
+    dpf = dep_sub.add_parser("preflight", help="Refuse unsafe configurations before the service starts")
+    dpf.add_argument("--public-origin", default=None, help="The https address patients and therapists use")
+    dpf.add_argument("--therapist-url", default=None, help="The therapist app's address under the public address")
+    dpf.add_argument("--assets-dir", default=None)
+    dpi = dep_sub.add_parser("init", help="First boot: create the server key; set the therapist password from a secret file")
+    dpi.add_argument("--password-file", default=None)
+    dpb = dep_sub.add_parser("backup", help="Encrypted backup of the live record, then prune old ones")
+    dpb.add_argument("--dest", default="data/backups")
+    dpb.add_argument("--key-file", default="data/backup.key", help="Keep a copy of this key away from the backups")
+    dpb.add_argument("--keep", type=int, default=14)
+    dpr = dep_sub.add_parser("restore", help="Restore the record from an encrypted backup (stop Limber first)")
+    dpr.add_argument("file")
+    dpr.add_argument("--key-file", default="data/backup.key")
+    dpr.add_argument("--force", action="store_true", help="Overwrite the existing record")
+
     msg_parser = subparsers.add_parser("messages", help="Conversations with patients: inbox, thread, reply")
     msg_sub = msg_parser.add_subparsers(dest="messages_cmd")
     mi = msg_sub.add_parser("inbox", help="One line per conversation, latest first")
@@ -1405,6 +1460,8 @@ Examples:
         return cmd_portal(args)
     elif args.command == "messages":
         return cmd_messages(args)
+    elif args.command == "deploy":
+        return cmd_deploy(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":

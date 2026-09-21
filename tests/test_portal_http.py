@@ -271,3 +271,18 @@ class TestMessages:
         login(client, seeded[1]["P-017"])
         html = client.get("/messages").text
         assert "Not for emergencies" in html and 'id="thread"' in html
+
+
+class TestHealthProvesTheRecordWorks:
+    """Feature 009 FR-006: the health check reads and writes the record."""
+
+    def test_ok(self, client):
+        body = client.get("/api/health").json()
+        assert body["ok"] is True and body["record"] == "ok"
+
+    def test_unwritable_record_is_unhealthy(self, client, seeded, monkeypatch):
+        from src.deploy import preflight
+        monkeypatch.setattr(preflight, "_record_writable", lambda db: "attempt to write a readonly database")
+        r = client.get("/api/health")
+        assert r.status_code == 503 and r.json()["ok"] is False and r.json()["record"] == "unavailable"
+        assert "readonly" not in r.text                     # no internals in a public response

@@ -2,6 +2,26 @@
 
 ---
 
+## Update 11 — 2026-09-21 — Ready to Host (nothing has been hosted yet)
+
+Feature spec: `specs/009-cloud-deployment/`; runbook: `docs/DEPLOYMENT.md`. Limber can now be run on one
+host behind HTTPS, provider-neutral: one application container (patient service plus the therapist app
+under `/therapist`), a Caddy proxy that obtains the certificate and is the only thing exposed, and one
+volume for the record, the server key, exports, and backups. **No cloud resource was created**, and the
+container image has not been built yet because Docker is not installed on the development machine.
+
+- `deploy preflight`: refuses to start without a therapist password, a server key, a writable record,
+  the pose files, and an https public address, and says what to fix.
+- `deploy init`: first boot; creates the server key and sets the therapist password from a secret file.
+- `deploy backup` / `deploy restore`: online backup of the live record, authenticated encryption,
+  verification, fourteen kept; a wrong key or damaged file is refused before anything changes.
+- `/api/health` now proves the record can be read and written (503 otherwise).
+- `cryptography` (already installed through aiortc) is now a direct, pinned dependency for backups.
+- The clinic's camera features stay on the clinic machine; the hosted therapist app is for review,
+  tracker, inbox, and home access. Exactly one instance may run against the record.
+
+---
+
 ## Update 10 — 2026-09-21 — Messages: the Therapist's Inbox and the Patient's Conversation
 
 Feature spec: `specs/008-messages/`. Schema moved to version 8 (`conversations`, `messages`,

@@ -32,6 +32,7 @@ from starlette.routing import Mount, Route, WebSocketRoute  # noqa: E402
 from starlette.websockets import WebSocket, WebSocketDisconnect  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
+from src.deploy import preflight  # noqa: E402
 from src.portal import access, admin, frames, live, messages, viewmodels  # noqa: E402
 from src.ptlog.models import PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
@@ -203,9 +204,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         return await run_in_threadpool(work)
 
     def health(_request: Request):
+        """Used by the proxy and the uptime check: proves the record can be read and written."""
+        if preflight._record_writable(db_path) is not None:
+            return _json({"ok": False, "record": "unavailable"}, 503)
         with open_store() as store:
             therapist = admin.password_is_set(store)
-        return _json({"ok": True, "pose_assets": pose_assets_present(static_dir), "therapist_sign_in": therapist})
+        return _json({"ok": True, "record": "ok", "pose_assets": pose_assets_present(static_dir),
+                      "therapist_sign_in": therapist})
 
     async def admin_login(request: Request):
         """The therapist door: check the password and hand over to the therapist app with a single-use
@@ -400,7 +405,8 @@ def main(argv: Optional[list] = None) -> int:
     secure = bool(args.certfile) or any(o.startswith("https://") for o in args.public_origin)
     app = create_app(allowed_origins=origins, trust_proxy=args.trust_proxy, secure_cookie=secure,
                      therapist_url=args.therapist_url)
-    if args.host not in LOOPBACK and not args.certfile:
+    behind_https_proxy = any(o.startswith("https://") for o in args.public_origin)
+    if args.host not in LOOPBACK and not args.certfile and not behind_https_proxy:
         print("WARNING: serving plain HTTP beyond this machine. Cameras will not work in patients' browsers.")
     if not pose_assets_present(STATIC_DIR):
         print("Pose assets are not installed; sessions will say setup is incomplete. Run: "

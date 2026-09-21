@@ -174,6 +174,11 @@ ai-pt-assistant/
 └── tests/                  # Test suite (pytest)
 ```
 
+## Hosting
+
+Limber can run on one host behind HTTPS for home use by study participants. See `docs/DEPLOYMENT.md`
+(start-up checks, encrypted backups, restore, runbook). Nothing is hosted by default.
+
 ## Documentation
 
 - [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) - Detailed project documentation

@@ -95,6 +95,9 @@ websockets>=16.0
 # httpx - Starlette's in-process test client (tests only)
 httpx>=0.28.0
 
+# cryptography - authenticated encryption (Fernet) for record backups; already installed through aiortc
+cryptography>=42.0.0
+
 # -----------------------------------------------------------------------------
 # Development & Testing
 # -----------------------------------------------------------------------------

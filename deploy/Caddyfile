@@ -1,0 +1,29 @@
+# Caddy terminates HTTPS (certificates are obtained and renewed automatically) and is the only
+# container with published ports. Plain HTTP is redirected to HTTPS by Caddy itself.
+{$LIMBER_DOMAIN} {
+	encode zstd gzip
+
+	# The therapist app lives under /therapist and shows only a sign-in until the therapist signs in.
+	handle /therapist* {
+		reverse_proxy limber:8501
+	}
+
+	# Everything else is the front page and the patient service (including the session WebSocket).
+	handle {
+		reverse_proxy limber:8600
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers delete
+				request>uri query delete
+			}
+		}
+	}
+}

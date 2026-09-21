@@ -1,0 +1,49 @@
+# Limber on one host: one application container, one proxy, one volume. Do not scale `limber`:
+# the record is a single SQLite file and must have exactly one writer.
+services:
+  limber:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+    env_file: limber.env
+    environment:
+      LIMBER_THERAPIST_PASSWORD_FILE: /run/secrets/therapist_password
+    secrets:
+      - therapist_password
+    volumes:
+      - limber_data:/data
+    expose:
+      - "8600"
+      - "8501"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8600/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - limber
+    env_file: limber.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+secrets:
+  therapist_password:
+    file: ./secrets/therapist_password      # create this file on the host; it is ignored by git
+
+volumes:
+  limber_data:
+  caddy_data:
+  caddy_config:

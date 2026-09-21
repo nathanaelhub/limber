@@ -77,3 +77,7 @@ videos/
 
 # Patient portal pose assets (fetched by scripts/fetch_portal_assets.py)
 interfaces/portal_static/vendor/
+
+# Deployment secrets and local settings (feature 009)
+deploy/secrets/
+deploy/limber.env
