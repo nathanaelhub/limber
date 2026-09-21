@@ -449,7 +449,8 @@ def adherence_table_rows(adh) -> List[Dict[str, Any]]:
 
 
 QUEUE_LABELS = {"pending_review": "Pending reviews", "attention_flag": "Attention flags",
-                "practice_gap": "Practice gaps", "low_adherence": "Low adherence"}
+                "practice_gap": "Practice gaps", "low_adherence": "Low adherence",
+                "unread_messages": "Unread messages"}
 
 
 def queue_lines(result) -> List[str]:

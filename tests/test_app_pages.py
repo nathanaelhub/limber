@@ -514,3 +514,83 @@ def test_patients_page_issues_a_code_once_and_revokes_it(seeded_env, monkeypatch
     with SessionStore(seeded_env).open() as store:
         assert store.portal_status("P-017").state == "revoked"
         assert [a.event for a in store.portal_audit_list("P-017")][:2] == ["code_revoked", "code_created"]
+
+
+# ----------------------------------------------------------------------------- feature 008: the therapist's inbox
+
+def _seed_messages(db):
+    from src.portal import messages
+    with SessionStore(db).open() as store:
+        store.add_patient("P-021")
+        for pid in ("P-017", "P-021"):
+            messages.set_enabled(store, pid, True)
+        messages.send(store, "P-017", "patient", "My knee was sore after the stairs")
+        messages.send(store, "P-017", "patient", "Should I skip tomorrow?")
+        messages.send(store, "P-021", "patient", "All good here")
+
+
+def _inbox(db, patient=None):
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    if patient:
+        at.session_state["inbox_open"] = patient
+    return at.run()
+
+
+def test_inbox_lists_conversations_and_the_sidebar_counts_unread(seeded_env):
+    _seed_messages(seeded_env)
+    home = AppTest.from_file(str(APP), default_timeout=180).run()
+    assert any("Inbox" in b.label and "3" in b.label for b in home.button)          # visible from every page
+    at = _inbox(seeded_env)
+    assert not at.exception, [e.value for e in at.exception]
+    table = at.dataframe[0].value
+    assert list(table["Patient"]) == ["P-021", "P-017"] and list(table["Unread"]) == [1, 2]
+    assert "All good here" in list(table["Latest message"])[0]
+    assert any("Inbox" in b.label and "3" in b.label for b in at.button)
+
+
+def test_opening_a_thread_marks_it_read_and_a_reply_is_stored(seeded_env):
+    from src.portal import messages
+    _seed_messages(seeded_env)
+    at = _inbox(seeded_env, "P-017")
+    assert not at.exception, [e.value for e in at.exception]
+    shown = " ".join(x.value for x in at.text)                         # message text is rendered as plain text
+    assert "sore after the stairs" in shown and "All good here" not in shown
+    with SessionStore(seeded_env).open() as store:
+        assert messages.unread_count(store, "P-017", "therapist") == 0 and messages.unread_count(store, "P-021", "therapist") == 1
+    at.text_area(key="inbox_reply").set_value("Rest tomorrow, then half the reps.").run()
+    at.button(key="inbox_send").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        thread = messages.thread(store, "P-017", viewer="patient", mark_read=False)
+        assert [(m.sender, m.body) for m in thread][-1] == ("therapist", "Rest tomorrow, then half the reps.")
+
+
+def test_reply_with_identifying_text_asks_first(seeded_env):
+    from src.portal import messages
+    _seed_messages(seeded_env)
+    at = _inbox(seeded_env, "P-017")
+    at.text_area(key="inbox_reply").set_value("Call Jane Smith at the front desk").run()
+    at.button(key="inbox_send").click().run()
+    assert any("name" in w.value for w in at.warning)
+    with SessionStore(seeded_env).open() as store:
+        assert len(messages.thread(store, "P-017", "therapist", mark_read=False)) == 2
+    at.button(key="inbox_send_anyway").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert messages.thread(store, "P-017", "therapist", mark_read=False)[-1].warned is True
+
+
+def test_thread_shows_context_and_can_turn_messaging_off_and_remove(seeded_env):
+    from src.portal import messages
+    _seed_messages(seeded_env)
+    at = _inbox(seeded_env, "P-017")
+    text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
+    assert "Latest session" in text and "3 reps" in text                   # context beside the thread
+    with SessionStore(seeded_env).open() as store:
+        first_id = messages.thread(store, "P-017", "therapist", mark_read=False)[0].id
+    at.button(key=f"inbox_remove_{first_id}").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert messages.thread(store, "P-017", "therapist", mark_read=False)[0].removed is True
+    at.toggle(key="inbox_enabled").set_value(False).run()
+    with SessionStore(seeded_env).open() as store:
+        assert messages.is_enabled(store, "P-017") is False

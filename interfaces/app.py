@@ -58,6 +58,7 @@ from src.ptlog import programs as ptprograms
 from src.ptlog import thresholds as ptthresholds
 from src.portal import access as ptaccess
 from src.portal import admin as ptadmin
+from src.portal import messages as ptmessages
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -315,8 +316,13 @@ def render_sidebar():
             'obs_logs': '🔬 Observation Logs',
             'review': '🩺 Review',
             'tracker': '🗂️ Tracker',
+            'inbox': '✉️ Inbox',
             'learn': '📚 How It Works'
         }
+        with _open_store() as store:
+            waiting = ptmessages.total_unread(store)
+        if waiting:                                   # who is waiting for a reply, visible from every page
+            pages['inbox'] = f"✉️ Inbox ({waiting})"
 
         for page_id, page_name in pages.items():
             if st.button(page_name, key=f"nav_{page_id}", use_container_width=True):
@@ -1570,6 +1576,111 @@ def _review_export(pid):
 TRACKER_SECTIONS = ["Roster", "Queue", "Adherence", "Discharged", "Export", "Settings"]
 
 
+def page_inbox():
+    """The therapist's inbox: one conversation per patient (feature 008). Text is shown as plain text."""
+    st.markdown("## ✉️ Inbox")
+    with _open_store() as store:
+        rows = ptmessages.inbox(store, include_empty=True)
+    if not rows:
+        st.info("No patients yet.")
+        return
+    active = [r for r in rows if r.last_at]
+    if active:
+        st.dataframe(pd.DataFrame([{
+            "Patient": r.patient_id, "Unread": r.unread,
+            "Latest message": ("You: " if r.last_sender == "therapist" else "") + r.first_line,
+            "When": (r.last_at or "")[:16].replace("T", " "), "Messaging": "on" if r.enabled else "off"} for r in active]),
+            use_container_width=True, hide_index=True)
+    else:
+        st.info("No conversations yet. Turn messaging on for a patient below to start one.")
+
+    ids = [r.patient_id for r in rows]
+    if st.session_state.get("inbox_open") not in ids:
+        st.session_state["inbox_open"] = (active[0].patient_id if active else ids[0])
+    by_id = {r.patient_id: r for r in rows}
+    pid = st.selectbox("Conversation", ids, key="inbox_open",
+                       format_func=lambda i: f"{i}" + (f" · {by_id[i].unread} unread" if by_id[i].unread else ""))
+    st.markdown("---")
+    left, right = st.columns([2, 1])
+
+    with _open_store() as store:
+        enabled = ptmessages.is_enabled(store, pid)
+        thread = ptmessages.thread(store, pid, viewer="therapist")        # opening it marks the patient's messages read
+        discharged = store.get_discharge(pid) is not None
+        latest = store.list_sessions(pid)[:1]
+        flags = ptreview.flags_for(store, pid, "30d").flags if latest else []
+
+    with left:
+        st.markdown(f"### {pid}")
+        wanted = st.toggle("Messaging on for this patient", value=enabled, key="inbox_enabled",
+                           help="Off hides the conversation from the patient and refuses new messages; what was written is kept.")
+        if wanted != enabled:
+            with _open_store() as store:
+                ptmessages.set_enabled(store, pid, wanted)
+            st.rerun()
+        if not thread:
+            st.caption("No messages yet.")
+        for m in thread:
+            who = "You" if m.sender == "therapist" else pid
+            when = m.sent_at[:16].replace("T", " ")
+            c1, c2 = st.columns([8, 1])
+            with c1:
+                st.caption(f"{who} · {when}" + (" · sent after a privacy warning" if m.warned else ""))
+                if m.removed:
+                    st.markdown("*This message was removed.*")
+                else:
+                    st.text(m.body)                                       # plain text: never rendered as markup
+            with c2:
+                if not m.removed and st.button("Remove", key=f"inbox_remove_{m.id}",
+                                               help="For a message that contains identifying details. A marker stays."):
+                    with _open_store() as store:
+                        ptmessages.remove(store, m.id)
+                    st.rerun()
+        if discharged:
+            st.info("This patient is discharged; the conversation is read-only.")
+        elif not enabled:
+            st.info("Messaging is off for this patient.")
+        else:
+            reply = st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH,
+                                 help="Plain text. Do not include names or contact details.")
+            pending = st.session_state.get("inbox_warned") == (pid, reply)
+            b1, b2 = st.columns(2)
+            send_now = b1.button("Send", key="inbox_send", type="primary")
+            send_anyway = b2.button("Send anyway", key="inbox_send_anyway", disabled=not pending)
+            if send_now or (send_anyway and pending):
+                try:
+                    with _open_store() as store:
+                        ptmessages.send(store, pid, "therapist", reply, confirm=bool(send_anyway and pending))
+                    st.session_state.pop("inbox_warned", None)
+                    st.session_state.pop("inbox_reply", None)
+                    st.rerun()
+                except ptmessages.NeedsConfirmation as warn:
+                    st.session_state["inbox_warned"] = (pid, reply)
+                    st.warning(str(warn))
+                    st.rerun()
+                except PTLogError as exc:
+                    st.error(str(exc))
+            if pending:
+                st.warning("This reply looks like it contains a " + " and a ".join(ptmessages.check_text(reply)) +
+                           ". Edit it, or press Send anyway.")
+
+    with right:
+        st.markdown("### Context")
+        if latest:
+            st.markdown("**Latest session**")
+            with _open_store() as store:
+                st.caption(ptviews.live_summary_line(store.load_session(latest[0].id)))
+            st.caption(f"{latest[0].start_time[:10]} · recorded at {'home' if latest[0].origin == 'home' else 'the clinic'}")
+        else:
+            st.caption("No sessions recorded yet.")
+        st.markdown("**Open flags (30 days)**")
+        if flags:
+            for f in flags[:5]:
+                st.caption(f"[{f.rule}] {f.message}")
+        else:
+            st.caption("None.")
+
+
 def page_tracker():
     """Manage the caseload; each section renders only when chosen."""
     st.markdown("## 🗂️ Tracker")
@@ -2014,6 +2125,8 @@ def main():
         page_review()
     elif page == 'tracker':
         page_tracker()
+    elif page == 'inbox':
+        page_inbox()
     elif page == 'learn':
         page_how_it_works()
     else:

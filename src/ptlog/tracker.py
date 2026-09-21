@@ -34,6 +34,7 @@ class PatientSnapshot:
     latest_review: Optional[Review]
     gap_days: int
     thresholds: Optional[Thresholds] = None   # the patient's effective attention thresholds
+    unread_messages: int = 0                  # from the patient, not yet opened by the therapist
 
 
 def _now(now: Optional[datetime]) -> datetime:
@@ -42,7 +43,7 @@ def _now(now: Optional[datetime]) -> datetime:
 
 def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = None,
              thresholds: Optional[Thresholds] = None,
-             per_exercise: Optional[dict] = None) -> PatientSnapshot:
+             per_exercise: Optional[dict] = None, unread_messages: Optional[int] = None) -> PatientSnapshot:
     """One load of the patient's sessions, reused for counts, flags, and adherence."""
     now = _now(now)
     today = now.date()
@@ -63,6 +64,8 @@ def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = No
         pending=store.pending_reviews(patient.id),
         latest_review=store.latest_review(patient.id),
         gap_days=thresholds.practice_gap, thresholds=thresholds,
+        unread_messages=(store.messages_unread("patient", patient.id).get(patient.id, 0)
+                         if unread_messages is None else unread_messages),
     )
 
 
@@ -79,7 +82,8 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
     pct = snap.adherence.percentage
     program_name = snap.assignment.program_name if snap.assignment else "none"
     program_status = snap.adherence.status if snap.assignment else "none"
-    needs = bool(open_flags) or bool(snap.pending) or (pct is not None and pct < threshold) or gap
+    needs = (bool(open_flags) or bool(snap.pending) or (pct is not None and pct < threshold) or gap
+             or snap.unread_messages > 0)
     return RosterRow(
         patient_id=snap.patient.id, label=snap.patient.label, is_builtin=snap.patient.is_builtin,
         program_id=snap.assignment.program_id if snap.assignment else None,
@@ -90,7 +94,7 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
         adherence_pct=pct, adherence_note=snap.adherence.note,
         pending_reviews=len(snap.pending), open_flags=len(open_flags), practice_gap=gap,
         last_next_step=snap.latest_review.next_step if snap.latest_review else None,
-        needs_attention=needs,
+        needs_attention=needs, unread_messages=snap.unread_messages,
     )
 
 
@@ -107,9 +111,11 @@ def roster(store: SessionStore, now: Optional[datetime] = None, sort: str = "att
     now = _now(now)
     everyone = store.effective_thresholds_all()
     by_exercise = store.effective_thresholds_by_exercise_all()
+    unread = store.messages_unread("patient")
     rows: List[RosterRow] = []
     for patient in store.active_patients():
-        snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}))
+        snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}),
+                        unread.get(patient.id, 0))
         if patient.is_builtin and not snap.rows:
             continue
         rows.append(row_from_snapshot(snap, now))
@@ -145,9 +151,11 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
     now = _now(now)
     everyone = store.effective_thresholds_all()
     by_exercise = store.effective_thresholds_by_exercise_all()
+    unread = store.messages_unread("patient")
     keyed = {kind: [] for kind in QUEUE_KINDS}
     for patient in store.active_patients():
-        snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}))
+        snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}),
+                        unread.get(patient.id, 0))
         threshold = snap.thresholds.adherence
         if patient.is_builtin and not snap.rows:
             continue
@@ -174,6 +182,11 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
             keyed["practice_gap"].append((-gap_value, QueueItem(
                 "practice_gap", pid, f"flags:{pid}", None, gap_value,
                 f"{gap_value} days since the last session (threshold {snap.gap_days} days)")))
+        if snap.unread_messages:
+            n = snap.unread_messages
+            keyed["unread_messages"].append((-n, QueueItem(
+                "unread_messages", pid, f"inbox:{pid}", None, 0,
+                f"{n} unread message{'s' if n != 1 else ''} from {pid}")))
         pct = snap.adherence.percentage
         if pct is not None and pct < threshold and snap.assignment is not None:
             keyed["low_adherence"].append((pct, QueueItem(
