@@ -59,3 +59,21 @@ def test_serve_refuses_to_leave_this_machine_without_a_secure_connection(cli_env
     assert r.returncode == 1 and "secure connection" in out(r) and "--insecure-http" in out(r)
     r = run_cli(cli_env, "portal", "serve", "--certfile", "only-one.pem")
     assert r.returncode == 1 and "both" in out(r).lower()
+
+
+def test_messages_from_the_command_line(cli_env):
+    """Feature 008: inbox, thread, reply, and the per-patient switch without the web app."""
+    run_cli(cli_env, "patients", "add", "P-017")
+    assert "Messages are not turned on" in out(run_cli(cli_env, "messages", "send", "P-017", "Hello"))
+    assert run_cli(cli_env, "messages", "on", "P-017").returncode == 0
+    assert run_cli(cli_env, "messages", "send", "P-017", "How is the knee today?").returncode == 0
+    warned = run_cli(cli_env, "messages", "send", "P-017", "Ask for Jane Smith at the desk")
+    assert warned.returncode == 1 and "name" in out(warned) and "--confirm" in out(warned)
+    assert run_cli(cli_env, "messages", "send", "P-017", "Ask for Jane Smith at the desk", "--confirm").returncode == 0
+    shown = run_cli(cli_env, "messages", "show", "P-017").stdout
+    assert "How is the knee today?" in shown and "therapist" in shown and "sent after a privacy warning" in shown
+    inbox = run_cli(cli_env, "messages", "inbox").stdout
+    assert "P-017" in inbox and "on" in inbox
+    assert run_cli(cli_env, "messages", "off", "P-017").returncode == 0
+    assert run_cli(cli_env, "messages", "send", "P-017", "again").returncode == 1
+    assert run_cli(cli_env, "messages", "show", "P-404").returncode == 1

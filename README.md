@@ -118,7 +118,8 @@ python interfaces/cli.py portal code create P-017        # the patient's access 
 python interfaces/cli.py portal serve                    # front page on http://127.0.0.1:8600
 ```
 
-Patients see today's plan, run a guided camera session (their video never leaves their device; only
+Therapists get an **Inbox** for conversations with patients (`python interfaces/cli.py messages inbox`);
+messaging is off until turned on per patient. Patients see today's plan, run a guided camera session (their video never leaves their device; only
 body-point positions are sent), and see their progress. Details: `specs/007-online-patient-view/`.
 
 **Try it with simulated data:** `python scripts/seed_demo.py` writes an invented caseload (pseudonymous

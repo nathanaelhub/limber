@@ -564,6 +564,10 @@ def test_opening_a_thread_marks_it_read_and_a_reply_is_stored(seeded_env):
     with SessionStore(seeded_env).open() as store:
         thread = messages.thread(store, "P-017", viewer="patient", mark_read=False)
         assert [(m.sender, m.body) for m in thread][-1] == ("therapist", "Rest tomorrow, then half the reps.")
+    assert at.text_area(key="inbox_reply").value == ""                  # emptied, so it cannot be sent twice
+    at.button(key="inbox_send").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert len(messages.thread(store, "P-017", viewer="patient", mark_read=False)) == 3
 
 
 def test_reply_with_identifying_text_asks_first(seeded_env):

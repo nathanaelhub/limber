@@ -1576,6 +1576,22 @@ def _review_export(pid):
 TRACKER_SECTIONS = ["Roster", "Queue", "Adherence", "Discharged", "Export", "Settings"]
 
 
+def _inbox_send(pid, confirm):
+    """Button callback: send the reply, then empty the box so it cannot be sent twice."""
+    reply = st.session_state.get("inbox_reply", "")
+    if confirm and st.session_state.get("inbox_warned") != (pid, reply):
+        return                                         # the text changed after the warning: check it again
+    try:
+        with _open_store() as store:
+            ptmessages.send(store, pid, "therapist", reply, confirm=confirm)
+        st.session_state["inbox_reply"] = ""
+        st.session_state.pop("inbox_warned", None)
+    except ptmessages.NeedsConfirmation:
+        st.session_state["inbox_warned"] = (pid, reply)
+    except PTLogError as exc:
+        st.session_state["inbox_error"] = str(exc)
+
+
 def page_inbox():
     """The therapist's inbox: one conversation per patient (feature 008). Text is shown as plain text."""
     st.markdown("## ✉️ Inbox")
@@ -1623,7 +1639,7 @@ def page_inbox():
         for m in thread:
             who = "You" if m.sender == "therapist" else pid
             when = m.sent_at[:16].replace("T", " ")
-            c1, c2 = st.columns([8, 1])
+            c1, c2 = st.columns([5, 1.3])
             with c1:
                 st.caption(f"{who} · {when}" + (" · sent after a privacy warning" if m.warned else ""))
                 if m.removed:
@@ -1641,25 +1657,16 @@ def page_inbox():
         elif not enabled:
             st.info("Messaging is off for this patient.")
         else:
-            reply = st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH,
-                                 help="Plain text. Do not include names or contact details.")
+            st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH,
+                         help="Plain text. Do not include names or contact details.")
+            reply = st.session_state.get("inbox_reply", "")
             pending = st.session_state.get("inbox_warned") == (pid, reply)
             b1, b2 = st.columns(2)
-            send_now = b1.button("Send", key="inbox_send", type="primary")
-            send_anyway = b2.button("Send anyway", key="inbox_send_anyway", disabled=not pending)
-            if send_now or (send_anyway and pending):
-                try:
-                    with _open_store() as store:
-                        ptmessages.send(store, pid, "therapist", reply, confirm=bool(send_anyway and pending))
-                    st.session_state.pop("inbox_warned", None)
-                    st.session_state.pop("inbox_reply", None)
-                    st.rerun()
-                except ptmessages.NeedsConfirmation as warn:
-                    st.session_state["inbox_warned"] = (pid, reply)
-                    st.warning(str(warn))
-                    st.rerun()
-                except PTLogError as exc:
-                    st.error(str(exc))
+            b1.button("Send", key="inbox_send", type="primary", on_click=_inbox_send, args=(pid, False))
+            b2.button("Send anyway", key="inbox_send_anyway", disabled=not pending, on_click=_inbox_send, args=(pid, True))
+            problem = st.session_state.pop("inbox_error", None)
+            if problem:
+                st.error(problem)
             if pending:
                 st.warning("This reply looks like it contains a " + " and a ".join(ptmessages.check_text(reply)) +
                            ". Edit it, or press Send anyway.")

@@ -161,6 +161,25 @@ def build(db_path: Path, seed: int = 7) -> None:
         review_all("P-016", step="progress")
         s.discharge("P-016", on=today - timedelta(days=45), reason="Goals met, independent with home program")
 
+        # Conversations (feature 008): some answered, some waiting for a reply.
+        from src.portal import messages
+        talk = [
+            ("P-017", 3, "patient", "My knee felt stiff this morning. Is that normal after the stairs exercise?"),
+            ("P-017", 3, "therapist", "Some stiffness is expected. Keep the reps slow, and ice for ten minutes afterwards."),
+            ("P-017", 0.2, "patient", "Thanks. Today the last three reps were hard. Should I stop at seven?"),
+            ("P-021", 1, "patient", "I could not finish the hip set today, it pinched on the outside."),
+            ("P-021", 0.5, "patient", "It is fine when I rest."),
+            ("P-023", 5, "therapist", "Please keep squats shallow until I see you on Thursday."),
+        ]
+        for pid in ("P-017", "P-021", "P-023"):
+            clock.now = datetime.now() - timedelta(days=6)
+            messages.set_enabled(s, pid, True)
+        for pid, days_ago, sender, text in talk:
+            clock.now = datetime.now() - timedelta(days=days_ago)
+            messages.send(s, pid, sender, text)
+        clock.now = datetime.now() - timedelta(days=2)
+        messages.thread(s, "P-017", viewer="patient")            # the patient has read the first reply
+
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)
         s.set_installation_threshold("adherence", 65)

@@ -191,6 +191,12 @@ class TestPagesAndHeaders:
         assert mark.status_code == 200 and "#0E6B64" in mark.text and "#F2684A" in mark.text
         assert client.get("/favicon.ico").headers["content-type"] == "image/png"
 
+    def test_hidden_elements_stay_hidden(self, client):
+        """Found in a browser run: classes that set `display` overrode the hidden attribute, so the
+        unread badge and other hidden elements still showed."""
+        css = client.get("/static/portal.css").text
+        assert re.search(r"\[hidden\]\s*\{\s*display:\s*none\s*!important", css)
+
     def test_pages_load_nothing_from_other_sites(self):
         """FR-018: every script, style, and model file comes from the service itself."""
         from interfaces import patient_portal

@@ -2,6 +2,31 @@
 
 ---
 
+## Update 10 — 2026-09-21 — Messages: the Therapist's Inbox and the Patient's Conversation
+
+Feature spec: `specs/008-messages/`. Schema moved to version 8 (`conversations`, `messages`,
+`message_events`), applied automatically. For demo and study use, like the patient view.
+
+- **Therapist**: a new **Inbox** page lists one conversation per patient, newest first, with the first
+  line and an unread count; the sidebar shows the total unread on every page. Opening a thread marks
+  the patient's messages read. Beside the thread: the latest session and open flags. Replies are plain
+  text; a message can be removed (a marker stays). Patients waiting for a reply also appear on the
+  roster and in a new "Unread messages" section of the work queue, without any message text.
+- **Patient**: a **Messages** page in Limber, shown only when the therapist has turned messaging on
+  for that patient. It always states that it is not for emergencies.
+- **Privacy**: messaging is off by default per patient. Free text is the first place someone can type
+  identifying details, so text that looks like a name, date, record number, phone number, or email
+  address triggers a warning before sending; the writer can edit or send anyway, and that choice is
+  recorded. Message text is never written to logs or to the event history, and is always displayed as
+  plain text, never as markup. One shared therapist inbox; no notifications outside the app.
+- **Limits**: 1 to 2,000 characters; 20 messages an hour per patient; closed for discharged patients.
+- **Command line**: `messages inbox | show <patient> | send <patient> "text" [--confirm] | on | off | remove <id>`.
+- **Found by testing in a browser and fixed**: styles that set `display` overrode the HTML `hidden`
+  attribute on the patient pages, so an empty unread badge still showed; one global rule now keeps
+  hidden elements hidden.
+
+---
+
 ## Update 9 — 2026-09-21 — Limber for Patients (home use) and One Front Page
 
 Feature spec: `specs/007-online-patient-view/`. For demo and consented study participants only; not

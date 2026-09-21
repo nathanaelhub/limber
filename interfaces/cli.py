@@ -695,6 +695,52 @@ def cmd_review(args):
         return 2
 
 
+def cmd_messages(args):
+    """Conversations with patients (feature 008). Message text is plain text and is never logged."""
+    from src.portal import messages
+    sub = args.messages_cmd
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            if sub == "inbox":
+                print_header("Inbox")
+                rows = messages.inbox(store, include_empty=args.all)
+                if not rows:
+                    print("No conversations yet.")
+                for r in rows:
+                    latest = ("you: " if r.last_sender == "therapist" else "") + r.first_line
+                    when = (r.last_at or "")[:16].replace("T", " ")
+                    print(f"{r.patient_id:<14}{'on' if r.enabled else 'off':<5}{r.unread:>3} unread  {when:<17}{latest}")
+            elif sub == "show":
+                thread = messages.thread(store, args.patient, viewer="therapist", mark_read=not args.peek)
+                print_header(f"Conversation: {args.patient}")
+                if not thread:
+                    print("No messages yet.")
+                for m in thread:
+                    note = " · sent after a privacy warning" if m.warned else ""
+                    print(f"[{m.sent_at[:16].replace('T', ' ')}] {m.sender}{note}")
+                    print("    " + ("(message removed)" if m.removed else m.body.replace("\n", "\n    ")))
+            elif sub == "send":
+                try:
+                    messages.send(store, args.patient, "therapist", args.text, confirm=args.confirm)
+                    print(f"Sent to {args.patient}.")
+                except messages.NeedsConfirmation as warn:
+                    print_error(f"{warn} To send it as it is, repeat the command with --confirm.")
+                    return 1
+            elif sub in ("on", "off"):
+                messages.set_enabled(store, args.patient, sub == "on")
+                print(f"Messaging is {sub} for {args.patient}.")
+            elif sub == "remove":
+                print("Removed; a marker stays in the thread." if messages.remove(store, args.message_id)
+                      else "No such message, or it was already removed.")
+            else:
+                print_error("Usage: messages {inbox,show,send,on,off,remove}")
+                return 1
+        return 0
+    except (PatientNotFoundError, PTLogError, ValueError) as e:
+        print_error(str(e))
+        return 1
+
+
 def cmd_portal(args):
     """Home access for patients (feature 007): access codes, the access history, and the service."""
     sub = args.portal_cmd
@@ -1287,6 +1333,23 @@ Examples:
     # Interactive mode
     subparsers.add_parser("interactive", help="Start interactive menu")
 
+    msg_parser = subparsers.add_parser("messages", help="Conversations with patients: inbox, thread, reply")
+    msg_sub = msg_parser.add_subparsers(dest="messages_cmd")
+    mi = msg_sub.add_parser("inbox", help="One line per conversation, latest first")
+    mi.add_argument("--all", action="store_true", help="Include patients without messages")
+    ms = msg_sub.add_parser("show", help="A patient's conversation; marks their messages read")
+    ms.add_argument("patient")
+    ms.add_argument("--peek", action="store_true", help="Do not mark anything read")
+    mse = msg_sub.add_parser("send", help="Reply to a patient")
+    mse.add_argument("patient")
+    mse.add_argument("text")
+    mse.add_argument("--confirm", action="store_true", help="Send even though the text looks identifying")
+    for switch in ("on", "off"):
+        sw = msg_sub.add_parser(switch, help=f"Turn messaging {switch} for a patient")
+        sw.add_argument("patient")
+    mr = msg_sub.add_parser("remove", help="Remove one message, leaving a marker")
+    mr.add_argument("message_id", type=int)
+
     portal_parser = subparsers.add_parser("portal", help="Home access for patients: codes, access history, the patient service")
     portal_sub = portal_parser.add_subparsers(dest="portal_cmd")
     pcode = portal_sub.add_parser("code", help="Issue, list, or revoke a patient's access code")
@@ -1340,6 +1403,8 @@ Examples:
         return cmd_tracker(args)
     elif args.command == "portal":
         return cmd_portal(args)
+    elif args.command == "messages":
+        return cmd_messages(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":
