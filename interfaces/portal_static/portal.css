@@ -53,3 +53,18 @@ button:disabled { opacity: .5; cursor: default; }
 .door:hover { background: transparent; color: var(--ink); }
 .door[aria-selected="true"] { color: #fff; background: var(--teal); }
 input.plain { letter-spacing: normal; text-transform: none; }
+.session .stage { position: relative; background: var(--ink); border-radius: 18px; overflow: hidden; aspect-ratio: 4 / 3; }
+.session video, .session canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
+.stage-notice { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%); margin: 0; padding: .5rem .9rem; color: #fff; background: rgba(22, 48, 44, .85); border-radius: 999px; font-size: .95rem; white-space: nowrap; }
+.hud { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin-top: 1.1rem; }
+.hud p { margin: 0; }
+.hud-exercise { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+.hud-reps { font-size: 1.1rem; }
+.hud-reps #reps { font-size: 2.8rem; font-weight: 800; letter-spacing: -.03em; color: var(--teal); }
+.chip { display: inline-block; margin: .9rem 0 0; padding: .3rem .8rem; border-radius: 999px; font-weight: 700; font-size: .9rem; color: #fff; background: var(--teal); }
+.chip.warning { background: #C98A1B; } .chip.poor, .chip.stop { background: var(--coral); }
+.form-messages { margin: .6rem 0 0; padding-left: 1.2rem; color: var(--ink); }
+.feedback { min-height: 1.5rem; margin: .5rem 0 0; color: var(--teal); font-weight: 600; }
+.actions { display: flex; gap: .8rem; flex-wrap: wrap; }
+button.secondary { color: var(--teal); background: var(--card); border: 2px solid var(--teal); }
+button.secondary:hover { color: #fff; }

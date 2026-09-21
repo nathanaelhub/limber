@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0E6B64">
   <link rel="icon" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/portal.css">
-  <title>Limber</title>
+  <title>Limber · Session</title>
 </head>
 <body data-page="session">
   <header class="bar">
@@ -14,7 +14,48 @@
     <nav><a href="/today">Today</a><a href="/progress">Progress</a></nav>
     <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
   </header>
-  <main class="card wide"><h1>Coming soon</h1><p class="lead">This page is not available yet.</p></main>
+  <main class="card wide session">
+    <section id="intro">
+      <h1>Today's session</h1>
+      <p class="lead">Stand where your whole body is in view. Your video stays on this device; only body-point positions are sent.</p>
+      <button id="begin" type="button">Start camera</button>
+      <p id="setup" class="error" role="alert" hidden></p>
+    </section>
+
+    <section id="live" hidden>
+      <div class="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <p id="notice" class="stage-notice" hidden></p>
+      </div>
+      <div class="hud">
+        <div>
+          <p id="exercise" class="hud-exercise"></p>
+          <p id="step" class="muted"></p>
+        </div>
+        <p class="hud-reps"><span id="reps">0</span><span class="muted"> / <span id="target">0</span> reps</span></p>
+      </div>
+      <p id="form" class="chip" hidden></p>
+      <ul id="messages" class="form-messages"></ul>
+      <p id="feedback" class="feedback"></p>
+      <div class="actions">
+        <button id="next" type="button" class="secondary">Next exercise</button>
+        <button id="stop" type="button">Finish session</button>
+      </div>
+    </section>
+
+    <section id="done" hidden>
+      <h1>Session saved</h1>
+      <p id="done-lead" class="lead"></p>
+      <ol id="summary" class="exercises"></ol>
+      <a class="button" href="/today">Back to today's plan</a>
+    </section>
+  </main>
+  <script src="/static/vendor/tf-core.min.js"></script>
+  <script src="/static/vendor/tf-converter.min.js"></script>
+  <script src="/static/vendor/tf-backend-webgl.min.js"></script>
+  <script src="/static/vendor/pose-detection.min.js"></script>
   <script src="/static/portal.js"></script>
+  <script src="/static/session.js"></script>
 </body>
 </html>

@@ -14,6 +14,7 @@ patient's browser finds the body points and sends only those numbers.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -26,10 +27,12 @@ if str(REPO_ROOT) not in sys.path:
 from starlette.applications import Starlette  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response  # noqa: E402
-from starlette.routing import Mount, Route  # noqa: E402
+from starlette.concurrency import run_in_threadpool  # noqa: E402
+from starlette.routing import Mount, Route, WebSocketRoute  # noqa: E402
+from starlette.websockets import WebSocket, WebSocketDisconnect  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
-from src.portal import access, admin, viewmodels  # noqa: E402
+from src.portal import access, admin, frames, live, viewmodels  # noqa: E402
 from src.ptlog.models import PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
@@ -83,11 +86,13 @@ def pose_assets_present(static_dir: Path) -> bool:
 def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                allowed_origins: Iterable[str] = (), clock: Callable[[], datetime] = datetime.now,
                static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False,
-               therapist_url: str = "http://localhost:8501") -> Starlette:
+               therapist_url: str = "http://localhost:8501", frame_rate_cap: int = 20,
+               max_live_sessions: int = 8) -> Starlette:
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
     origins = {o.rstrip("/") for o in allowed_origins}
     limiter = access.LoginLimiter(clock=clock)
+    registry = live.LiveRegistry(limit=max_live_sessions)
 
     def open_store() -> SessionStore:
         return SessionStore(db_path, clock=clock).open()
@@ -184,6 +189,102 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 return _json({"error": str(denied)}, 401)
         return _json({"redirect": f"{therapist_url.rstrip('/')}/?pass={a_pass}"})
 
+    # ------------------------------------------------------------------ guided session
+
+    STATE_KEYS = ("exercise", "index", "rep_count", "phase", "form_status", "form_messages", "feedback",
+                  "set_complete", "seen", "notice", "target_reps")
+    IDLE_SECONDS, MAX_SECONDS, BAD_LIMIT, RECHECK_EVERY = 60, 60 * 60, 10, 15
+
+    def _patient_for(token):
+        with open_store() as store:
+            return access.current_patient(store, token, clock=clock)
+
+    def _audit(event, patient_id, detail=None):
+        with open_store() as store:
+            store.portal_audit_add(event, patient_id, None, detail)
+
+    async def session_socket(ws: WebSocket):
+        """The patient's browser sends body points; the service answers with what the engine sees."""
+        token = ws.cookies.get(COOKIE)
+        origin_ok = (ws.headers.get("origin") or "").rstrip("/") in origins
+        patient_id = await run_in_threadpool(_patient_for, token) if origin_ok else None
+        if patient_id is None:                                  # refused before the connection is accepted
+            await ws.close(code=1008)
+            return
+        await ws.accept()
+        session, bad, accepted = None, 0, 0
+        last_sent, last_sent_at, started_at = None, 0.0, asyncio.get_running_loop().time()
+
+        async def send_state(state, force=False):
+            nonlocal last_sent, last_sent_at
+            if state is None:
+                return
+            now = asyncio.get_running_loop().time()
+            key = tuple(str(state.get(k)) for k in STATE_KEYS)
+            if force or key != last_sent or now - last_sent_at >= 0.2:
+                last_sent, last_sent_at = key, now
+                await ws.send_json(state)
+
+        async def close_with(reason, code=1008):
+            if session is not None:
+                await run_in_threadpool(session.interrupt, reason)
+            await ws.close(code=code)
+
+        try:
+            while True:
+                try:
+                    text = await asyncio.wait_for(ws.receive_text(), timeout=IDLE_SECONDS)
+                except asyncio.TimeoutError:
+                    if session is not None:
+                        await ws.send_json(await run_in_threadpool(session.stop))
+                    await ws.close(code=1000)
+                    return
+                try:
+                    message = frames.parse(text)
+                    kind = message["type"]
+                    if kind == "start":
+                        if session is None:
+                            try:
+                                session = await run_in_threadpool(
+                                    lambda: live.PortalLiveSession.start(db_path, patient_id, registry,
+                                                                         pose_model=message.get("pose_model") or live.DEFAULT_POSE_MODEL,
+                                                                         clock=clock, rate_cap=frame_rate_cap))
+                            except live.LiveRefused as refused:
+                                await run_in_threadpool(_audit, "live_refused", patient_id, refused.reason)
+                                await ws.send_json({"type": "refused", "reason": refused.reason, "message": str(refused)})
+                                await ws.close(code=1000)
+                                return
+                        await send_state(session.state(), force=True)
+                    elif session is None:
+                        raise frames.FrameError("start first")
+                    elif kind == "frame":
+                        state = await run_in_threadpool(session.handle_frame, message)
+                        if state is not None:
+                            accepted += 1
+                            await send_state(state)
+                            if accepted % RECHECK_EVERY == 0 and await run_in_threadpool(_patient_for, token) is None:
+                                await close_with("access_revoked")
+                                return
+                    elif kind == "next":
+                        await send_state(await run_in_threadpool(session.next), force=True)
+                    elif kind == "stop":
+                        await ws.send_json(await run_in_threadpool(session.stop))
+                        await ws.close(code=1000)
+                        return
+                except frames.FrameError:
+                    bad += 1
+                    if bad >= BAD_LIMIT:
+                        await run_in_threadpool(_audit, "live_refused", patient_id, "bad_frames")
+                        await close_with("bad_frames")
+                        return
+                if session is not None and asyncio.get_running_loop().time() - started_at > MAX_SECONDS:
+                    await ws.send_json(await run_in_threadpool(session.stop))
+                    await ws.close(code=1000)
+                    return
+        except WebSocketDisconnect:
+            if session is not None:
+                await run_in_threadpool(session.interrupt, "portal_disconnected")
+
     # ------------------------------------------------------------------ pages
 
     def index(_request: Request):
@@ -208,6 +309,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/health", health),
         Route("/api/admin/login", admin_login, methods=["POST"]),
         Route("/favicon.ico", lambda _r: FileResponse(static_dir / "favicon.png")),
+        WebSocketRoute("/ws/session", session_socket),
         Mount("/static", StaticFiles(directory=str(static_dir)), name="static"),
     ]
     app = Starlette(routes=routes)

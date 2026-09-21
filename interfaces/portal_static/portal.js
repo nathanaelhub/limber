@@ -64,6 +64,10 @@
     });
   }
 
+  if (page === "session" || page === "progress") {
+    api("/api/today").then(function (res) { if (res.status === 401) { window.location.href = "/"; } else { text("patient-id", res.data.patient_id); } });
+  }
+
   if (page === "today") {
     api("/api/today").then(function (res) {
       if (res.status === 401) { window.location.href = "/"; return; }

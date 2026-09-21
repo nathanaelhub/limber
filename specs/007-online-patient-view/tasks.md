@@ -46,12 +46,12 @@ suite needs no network, camera, model, or browser: `.venv/bin/python -m pytest t
 
 - [X] T022 [P] [US2] Failing tests in tests/test_portal_frames.py: `validate_frame` accepts 51 finite numbers with sensible w and h, null `k`, clamps slightly off-frame points, rejects wrong shapes, NaN, oversize; `to_engine_keypoints` scales uniformly to 720 and leaves angles equal; `RateMeter` observed rate, dropped count, low-rate after five seconds under 12 Hz
 - [X] T023 [US2] Implement src/portal/frames.py
-- [ ] T024 [P] [US2] Failing tests in tests/test_portal_live.py: rep cycles for two exercises store two sets, the switch, `origin: portal`, targets from goal or configuration, start at the first exercise not done today; `next` ignored on the last; stop completes with the summary; interrupt keeps reps; registry refuses a second session per patient and beyond eight in total; another patient's session is untouched (SC-004)
-- [ ] T025 [US2] Implement src/portal/live.py
-- [ ] T026 [P] [US2] Failing tests in tests/test_portal_ws.py: handshake refused without sign-in or allowed Origin; start, frames, state messages, next, stop, ended; second device refused; rate cap drops extras; ten bad messages close with 1008 and audit; abrupt close interrupts; revoked code closes and interrupts; idle limit
-- [ ] T027 [US2] Implement `WS /ws/session` in interfaces/patient_portal.py and session.html, session.js (camera, MoveNet, 15 Hz sender, mirrored overlay, state rendering)
-- [ ] T028 [P] [US2] Failing test for scripts/fetch_portal_assets.py (hash check against local files, refuses a mismatch); implement it with the recorded hashes
-- [ ] T029 [US2] Suite; checkpoint commit
+- [X] T024 [P] [US2] Failing tests in tests/test_portal_live.py: rep cycles for two exercises store two sets, the switch, `origin: portal`, targets from goal or configuration, start at the first exercise not done today; `next` ignored on the last; stop completes with the summary; interrupt keeps reps; registry refuses a second session per patient and beyond eight in total; another patient's session is untouched (SC-004)
+- [X] T025 [US2] Implement src/portal/live.py
+- [X] T026 [P] [US2] Failing tests in tests/test_portal_ws.py: handshake refused without sign-in or allowed Origin; start, frames, state messages, next, stop, ended; second device refused; rate cap drops extras; ten bad messages close with 1008 and audit; abrupt close interrupts; revoked code closes and interrupts; idle limit
+- [X] T027 [US2] Implement `WS /ws/session` in interfaces/patient_portal.py and session.html, session.js (camera, MoveNet, 15 Hz sender, mirrored overlay, state rendering)
+- [X] T028 [P] [US2] Failing test for scripts/fetch_portal_assets.py (hash check against local files, refuses a mismatch); implement it with the recorded hashes
+- [X] T029 [US2] Suite; checkpoint commit
 
 ## Phase 5b: User Story 6 - One entry page with two doors (P1, added 2026-09-21)
 
