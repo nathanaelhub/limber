@@ -170,3 +170,33 @@ class TestThresholdsInExports:
         cell = rows[1].rsplit(",", 1)[1]
         assert cell.startswith("practice_gap=30 (patient); form_drop=10; rom_regression=10;") and cell.endswith("adherence=60")
         assert all(r.rsplit(",", 1)[1] == cell for r in rows[1:])
+
+
+class TestExerciseThresholdsInExports:
+    """Feature 006 US3."""
+
+    def test_report_names_exercise_overrides(self, patient_history):
+        store, _, _ = patient_history
+        store.set_exercise_threshold("P-017", "Knee Extension", "rom_regression", 5)
+        lines = to_review_report(review.review_summary(store, "P-017", "all", now=D0)).splitlines()
+        start, end = lines.index("THRESHOLDS IN USE"), lines.index("GOALS")
+        assert "Knee Extension: ROM regression 5 degrees (exercise override)" in lines[start:end]
+
+    def test_report_with_only_an_exercise_override(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-031")
+        make_session(store, clock, "P-031", "Squat", D0 - timedelta(days=2), [(90.0, 80.0, 2.4)])
+        store.set_exercise_threshold("P-031", "Squat", "form_drop", 15)
+        lines = to_review_report(review.review_summary(store, "P-031", "all", now=D0)).splitlines()
+        i = lines.index("THRESHOLDS IN USE")
+        assert lines[i + 1] == "Built-in defaults were used for every threshold, except:"
+        assert lines[i + 2] == "Squat: Form drop 15 points (exercise override)"
+
+    def test_csv_cell_follows_the_rows_exercise(self, patient_history):
+        store, _, _ = patient_history
+        store.set_exercise_threshold("P-017", "Squat", "rom_regression", 5)
+        rows = to_review_csv(review.review_summary(store, "P-017", "all", now=D0)).strip().split("\r\n")
+        squat = [r for r in rows[1:] if ",Squat," in r]
+        knee = [r for r in rows[1:] if ",Knee Extension," in r]
+        assert squat and all("rom_regression=5 (exercise)" in r for r in squat)
+        assert knee and all("rom_regression=10;" in r for r in knee)

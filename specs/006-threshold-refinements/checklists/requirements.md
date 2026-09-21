@@ -33,3 +33,10 @@
 
 - Defaults chosen rather than asked: history records when and what (no accounts, so not who);
   history is never pruned; practice gap and adherence stay patient-level.
+
+## Implementation notes (2026-09-21)
+
+- Suite: 502 passed, 1 skipped. Quickstart steps 1-5 passed on a temporary database; step 6 (web)
+  is covered by page tests and was not run by hand.
+- The store's exercise overrides and history were implemented in one step because the foundation
+  tests exercise both; every test was seen failing before its code.

@@ -2,6 +2,42 @@
 
 ---
 
+## Update 8 — 2026-09-21 — Per-Exercise Thresholds and Change History
+
+Feature spec: `specs/006-threshold-refinements/`. Schema moved to version 5 (`exercise_thresholds`,
+`threshold_changes`), applied automatically; existing values are kept and the history starts empty.
+
+### 1. Thresholds for one exercise
+
+Six thresholds (form drop, ROM regression, ROM plateau, sessions below target, partial-rep share
+and rise) can be set for one exercise of one patient. The value in use is the exercise's, else
+the patient's, else the installation's, else the built-in default. Practice gap and adherence
+describe the whole patient and are rejected at exercise level. Flags, the roster, the queue, and
+the review exports use the exercise's values; the report lists them as
+`Knee Extension: ROM regression 5 degrees (exercise override)`.
+
+### 2. Change history
+
+Every change of a stored threshold (patient, exercise, or installation; set, reset, reset all,
+restore defaults) is recorded with its time, old value, and new value. Saving an unchanged value
+records nothing. A patient's history also shows installation changes, because they alter the
+patient's effective values. History holds keys and whole numbers only and is removed with its
+patient. There are no user accounts, so it records when and what, not who.
+
+### 3. How to use it
+
+```bash
+python interfaces/cli.py review thresholds P-017 --exercise "Knee Extension" --set rom_regression=5
+python interfaces/cli.py review thresholds P-017 --exercise "Knee Extension" --reset-all
+python interfaces/cli.py review thresholds P-017 --history
+python interfaces/cli.py review thresholds --installation --history
+```
+
+Web: Review → Goals & settings → Attention thresholds → "Applies to" (Whole patient or one
+exercise), with "Change history" below it; Tracker → Settings shows the installation history.
+
+---
+
 ## Update 7 — 2026-09-20 — Configurable Attention Thresholds
 
 Feature spec: `specs/005-attention-thresholds/`. The numbers that decide when a patient needs

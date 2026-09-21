@@ -93,6 +93,8 @@ python interfaces/cli.py tracker queue
 
 # Tune when a patient needs attention (per patient, or --installation)
 python interfaces/cli.py review thresholds P-017 --set rom_regression=5
+python interfaces/cli.py review thresholds P-017 --exercise "Knee Extension" --set rom_regression=5
+python interfaces/cli.py review thresholds P-017 --history
 
 # Launch web interface
 streamlit run interfaces/app.py
