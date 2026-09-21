@@ -102,3 +102,21 @@ def test_recorder_marks_every_session_with_its_process(tmp_db):
     vid = video.start(None, "video", "clip.mp4", cfg, exercise_key="knee_extension")
     assert store.load_session(vid).source_extras == {"pid": os.getpid()}
     store.close()
+
+
+# ----------------------------------------------------------------------------- feature 007: one running session per patient
+
+def test_another_patients_session_is_not_interrupted(tmp_db):
+    """FR-012: two people exercise at once (two patients at home, or home and clinic)."""
+    store = SessionStore(tmp_db).open()
+    store.add_patient("P-017")
+    store.add_patient("P-018")
+    a = store.start_session("P-017", "webcam", "home", {"pid": os.getpid()})
+    b = store.start_session("P-018", "webcam", "home", {"pid": os.getpid()})
+    assert store.load_session(a).status == "running" and store.load_session(b).status == "running"
+    a2 = store.start_session("P-017", "webcam", "Default", {"pid": os.getpid()})     # same patient: still superseded
+    assert store.load_session(a).status == "interrupted"
+    assert store.load_session(a).interrupted_reason == "superseded_by_new_session"
+    assert store.load_session(b).status == "running" and store.load_session(a2).status == "running"
+    assert store.end_session(b).status == "completed"
+    store.close()

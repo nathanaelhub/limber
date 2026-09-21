@@ -74,3 +74,6 @@ videos/
 # Claude Code (keep Spec Kit skills, ignore local settings)
 .claude/*
 !.claude/skills/
+
+# Patient portal pose assets (fetched by scripts/fetch_portal_assets.py)
+interfaces/portal_static/vendor/

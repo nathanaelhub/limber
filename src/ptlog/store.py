@@ -20,6 +20,10 @@ from .privacy import validate_label, validate_notes, validate_patient_id
 from . import thresholds
 from .models import (
     PTLogError,
+    AccessStatus,
+    AuditEntry,
+    PortalError,
+    PortalSignIn,
     ThresholdChange,
     ThresholdValidationError,
     ADHERENCE_THRESHOLD_DEFAULT,
@@ -54,7 +58,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -287,12 +291,43 @@ CREATE TABLE IF NOT EXISTS threshold_changes (
 CREATE INDEX IF NOT EXISTS idx_threshold_changes_patient ON threshold_changes(patient_id, id);
 """
 
+# v6 (feature 007): the patient portal's access codes, sign-ins, and access history.
+SCHEMA_V6_SQL = """
+CREATE TABLE IF NOT EXISTS portal_access (
+    patient_id    TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    code_lookup   TEXT NOT NULL UNIQUE,
+    created_at    TEXT NOT NULL,
+    expires_at    TEXT NOT NULL,
+    revoked_at    TEXT,
+    last_used_at  TEXT
+);
+CREATE TABLE IF NOT EXISTS portal_sessions (
+    token_hash    TEXT PRIMARY KEY,
+    patient_id    TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    created_at    TEXT NOT NULL,
+    last_seen_at  TEXT NOT NULL,
+    expires_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_portal_sessions_patient ON portal_sessions(patient_id);
+CREATE TABLE IF NOT EXISTS portal_audit (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    patient_id  TEXT REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    event       TEXT NOT NULL CHECK (event IN ('code_created', 'code_revoked', 'login_ok', 'login_failed',
+                'locked_out', 'logout', 'live_start', 'live_end', 'live_interrupted', 'live_refused')),
+    client      TEXT,
+    detail      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_portal_audit_patient ON portal_audit(patient_id, id);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
     (3, SCHEMA_V3_SQL),
     (4, SCHEMA_V4_SQL),
     (5, SCHEMA_V5_SQL),
+    (6, SCHEMA_V6_SQL),
 ]
 
 
@@ -378,9 +413,13 @@ class SessionStore:
         """Mark sessions left 'running' by an interruption (FR-011)."""
         self._interrupt_running("recovered_on_open", skip_living_owner=True)
 
-    def _interrupt_running(self, reason: str, skip_living_owner: bool = False) -> None:
-        rows = self.conn.execute(
-            "SELECT id, start_time, source_extras FROM sessions WHERE status = 'running'").fetchall()
+    def _interrupt_running(self, reason: str, skip_living_owner: bool = False,
+                           patient_id: Optional[str] = None) -> None:
+        """Mark running sessions interrupted: all of them (recovery on open), or one patient's."""
+        sql, args = "SELECT id, start_time, source_extras FROM sessions WHERE status = 'running'", ()
+        if patient_id is not None:
+            sql, args = sql + " AND patient_id = ?", (patient_id,)
+        rows = self.conn.execute(sql, args).fetchall()
         for row in rows:
             if skip_living_owner and _owner_alive(row["source_extras"]):
                 continue   # still being recorded by a living process (live web session)
@@ -428,10 +467,12 @@ class SessionStore:
 
     def start_session(self, patient_id: str, source: str, source_ref: str,
                       extras: Optional[dict] = None) -> int:
-        """Open a new running session. Any session still 'running' is marked interrupted first."""
+        """Open a new running session. The same patient's running sessions are marked interrupted
+        first; other patients' sessions are left alone, so two people can exercise at once
+        (feature 007 changed feature 004's one-per-installation rule to one per patient)."""
         if self.get_patient(patient_id) is None:
             raise PatientNotFoundError(f"Patient '{patient_id}' not found")
-        self._interrupt_running("superseded_by_new_session")
+        self._interrupt_running("superseded_by_new_session", patient_id=patient_id)
         cur = self.conn.execute(
             """
             INSERT INTO sessions (patient_id, schema_version, source, source_ref, source_extras, status, start_time)
@@ -1332,6 +1373,115 @@ class SessionStore:
 
     def set_adherence_threshold(self, value: int) -> int:
         return self.set_installation_threshold("adherence", value)
+
+    # ---------------------------------------------------------------- patient portal (feature 007)
+
+    def _access_status(self, patient_id: str, row) -> AccessStatus:
+        if row is None:
+            return AccessStatus(patient_id=patient_id, state="none")
+        if row["revoked_at"]:
+            state = "revoked"
+        elif _ts_key(row["expires_at"]) <= _ts_key(self._now()):
+            state = "expired"
+        else:
+            state = "active"
+        return AccessStatus(patient_id=patient_id, state=state, created_at=row["created_at"],
+                            expires_at=row["expires_at"], revoked_at=row["revoked_at"],
+                            last_used_at=row["last_used_at"])
+
+    def portal_set_code(self, patient_id: str, code_lookup: str, expires_at: datetime) -> AccessStatus:
+        """Store the patient's one access code (as its lookup hash). Replaces any earlier code and
+        ends every sign-in of the patient."""
+        patient = self.get_patient(patient_id)
+        if patient is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        if patient.is_builtin:
+            raise PortalError("Home access cannot be given to the built-in patient")
+        if self.get_discharge(patient_id) is not None:
+            raise PortalError(f"Patient '{patient_id}' is discharged; reactivate them before giving home access")
+        try:
+            self.conn.execute("DELETE FROM portal_sessions WHERE patient_id = ?", (patient_id,))
+            # Plain INSERT after deleting this patient's row: "OR REPLACE" would resolve a duplicate
+            # lookup hash by deleting another patient's access.
+            self.conn.execute("DELETE FROM portal_access WHERE patient_id = ?", (patient_id,))
+            self.conn.execute(
+                "INSERT INTO portal_access (patient_id, code_lookup, created_at, expires_at, revoked_at, last_used_at) "
+                "VALUES (?, ?, ?, ?, NULL, NULL)", (patient_id, code_lookup, self._now(), expires_at.isoformat()))
+            self.conn.commit()
+        except sqlite3.IntegrityError:
+            self.conn.rollback()
+            raise
+        return self.portal_status(patient_id)
+
+    def portal_status(self, patient_id: str) -> AccessStatus:
+        row = self.conn.execute("SELECT * FROM portal_access WHERE patient_id = ?", (patient_id,)).fetchone()
+        return self._access_status(patient_id, row)
+
+    def portal_lookup(self, code_lookup: str) -> Optional[AccessStatus]:
+        row = self.conn.execute("SELECT * FROM portal_access WHERE code_lookup = ?", (code_lookup,)).fetchone()
+        return self._access_status(row["patient_id"], row) if row else None
+
+    def portal_list(self) -> List[AccessStatus]:
+        """Every non-built-in patient with their home access state, by ID."""
+        rows = {r["patient_id"]: r for r in self.conn.execute("SELECT * FROM portal_access")}
+        ids = [r[0] for r in self.conn.execute("SELECT id FROM patients WHERE is_builtin = 0 ORDER BY id")]
+        return [self._access_status(pid, rows.get(pid)) for pid in ids]
+
+    def portal_revoke(self, patient_id: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE portal_access SET revoked_at = ? WHERE patient_id = ? AND revoked_at IS NULL",
+            (self._now(), patient_id))
+        self.conn.execute("DELETE FROM portal_sessions WHERE patient_id = ?", (patient_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def portal_touch(self, patient_id: str) -> None:
+        self.conn.execute("UPDATE portal_access SET last_used_at = ? WHERE patient_id = ?", (self._now(), patient_id))
+        self.conn.commit()
+
+    def portal_signin_create(self, token_hash: str, patient_id: str, expires_at: datetime, keep: int = 3) -> None:
+        now = self._now()
+        self.conn.execute(
+            "INSERT INTO portal_sessions (token_hash, patient_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+            (token_hash, patient_id, now, now, expires_at.isoformat()))
+        self.conn.execute(
+            "DELETE FROM portal_sessions WHERE patient_id = ? AND token_hash NOT IN ("
+            "SELECT token_hash FROM portal_sessions WHERE patient_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?)",
+            (patient_id, patient_id, int(keep)))
+        self.conn.commit()
+
+    def portal_signin_get(self, token_hash: str) -> Optional[PortalSignIn]:
+        row = self.conn.execute("SELECT * FROM portal_sessions WHERE token_hash = ?", (token_hash,)).fetchone()
+        if row is None:
+            return None
+        return PortalSignIn(patient_id=row["patient_id"], created_at=row["created_at"],
+                            last_seen_at=row["last_seen_at"], expires_at=row["expires_at"])
+
+    def portal_signin_touch(self, token_hash: str) -> None:
+        self.conn.execute("UPDATE portal_sessions SET last_seen_at = ? WHERE token_hash = ?", (self._now(), token_hash))
+        self.conn.commit()
+
+    def portal_signin_delete(self, token_hash: str) -> None:
+        self.conn.execute("DELETE FROM portal_sessions WHERE token_hash = ?", (token_hash,))
+        self.conn.commit()
+
+    def portal_audit_add(self, event: str, patient_id: Optional[str], client: Optional[str],
+                         detail: Optional[str] = None) -> None:
+        try:
+            self.conn.execute("INSERT INTO portal_audit (at, patient_id, event, client, detail) VALUES (?, ?, ?, ?, ?)",
+                              (self._now(), patient_id, event, client, detail))
+            self.conn.commit()
+        except sqlite3.IntegrityError:
+            self.conn.rollback()
+            raise
+
+    def portal_audit_list(self, patient_id: Optional[str] = None, limit: int = 200) -> List[AuditEntry]:
+        sql, args = "SELECT * FROM portal_audit", ()
+        if patient_id is not None:
+            sql, args = sql + " WHERE patient_id = ?", (patient_id,)
+        rows = self.conn.execute(sql + f" ORDER BY id DESC LIMIT {int(limit)}", args).fetchall()
+        return [AuditEntry(id=r["id"], at=r["at"], patient_id=r["patient_id"], event=r["event"],
+                           client=r["client"], detail=r["detail"]) for r in rows]
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(

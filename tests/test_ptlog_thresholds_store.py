@@ -146,7 +146,7 @@ def test_v5_tables_and_upgrade_keeps_values_with_empty_history(tmp_db):
     _v4_file(tmp_db)
     with SessionStore(tmp_db).open() as s:
         tables = {r[0] for r in s.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        assert SCHEMA_VERSION == 5 and {"exercise_thresholds", "threshold_changes"} <= tables
+        assert SCHEMA_VERSION >= 5 and {"exercise_thresholds", "threshold_changes"} <= tables
         assert s.get_patient_thresholds("P-017") == {"form_drop": 8} and s.get_installation_thresholds() == {"adherence": 50}
         assert s.threshold_history("P-017") == [] and s.threshold_history(None) == []
 

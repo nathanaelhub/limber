@@ -302,3 +302,32 @@ class TestPanelOnSmallFrames:
         live.start()
         out = live.process(big)
         assert (out == draw_metrics_panel(big.copy(), live.metrics)).all()
+
+
+class TestExtrasAndInterrupt:
+    """Feature 007: what the patient portal needs from the adapter."""
+
+    def test_extras_are_merged_and_can_mark_the_origin(self, store):
+        live = LiveSession(store, "P-017", "knee_extension", 10, "home", FakeInfer([]),
+                           form_analyzer_factory=lambda b: QuietAnalyzer(), draw=False, fps=15.0,
+                           extras={"origin": "portal", "pose_model": "movenet-lightning-4", "fps_nominal": 15})
+        s = store.load_session(live.start())
+        assert s.source_extras["origin"] == "portal" and s.source_extras["pose_model"] == "movenet-lightning-4"
+        assert s.source_extras["fps_nominal"] == 15 and s.source_extras["pid"] == os.getpid()
+        assert s.source == "webcam" and s.source_ref == "home"
+
+    def test_interrupt_keeps_reps_and_is_final(self, store):
+        angles = rep_cycle() * 2
+        live, _ = make_live(store, angles, draw=False)
+        sid = live.start()
+        run(live, len(angles))
+        done = live.interrupt("portal_disconnected")
+        assert (done.status, done.interrupted_reason, done.total_reps) == ("interrupted", "portal_disconnected", 2)
+        assert live.ended and live.interrupt("again").interrupted_reason == "portal_disconnected"
+        assert live.end().status == "interrupted"
+        assert live.process(FRAME) is FRAME
+        assert store.load_session(sid).sets[0].end_time is not None
+
+    def test_interrupt_before_start_is_a_no_op(self, store):
+        live, _ = make_live(store)
+        assert live.interrupt("x") is None

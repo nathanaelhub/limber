@@ -494,6 +494,45 @@ METRIC_DEFINITIONS.update({
 })
 
 
+# --------------------------------------------------------------------------------------
+# Patient portal (feature 007)
+# --------------------------------------------------------------------------------------
+
+class PortalError(PTLogError):
+    """A patient-portal rule was broken (who may get a code, sign-in, frames, live sessions)."""
+
+
+@dataclass
+class AccessStatus:
+    """A patient's home access. state: none | active | expired | revoked. The code itself is never stored."""
+    patient_id: str
+    state: str
+    created_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    revoked_at: Optional[str] = None
+    last_used_at: Optional[str] = None
+
+
+@dataclass
+class PortalSignIn:
+    """One open sign-in of a patient on one device."""
+    patient_id: str
+    created_at: str
+    last_seen_at: str
+    expires_at: str
+
+
+@dataclass
+class AuditEntry:
+    """One line of the portal's access history. `client` is a keyed hash, never an address."""
+    id: int
+    at: str
+    patient_id: Optional[str]
+    event: str
+    client: Optional[str] = None
+    detail: Optional[str] = None
+
+
 @dataclass
 class ThresholdChange:
     """One change of a stored attention threshold. None = no stored value (the inherited value applies)."""

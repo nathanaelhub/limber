@@ -61,7 +61,7 @@ class LiveSession:
                  infer: Callable[[np.ndarray], Any], fps: float = 30.0,
                  config_path: str = "config.yaml", imgsz: int = 320,
                  form_analyzer_factory: Optional[Callable[[str], Any]] = None, draw: bool = True,
-                 clock: Callable[[], datetime] = datetime.now):
+                 clock: Callable[[], datetime] = datetime.now, extras: Optional[Dict[str, Any]] = None):
         self.store = store
         self.patient_id = patient_id or UNASSIGNED
         self.source_ref = str(source_ref)
@@ -70,6 +70,7 @@ class LiveSession:
         self.imgsz = imgsz
         self.draw = draw
         self.target_reps = int(target_reps) if target_reps else None
+        self.extras = dict(extras or {})     # capture details from the caller, e.g. the patient portal's origin
         self._analyzer_factory = form_analyzer_factory or FormAnalyzer
         self.exercises = load_config(config_path)
         self.exercise_key = exercise_key
@@ -117,7 +118,7 @@ class LiveSession:
                 self.recorder.start(
                     self.patient_id, "webcam", self.source_ref, self.config, exercise_key=self.exercise_key,
                     extras={"camera_id": self.source_ref, "imgsz": self.imgsz, "frame_skip": 1,
-                            "origin": "web", "pid": os.getpid()})
+                            "origin": "web", "pid": os.getpid(), **self.extras})
                 self._started = True
             return self.recorder.session_id
 
@@ -200,6 +201,24 @@ class LiveSession:
             except Exception:  # noqa: BLE001 — a finalization error must not lose the record
                 engine_session = self.tracker.session
             self._result = self.recorder.end(engine_session)
+            return self._result
+
+
+    def interrupt(self, reason: str) -> Optional[Session]:
+        """End the session as interrupted (a lost connection, revoked access), keeping everything
+        recorded so far. Idempotent; after it, `end()` returns the same interrupted session."""
+        with self._lock:
+            if not self._started:
+                return None
+            if self.ended:
+                return self._result
+            self.ended = True
+            try:
+                self.recorder.flush()
+            except Exception:  # noqa: BLE001 — still mark the session; buffered angle samples are not clinical events
+                pass
+            self.store.interrupt_session(self.recorder.session_id, reason)
+            self._result = self.store.load_session(self.recorder.session_id)
             return self._result
 
 

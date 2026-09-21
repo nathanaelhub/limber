@@ -79,6 +79,23 @@ av>=10.0.0
 # imageio[ffmpeg]>=2.31.0
 
 # -----------------------------------------------------------------------------
+# Patient portal (feature 007)
+# -----------------------------------------------------------------------------
+# These already come with Streamlit; the patient service uses them directly, so they are pinned.
+
+# starlette - routing, static files, WebSockets for interfaces/patient_portal.py
+starlette>=1.6.0
+
+# uvicorn - runs the patient service
+uvicorn>=0.52.0
+
+# websockets - WebSocket protocol used by uvicorn
+websockets>=16.0
+
+# httpx - Starlette's in-process test client (tests only)
+httpx>=0.28.0
+
+# -----------------------------------------------------------------------------
 # Development & Testing
 # -----------------------------------------------------------------------------
 
