@@ -707,7 +707,38 @@ def cmd_portal(args):
         argv += ["--certfile", args.certfile] if args.certfile else []
         argv += ["--keyfile", args.keyfile] if args.keyfile else []
         argv += ["--insecure-http"] if args.insecure_http else []
+        argv += ["--therapist-url", args.therapist_url]
         return patient_portal.main(argv)
+
+    if sub == "admin":
+        from src.portal import admin
+        try:
+            with SessionStore(default_db_path()).open() as store:
+                if args.admin_cmd == "set-password":
+                    if args.stdin:
+                        password = sys.stdin.readline().rstrip("\n")
+                    else:
+                        import getpass
+                        password = getpass.getpass("New therapist password (12 or more characters): ")
+                        if getpass.getpass("Repeat it: ") != password:
+                            print_error("The two entries differ; nothing was changed.")
+                            return 1
+                    admin.set_password(store, password)
+                    print("The therapist password is set. The therapist app now asks for sign-in.")
+                elif args.admin_cmd == "clear":
+                    print("Therapist sign-in removed; the therapist app opens without a password."
+                          if admin.clear_password(store) else "No therapist password was set.")
+                elif args.admin_cmd == "status":
+                    print("Therapist password: " + ("is set" if admin.password_is_set(store) else "not set"))
+                    for e in admin.history(store, limit=args.limit):
+                        print(" | ".join([e["at"][:16].replace("T", " "), e["event"]] + ([f"client {e['client']}"] if e["client"] else [])))
+                else:
+                    print_error("Usage: portal admin {set-password,status,clear}")
+                    return 1
+            return 0
+        except PTLogError as e:
+            print_error(str(e))
+            return 1
 
     from src.portal import access
     try:
@@ -741,7 +772,7 @@ def cmd_portal(args):
                     parts += [r.detail] if r.detail else []
                     print(" | ".join(parts))
             else:
-                print_error("Usage: portal {code {create,list,revoke}, audit, serve}")
+                print_error("Usage: portal {code {create,list,revoke}, audit, admin, serve}")
                 return 1
         return 0
     except (PatientNotFoundError, PTLogError, ValueError) as e:
@@ -1277,6 +1308,14 @@ Examples:
     pserve.add_argument("--certfile", default=None)
     pserve.add_argument("--keyfile", default=None)
     pserve.add_argument("--insecure-http", action="store_true")
+    pserve.add_argument("--therapist-url", default="http://localhost:8501")
+    padmin = portal_sub.add_parser("admin", help="Therapist sign-in: set, check, or remove the therapist password")
+    padmin_sub = padmin.add_subparsers(dest="admin_cmd")
+    pset = padmin_sub.add_parser("set-password", help="Set the therapist password (asked for, never an argument)")
+    pset.add_argument("--stdin", action="store_true", help="Read the password from standard input")
+    pstatus = padmin_sub.add_parser("status", help="Whether a password is set, and the therapist access history")
+    pstatus.add_argument("--limit", type=int, default=20)
+    padmin_sub.add_parser("clear", help="Remove the therapist password (private machines only)")
 
     args = parser.parse_args()
 

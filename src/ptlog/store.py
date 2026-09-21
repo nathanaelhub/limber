@@ -58,7 +58,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -321,6 +321,29 @@ CREATE TABLE IF NOT EXISTS portal_audit (
 CREATE INDEX IF NOT EXISTS idx_portal_audit_patient ON portal_audit(patient_id, id);
 """
 
+# v7 (feature 007, US6): the therapist password, therapist sign-ins and single-use passes, and their history.
+SCHEMA_V7_SQL = """
+CREATE TABLE IF NOT EXISTS portal_admin (
+    id             INTEGER PRIMARY KEY CHECK (id = 1),
+    salt           TEXT NOT NULL,
+    password_hash  TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_signins (
+    token_hash  TEXT PRIMARY KEY,
+    kind        TEXT NOT NULL CHECK (kind IN ('pass', 'signin')),
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_audit (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    at      TEXT NOT NULL,
+    event   TEXT NOT NULL CHECK (event IN ('password_set', 'password_cleared', 'login_ok', 'login_failed',
+            'locked_out', 'logout')),
+    client  TEXT
+);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -328,6 +351,7 @@ MIGRATIONS: List[tuple] = [
     (4, SCHEMA_V4_SQL),
     (5, SCHEMA_V5_SQL),
     (6, SCHEMA_V6_SQL),
+    (7, SCHEMA_V7_SQL),
 ]
 
 
@@ -1483,6 +1507,49 @@ class SessionStore:
         rows = self.conn.execute(sql + f" ORDER BY id DESC LIMIT {int(limit)}", args).fetchall()
         return [AuditEntry(id=r["id"], at=r["at"], patient_id=r["patient_id"], event=r["event"],
                            client=r["client"], detail=r["detail"]) for r in rows]
+
+    # therapist sign-in (feature 007, US6); the rules live in src/portal/admin.py
+
+    def admin_get(self) -> Optional[tuple]:
+        row = self.conn.execute("SELECT salt, password_hash, updated_at FROM portal_admin WHERE id = 1").fetchone()
+        return (row["salt"], row["password_hash"], row["updated_at"]) if row else None
+
+    def admin_set(self, salt: str, password_hash: str) -> None:
+        """Store the therapist password's salted hash; every therapist sign-in and pass ends."""
+        self.conn.execute("DELETE FROM portal_admin")
+        self.conn.execute("INSERT INTO portal_admin (id, salt, password_hash, updated_at) VALUES (1, ?, ?, ?)",
+                          (salt, password_hash, self._now()))
+        self.conn.execute("DELETE FROM admin_signins")
+        self.conn.commit()
+
+    def admin_clear(self) -> bool:
+        cur = self.conn.execute("DELETE FROM portal_admin")
+        self.conn.execute("DELETE FROM admin_signins")
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def admin_token_add(self, token_hash: str, kind: str, expires_at: datetime) -> None:
+        self.conn.execute("DELETE FROM admin_signins WHERE expires_at <= ?", (self._now(),))
+        self.conn.execute("INSERT INTO admin_signins (token_hash, kind, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                          (token_hash, kind, self._now(), expires_at.isoformat()))
+        self.conn.commit()
+
+    def admin_token_get(self, token_hash: str) -> Optional[tuple]:
+        row = self.conn.execute("SELECT kind, expires_at FROM admin_signins WHERE token_hash = ?", (token_hash,)).fetchone()
+        return (row["kind"], row["expires_at"]) if row else None
+
+    def admin_token_delete(self, token_hash: str) -> bool:
+        cur = self.conn.execute("DELETE FROM admin_signins WHERE token_hash = ?", (token_hash,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def admin_audit_add(self, event: str, client: Optional[str] = None) -> None:
+        self.conn.execute("INSERT INTO admin_audit (at, event, client) VALUES (?, ?, ?)", (self._now(), event, client))
+        self.conn.commit()
+
+    def admin_audit_list(self, limit: int = 200) -> List[dict]:
+        rows = self.conn.execute(f"SELECT at, event, client FROM admin_audit ORDER BY id DESC LIMIT {int(limit)}").fetchall()
+        return [{"at": r["at"], "event": r["event"], "client": r["client"]} for r in rows]
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(

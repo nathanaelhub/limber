@@ -419,3 +419,68 @@ def test_tracker_settings_shows_installation_history(seeded_env):
     at = _tracker_page(seeded_env, "Settings")
     assert not at.exception, [e.value for e in at.exception]
     assert any("Change" in d.value.columns and "default → 50 percent" in d.value["Change"][0] for d in at.dataframe)
+
+
+# ----------------------------------------------------------------------------- feature 007 US6: therapist sign-in
+
+THERAPIST_PASSWORD = "correct horse battery"
+
+
+def _with_password(db):
+    from src.portal import admin
+    with SessionStore(db).open() as store:
+        admin.set_password(store, THERAPIST_PASSWORD)
+
+
+def _visible_text(at):
+    parts = [m.value for m in at.markdown] + [c.value for c in at.caption] + [b.label for b in at.button]
+    parts += [str(d.value) for d in at.dataframe] + [str(o) for s in at.selectbox for o in s.options]
+    return " ".join(parts)
+
+
+def test_therapist_app_shows_only_a_sign_in_when_a_password_is_set(seeded_env):
+    _with_password(seeded_env)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "sessions"
+    at.session_state["patient_id"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert any(t.key == "therapist_password" for t in at.text_input)
+    text = _visible_text(at)
+    assert "P-017" not in text and "Post-op knee" not in text and not at.dataframe
+    assert not any("Tracker" in b.label or "Review" in b.label for b in at.button)
+
+
+def test_password_opens_the_app_and_sign_out_closes_it(seeded_env):
+    _with_password(seeded_env)
+    at = AppTest.from_file(str(APP), default_timeout=180).run()
+    at.text_input(key="therapist_password").set_value("wrong password!!").run()
+    at.button(key="therapist_signin").click().run()
+    assert any("did not work" in e.value for e in at.error) and not any("Tracker" in b.label for b in at.button)
+    at.text_input(key="therapist_password").set_value(THERAPIST_PASSWORD).run()
+    at.button(key="therapist_signin").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("Tracker" in b.label for b in at.button)
+    at.button(key="therapist_signout").click().run()
+    assert any(t.key == "therapist_password" for t in at.text_input)
+
+
+def test_a_pass_from_the_front_page_opens_the_app_once(seeded_env):
+    from src.portal import admin
+    _with_password(seeded_env)
+    with SessionStore(seeded_env).open() as store:
+        a_pass = admin.issue_pass(store)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.query_params["pass"] = a_pass
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("Tracker" in b.label for b in at.button) and "pass" not in at.query_params
+    again = AppTest.from_file(str(APP), default_timeout=180)
+    again.query_params["pass"] = a_pass
+    again.run()
+    assert any(t.key == "therapist_password" for t in again.text_input)          # single use
+
+
+def test_without_a_password_the_app_opens_as_before(seeded_env):
+    at = AppTest.from_file(str(APP), default_timeout=180).run()
+    assert any("Tracker" in b.label for b in at.button) and not any(t.key == "therapist_password" for t in at.text_input)

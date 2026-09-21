@@ -56,6 +56,8 @@ from src.ptlog import review as ptreview
 from src.ptlog import tracker as pttracker
 from src.ptlog import programs as ptprograms
 from src.ptlog import thresholds as ptthresholds
+from src.portal import access as ptaccess
+from src.portal import admin as ptadmin
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -338,6 +340,11 @@ def render_sidebar():
         st.toggle("Show Technical Details", key="show_technical")
 
         st.markdown("---")
+        if st.session_state.get("admin_token"):
+            if st.button("Sign out", key="therapist_signout", use_container_width=True):
+                with _open_store() as store:
+                    ptadmin.sign_out(store, st.session_state.pop("admin_token", None), "therapist-app")
+                st.rerun()
         st.caption("Limber v1.0 · therapist app")
         st.caption("Powered by YOLO11 Pose Estimation")
 
@@ -1898,9 +1905,53 @@ def calculate_form_score(rep_data):
 # MAIN APP
 # =============================================================================
 
+@st.cache_resource
+def _therapist_limiter():
+    """One attempt limiter for this app process (shared by every browser tab)."""
+    return ptaccess.LoginLimiter()
+
+
+def therapist_gate() -> bool:
+    """True when the therapist app may be shown (feature 007, US6).
+
+    With no therapist password set (a private machine) the app opens as it always has. With one
+    set, nothing but this sign-in is rendered until the visitor presents a single-use pass from
+    the Limber front page or the password itself."""
+    with _open_store() as store:
+        if not ptadmin.password_is_set(store):
+            return True
+        if ptadmin.signed_in(store, st.session_state.get("admin_token")):
+            return True
+        a_pass = st.query_params.get("pass")
+        if a_pass:
+            token = ptadmin.redeem_pass(store, a_pass)
+            st.query_params.clear()                      # the pass must not stay in the address bar
+            if token:
+                st.session_state.admin_token = token
+                return True
+
+    left, middle, right = st.columns([1, 1.2, 1])
+    with middle:
+        st.markdown(f'''<div class="limber-lockup">{LIMBER_MARK_SVG}<span>Limber</span></div>
+            <div class="limber-tag">Therapist sign-in</div>''', unsafe_allow_html=True)
+        password = st.text_input("Therapist password", type="password", key="therapist_password")
+        if st.button("Sign in", key="therapist_signin", type="primary", use_container_width=True):
+            try:
+                with _open_store() as store:
+                    st.session_state.admin_token = ptadmin.sign_in(store, password, "therapist-app", _therapist_limiter())
+                st.session_state.pop("therapist_password", None)
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+        st.caption("Patients sign in with their access code on the Limber front page.")
+    return False
+
+
 def main():
     """Main application entry point."""
     init_session_state()
+    if not therapist_gate():
+        return
     render_sidebar()
 
     # Route to current page

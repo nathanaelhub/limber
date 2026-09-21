@@ -165,6 +165,37 @@ service from a phone securely.
    connection, **Then** it refuses unless the therapist explicitly overrides, and warns that
    cameras will not work.
 
+---
+
+### User Story 6 - One Entry Page with Two Doors (Priority: P1, added 2026-09-21 at the owner's request)
+
+Limber has one front page. It shows the brand and two choices: "I'm a patient" (enter the access
+code) and "Therapist sign-in" (enter the therapist password). A patient lands on today's plan; a
+therapist lands in the therapist app. Until now the therapist app had no sign-in at all, which is
+acceptable on a private machine and not acceptable once anything is reachable from outside.
+
+**Why this priority**: One address to hand out, and the therapist app must not be open to anyone
+who finds its address once the platform leaves the local machine.
+
+**Independent Test**: With a therapist password set, the front page offers both doors; the right
+password opens the therapist app, a wrong one is refused like a wrong code; opening the therapist
+app's address directly shows a sign-in instead of patient data.
+
+**Acceptance Scenarios**:
+
+1. **Given** the front page, **Then** it shows both doors, and the patient notice of what is sent.
+2. **Given** a therapist password has been set from the command line, **When** the therapist enters
+   it on the front page, **Then** they are taken to the therapist app, already signed in, through a
+   single-use pass that is valid for one minute.
+3. **Given** a wrong password, **Then** it is refused with a generic message, counted by the same
+   attempt limits as patient codes, and recorded in the therapist access history.
+4. **Given** a therapist password is set, **When** anyone opens the therapist app directly without a
+   valid pass or sign-in, **Then** no page, patient ID, or number is shown, only the sign-in.
+5. **Given** no therapist password has been set (a private machine), **Then** the therapist app
+   opens as it always has, and the front page's therapist door says a password has not been set up.
+6. **Given** a signed-in therapist, **When** they sign out or eight hours pass, **Then** the
+   therapist app asks for sign-in again.
+
 ### Edge Cases
 
 - The therapist's machine is off or the service is not running: the patient sees that the service
@@ -189,7 +220,17 @@ service from a phone securely.
   alphabet shown as three groups of four, expire after 90 days by default, be shown once, and be
   stored only in a non-reversible form. Issuing a new code MUST revoke the previous one. Codes
   MUST NOT be issued to the built-in or to discharged patients.
-- **FR-002**: The patient service MUST be a separate launch containing no therapist pages, and
+- **FR-021**: The front page MUST offer a patient door (access code) and a therapist door (password).
+  The therapist password MUST be set only from the command line on the machine itself, MUST be at
+  least 12 characters, and MUST be stored only as a salted slow hash. Therapist sign-in MUST use the
+  same attempt limits as patient codes and a generic refusal message.
+- **FR-022**: When a therapist password is set, the therapist app MUST show nothing but a sign-in
+  until the visitor presents a valid single-use pass from the front page (valid one minute) or the
+  password itself; a therapist sign-in MUST end on sign-out or after eight hours. When no password
+  is set, the therapist app MUST behave as before. Therapist sign-ins, failures, and lock-outs
+  MUST be recorded in a therapist access history without addresses or passwords.
+- **FR-002**: The patient service MUST be a separate launch containing no therapist pages (the
+  front page's therapist door only checks the password and hands over to the therapist app), and
   MUST listen only on this machine unless the therapist chooses otherwise; listening elsewhere
   without a secure connection MUST require an explicit override.
 - **FR-003**: Sign-in MUST use the access code alone, MUST NOT reveal whether a code exists, MUST
@@ -306,6 +347,8 @@ service from a phone securely.
   permanent hosting is a later decision.
 - **Reaching it from a phone** needs a secure connection; the recommended path is a temporary
   tunnel, and the tunnel's operator can see the body-point numbers in transit.
+- **One therapist password per installation** in this version; named therapist accounts are a later
+  feature. A forgotten password is replaced from the command line.
 - **No accounts, no recovery**: a lost code is replaced by the therapist.
 - **A second device is refused** rather than taking over a running session.
 - **The patient sees their pseudonymous ID** on screen, so they can quote it to their therapist.

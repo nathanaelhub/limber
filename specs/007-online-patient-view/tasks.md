@@ -53,6 +53,13 @@ suite needs no network, camera, model, or browser: `.venv/bin/python -m pytest t
 - [ ] T028 [P] [US2] Failing test for scripts/fetch_portal_assets.py (hash check against local files, refuses a mismatch); implement it with the recorded hashes
 - [ ] T029 [US2] Suite; checkpoint commit
 
+## Phase 5b: User Story 6 - One entry page with two doors (P1, added 2026-09-21)
+
+- [X] T036 [P] [US6] Failing tests in tests/test_portal_admin.py: schema v7 tables; `set_admin_password` rules (12+ characters, salted scrypt, never the password in the database); `verify_admin_password`; single-use one-minute pass; therapist sign-in with eight-hour limit and sign-out; admin audit without addresses; HTTP `POST /api/admin/login` success returns the hand-over address with a pass, wrong password generic 401, lock-out shared with patient codes, 409 when no password is set; front page shows both doors; CLI `portal admin set-password|status|clear`
+- [X] T037 [US6] Implement in src/ptlog/store.py (schema v7), src/portal/admin.py, interfaces/patient_portal.py, interfaces/portal_static/index.html and portal.js, interfaces/cli.py
+- [X] T038 [P] [US6] Failing page tests in tests/test_app_pages.py: with a password set the therapist app shows only the sign-in (no patient IDs, no navigation); a valid pass or the password opens it; sign-out closes it; without a password it behaves as before
+- [X] T039 [US6] Implement the gate in interfaces/app.py; suite; checkpoint commit
+
 ## Phase 6: User Story 3 - Progress (P2) and User Story 4 - Streak (P2)
 
 - [ ] T030 [P] [US3] Failing tests for `progress_view` (per-origin series, change, goal sentence, too-few message, definitions, allowed keys) and `/api/progress`; streak shown on today and progress pages

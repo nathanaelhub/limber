@@ -22,6 +22,34 @@
   }
 
   if (page === "signin") {
+    // two doors on one front page: the patient's access code, or the therapist's password
+    var doors = { patient: document.getElementById("door-patient"), therapist: document.getElementById("door-therapist") };
+    var panels = { patient: document.getElementById("signin"), therapist: document.getElementById("admin-signin") };
+    var show = function (which) {
+      Object.keys(doors).forEach(function (k) {
+        doors[k].setAttribute("aria-selected", String(k === which));
+        panels[k].hidden = k !== which;
+      });
+      document.getElementById("patient-notice").hidden = which !== "patient";
+      (which === "patient" ? document.getElementById("code") : document.getElementById("password")).focus();
+    };
+    doors.patient.addEventListener("click", function () { show("patient"); });
+    doors.therapist.addEventListener("click", function () { show("therapist"); });
+    api("/api/health").then(function (res) {
+      document.getElementById("admin-hint").hidden = res.data.therapist_sign_in !== false;
+    });
+    panels.therapist.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var error = document.getElementById("admin-error");
+      error.hidden = true;
+      api("/api/admin/login", { method: "POST", body: JSON.stringify({ password: document.getElementById("password").value }) })
+        .then(function (res) {
+          if (res.status === 200 && res.data.redirect) { window.location.href = res.data.redirect; return; }
+          error.textContent = res.data.error || "Sign-in is not available right now.";
+          error.hidden = false;
+        })
+        .catch(function () { error.textContent = "The service cannot be reached right now."; error.hidden = false; });
+    });
     document.getElementById("signin").addEventListener("submit", function (event) {
       event.preventDefault();
       var error = document.getElementById("error");

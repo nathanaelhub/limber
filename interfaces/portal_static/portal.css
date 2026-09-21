@@ -48,3 +48,8 @@ button:disabled { opacity: .5; cursor: default; }
 .stats { display: flex; gap: 2.5rem; margin: 1.6rem 0 0; padding-top: 1.2rem; border-top: 1px solid var(--line); }
 .big { display: block; font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; }
 .unit { color: var(--muted); font-size: .9rem; }
+.doors { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; padding: .3rem; margin: 0 0 1.3rem; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
+.door { margin: 0; padding: .7rem .5rem; font-weight: 600; color: var(--muted); background: transparent; border-radius: 12px; }
+.door:hover { background: transparent; color: var(--ink); }
+.door[aria-selected="true"] { color: #fff; background: var(--teal); }
+input.plain { letter-spacing: normal; text-transform: none; }

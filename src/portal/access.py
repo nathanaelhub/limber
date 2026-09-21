@@ -29,13 +29,14 @@ IDLE_LIMIT = timedelta(minutes=30)
 ABSOLUTE_LIMIT = timedelta(hours=12)
 SIGN_INS_PER_PATIENT = 3
 DENIED_MESSAGE = "That code did not work. Check it, or ask your therapist for a new one."
+DENIED_ADMIN_MESSAGE = "That password did not work."
 
 
 class AccessDenied(PortalError):
     """Sign-in refused. The message is the same whatever the reason, so codes cannot be probed."""
 
-    def __init__(self):
-        super().__init__(DENIED_MESSAGE)
+    def __init__(self, message: str = DENIED_MESSAGE):
+        super().__init__(message)
 
 
 class LockedOut(PortalError):

@@ -6,20 +6,35 @@
   <meta name="theme-color" content="#0E6B64">
   <link rel="icon" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/portal.css">
-  <title>Limber · Sign in</title>
+  <title>Limber</title>
 </head>
 <body data-page="signin">
   <main class="card">
     <div class="lockup"><img src="/static/limber-mark.svg" alt="" width="56" height="56"><span>Limber</span></div>
     <p class="lead">Physical therapy, between visits</p>
-    <form id="signin" autocomplete="off">
+
+    <div class="doors" role="tablist" aria-label="Who is signing in">
+      <button id="door-patient" class="door" type="button" role="tab" aria-selected="true" aria-controls="signin">I'm a patient</button>
+      <button id="door-therapist" class="door" type="button" role="tab" aria-selected="false" aria-controls="admin-signin">Therapist sign-in</button>
+    </div>
+
+    <form id="signin" autocomplete="off" role="tabpanel">
       <label for="code">Access code from your therapist</label>
       <input id="code" name="code" inputmode="text" autocapitalize="characters" spellcheck="false"
              placeholder="XXXX-XXXX-XXXX" maxlength="20" required>
-      <button type="submit">Sign in</button>
+      <button type="submit">Open my plan</button>
       <p id="error" class="error" role="alert" hidden></p>
     </form>
-    <section class="notice" aria-label="What is sent">
+
+    <form id="admin-signin" autocomplete="off" role="tabpanel" hidden>
+      <label for="password">Therapist password</label>
+      <input id="password" class="plain" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+      <button type="submit">Open the therapist app</button>
+      <p id="admin-error" class="error" role="alert" hidden></p>
+      <p id="admin-hint" class="small" hidden>Therapist sign-in has not been set up on this installation yet.</p>
+    </form>
+
+    <section id="patient-notice" class="notice" aria-label="What is sent">
       <h2>What this page sends</h2>
       <ul>
         <li>Your camera video <strong>never leaves</strong> this device. It is not recorded or uploaded.</li>

@@ -29,7 +29,7 @@ from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import Mount, Route  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
-from src.portal import access, viewmodels  # noqa: E402
+from src.portal import access, admin, viewmodels  # noqa: E402
 from src.ptlog.models import PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
@@ -82,7 +82,8 @@ def pose_assets_present(static_dir: Path) -> bool:
 
 def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                allowed_origins: Iterable[str] = (), clock: Callable[[], datetime] = datetime.now,
-               static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False) -> Starlette:
+               static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False,
+               therapist_url: str = "http://localhost:8501") -> Starlette:
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
     origins = {o.rstrip("/") for o in allowed_origins}
@@ -155,7 +156,33 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 return _json({"error": str(err)}, 400)
 
     def health(_request: Request):
-        return _json({"ok": True, "pose_assets": pose_assets_present(static_dir)})
+        with open_store() as store:
+            therapist = admin.password_is_set(store)
+        return _json({"ok": True, "pose_assets": pose_assets_present(static_dir), "therapist_sign_in": therapist})
+
+    async def admin_login(request: Request):
+        """The therapist door: check the password and hand over to the therapist app with a single-use
+        pass. The portal keeps no therapist session and serves no therapist page."""
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+            password = body.get("password") if isinstance(body, dict) else None
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        with open_store() as store:
+            try:
+                admin.check_password(store, password if isinstance(password, str) else None, client_of(request), limiter)
+                a_pass = admin.issue_pass(store, clock=clock)
+            except admin.NotConfigured as missing:
+                return _json({"error": str(missing)}, 409)
+            except access.LockedOut as locked:
+                return _json({"error": str(locked), "retry_after_seconds": locked.retry_after}, 429,
+                             {"Retry-After": str(locked.retry_after)})
+            except access.AccessDenied as denied:
+                return _json({"error": str(denied)}, 401)
+        return _json({"redirect": f"{therapist_url.rstrip('/')}/?pass={a_pass}"})
 
     # ------------------------------------------------------------------ pages
 
@@ -179,6 +206,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
         Route("/api/health", health),
+        Route("/api/admin/login", admin_login, methods=["POST"]),
         Route("/favicon.ico", lambda _r: FileResponse(static_dir / "favicon.png")),
         Mount("/static", StaticFiles(directory=str(static_dir)), name="static"),
     ]
@@ -211,6 +239,8 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--certfile")
     parser.add_argument("--keyfile")
     parser.add_argument("--insecure-http", action="store_true")
+    parser.add_argument("--therapist-url", default="http://localhost:8501",
+                        help="Where the therapist app runs; the front page's therapist door hands over to it")
     args = parser.parse_args(argv)
 
     problem = serve_problem(args.host, args.certfile, args.keyfile, args.insecure_http)
@@ -220,7 +250,8 @@ def main(argv: Optional[list] = None) -> int:
     scheme = "https" if args.certfile else "http"
     origins = [f"{scheme}://{h}:{args.port}" for h in {args.host, "127.0.0.1", "localhost"}] + list(args.public_origin)
     secure = bool(args.certfile) or any(o.startswith("https://") for o in args.public_origin)
-    app = create_app(allowed_origins=origins, trust_proxy=args.trust_proxy, secure_cookie=secure)
+    app = create_app(allowed_origins=origins, trust_proxy=args.trust_proxy, secure_cookie=secure,
+                     therapist_url=args.therapist_url)
     if args.host not in LOOPBACK and not args.certfile:
         print("WARNING: serving plain HTTP beyond this machine. Cameras will not work in patients' browsers.")
     if not pose_assets_present(STATIC_DIR):
