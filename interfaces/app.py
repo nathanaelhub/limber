@@ -1519,6 +1519,7 @@ def _tracker_adherence():
     with _open_store() as store:
         try:
             adh = pttracker.adherence_for(store, pid)
+            effective = store.effective_thresholds(pid)
         except PTLogError as exc:
             st.error(str(exc))
             return
@@ -1534,6 +1535,7 @@ def _tracker_adherence():
     for line in ptviews.adherence_lines(adh)[1:]:
         if line.startswith("Adherence:") or line.startswith("First week") or line.startswith("Starts") or line.startswith("Superseded"):
             st.write(line)
+    st.markdown(ptviews.adherence_threshold_line(effective))
     st.caption(ptviews.metric_definition("adherence_pct"))
 
 

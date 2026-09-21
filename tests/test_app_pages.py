@@ -367,3 +367,13 @@ def test_review_page_thresholds_editor(seeded_env):
     at.button(key="thresholds_reset_all").click().run()
     with SessionStore(seeded_env).open() as store:
         assert store.get_patient_thresholds("P-017") == {}
+
+
+def test_tracker_adherence_states_the_threshold(seeded_env):
+    from datetime import date, timedelta
+    with SessionStore(seeded_env).open() as store:
+        store.assign_program("P-017", "custom", "Custom", ["knee_extension"], 3, date.today() - timedelta(days=10))
+        store.set_patient_threshold("P-017", "adherence", 50)
+    at = _tracker_page(seeded_env, "Adherence")
+    assert not at.exception
+    assert any("Attention threshold: 50% (patient)" in m.value for m in at.markdown)

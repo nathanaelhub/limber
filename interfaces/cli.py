@@ -736,14 +736,18 @@ def cmd_tracker(args):
                               f"{a.sessions_per_week}/week  [{', '.join(a.exercise_keys)}]")
             elif sub == "adherence":
                 adh = tracker.adherence_for(store, args.patient)
+                effective = store.effective_thresholds(args.patient)
                 if args.json:
                     print(json.dumps({"status": adh.status, "percentage": adh.percentage, "note": adh.note,
+                                      "threshold": {"value": effective.adherence, "origin": effective.origin("adherence")},
                                       "assignment": asdict(adh.assignment) if adh.assignment else None,
                                       "weeks": [asdict(w) for w in adh.weeks]}, indent=2))
                 else:
                     print_header(f"Adherence: {args.patient}")
                     for line in views.adherence_lines(adh):
                         print(line)
+                    if adh.assignment is not None:
+                        print(views.adherence_threshold_line(effective))
             elif sub == "queue":
                 q = tracker.queue(store)
                 if args.json:

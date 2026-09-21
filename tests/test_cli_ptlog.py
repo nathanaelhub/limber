@@ -513,3 +513,14 @@ class TestReviewThresholds:
             assert run_cli(cli_env, "review", "thresholds", "P-017", "--set", bad).returncode == 1
         assert run_cli(cli_env, "review", "thresholds", "ghost").returncode == 1
         assert run_cli(cli_env, "review", "thresholds").returncode == 1          # a patient or --installation is required
+
+
+class TestAdherenceThresholdShown:
+    def test_adherence_view_states_threshold_and_origin(self, cli_env, tmp_db):
+        seed_caseload(tmp_db)
+        assert "Attention threshold: 60% (default)" in run_cli(cli_env, "tracker", "adherence", "P-017").stdout
+        run_cli(cli_env, "review", "thresholds", "P-017", "--set", "adherence=50")
+        r = run_cli(cli_env, "tracker", "adherence", "P-017")
+        assert "Attention threshold: 50% (patient)" in r.stdout
+        d = json.loads(run_cli(cli_env, "tracker", "adherence", "P-017", "--json").stdout)
+        assert d["threshold"] == {"value": 50, "origin": "patient"}

@@ -16,6 +16,7 @@ from . import adherence as adherence_mod
 from . import review
 from .models import Adherence, Assignment, FlagResult, Patient, QueueItem, QueueResult, Review, RosterRow, Session, SessionSummaryRow
 from .store import SessionStore
+from .thresholds import Thresholds
 
 FLAG_WINDOW_DAYS = 30
 ADHERENCE_LOOKBACK_DAYS = 36     # four complete weeks plus the current one
@@ -32,16 +33,20 @@ class PatientSnapshot:
     pending: List[SessionSummaryRow]
     latest_review: Optional[Review]
     gap_days: int
+    thresholds: Optional[Thresholds] = None   # the patient's effective attention thresholds
 
 
 def _now(now: Optional[datetime]) -> datetime:
     return now or datetime.now()
 
 
-def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = None) -> PatientSnapshot:
+def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = None,
+             thresholds: Optional[Thresholds] = None) -> PatientSnapshot:
     """One load of the patient's sessions, reused for counts, flags, and adherence."""
     now = _now(now)
     today = now.date()
+    if thresholds is None:
+        thresholds = store.effective_thresholds(patient.id)
     rows = store.list_sessions(patient.id)
     assignment = None if patient.is_builtin else store.active_assignment(patient.id, today)
     window_start = now - timedelta(days=FLAG_WINDOW_DAYS)
@@ -53,14 +58,17 @@ def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = No
     return PatientSnapshot(
         patient=patient, rows=rows, sessions=sessions, assignment=assignment,
         adherence=adherence_mod.compute(assignment, sessions, today),
-        flags=review._flags_from_sessions(store, patient.id, recent, now),
+        flags=review._flags_from_sessions(store, patient.id, recent, now, thresholds),
         pending=store.pending_reviews(patient.id),
         latest_review=store.latest_review(patient.id),
-        gap_days=store.get_gap_days(patient.id),
+        gap_days=thresholds.practice_gap, thresholds=thresholds,
     )
 
 
-def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: int) -> RosterRow:
+def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[int] = None) -> RosterRow:
+    """`threshold` overrides the patient's effective adherence threshold (kept for older callers)."""
+    if threshold is None:
+        threshold = snap.thresholds.adherence
     last = snap.rows[0].start_time if snap.rows else None
     days_since = (now - datetime.fromisoformat(last)).days if last else None
     since7 = (now - timedelta(days=7)).isoformat()
@@ -96,13 +104,13 @@ def roster(store: SessionStore, now: Optional[datetime] = None, sort: str = "att
            program: Optional[str] = None, needs_attention: bool = False) -> List[RosterRow]:
     """Every active patient with the FR-001 columns; the built-in patient only when it holds sessions."""
     now = _now(now)
-    threshold = store.get_adherence_threshold()
+    everyone = store.effective_thresholds_all()
     rows: List[RosterRow] = []
     for patient in store.active_patients():
-        snap = snapshot(store, patient, now)
+        snap = snapshot(store, patient, now, everyone[patient.id])
         if patient.is_builtin and not snap.rows:
             continue
-        rows.append(row_from_snapshot(snap, now, threshold))
+        rows.append(row_from_snapshot(snap, now))
     if program:
         rows = [r for r in rows if r.program_id == program]
     if needs_attention:
@@ -133,10 +141,11 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
     """Everything needing the PT's action across active patients, oldest first per kind (FR-013)."""
     from .models import QUEUE_KINDS
     now = _now(now)
-    threshold = store.get_adherence_threshold()
+    everyone = store.effective_thresholds_all()
     keyed = {kind: [] for kind in QUEUE_KINDS}
     for patient in store.active_patients():
-        snap = snapshot(store, patient, now)
+        snap = snapshot(store, patient, now, everyone[patient.id])
+        threshold = snap.thresholds.adherence
         if patient.is_builtin and not snap.rows:
             continue
         pid = patient.id

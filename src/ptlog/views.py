@@ -474,3 +474,8 @@ def threshold_rows(effective, inherited=None) -> List[Dict[str, Any]]:
 def threshold_lines(effective, inherited=None) -> List[str]:
     return [f"{r['name']}: {r['value']} {r['unit']} ({_origin_text(r['origin'], r['default'])}) - {r['meaning']}"
             for r in threshold_rows(effective, inherited)]
+
+
+def adherence_threshold_line(effective) -> str:
+    """The adherence threshold in use for a patient and where it comes from."""
+    return f"Attention threshold: {effective.value('adherence')}% ({effective.origin('adherence')})"

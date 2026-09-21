@@ -35,10 +35,10 @@ Suite: `.venv/bin/python -m pytest tests`.
 
 ## Phase 4: User Story 2 - Per-patient adherence threshold (P2)
 
-- [ ] T016 [P] [US2] Write failing tests in tests/test_ptlog_tracker.py: two patients at 55% adherence, installation 60, one override 50 → only the other is marked for adherence in roster and queue; reset restores; roster uses `effective_thresholds_all` (one load); per-patient gap threshold still honoured; performance test still inside its budget
-- [ ] T017 [US2] Use effective thresholds in src/ptlog/tracker.py (`snapshot`, `roster`, `adherence_for`, `queue`)
-- [ ] T018 [P] [US2] Write failing tests: `tracker adherence P-017` prints `Attention threshold: 50% (patient)` in tests/test_cli_ptlog.py; the adherence section in tests/test_app_pages.py shows the same
-- [ ] T019 [US2] Implement in src/ptlog/views.py, interfaces/cli.py, interfaces/app.py; checkpoint commit
+- [X] T016 [P] [US2] Write failing tests in tests/test_ptlog_tracker.py: two patients at 55% adherence, installation 60, one override 50 → only the other is marked for adherence in roster and queue; reset restores; roster uses `effective_thresholds_all` (one load); per-patient gap threshold still honoured; performance test still inside its budget
+- [X] T017 [US2] Use effective thresholds in src/ptlog/tracker.py (`snapshot`, `roster`, `adherence_for`, `queue`)
+- [X] T018 [P] [US2] Write failing tests: `tracker adherence P-017` prints `Attention threshold: 50% (patient)` in tests/test_cli_ptlog.py; the adherence section in tests/test_app_pages.py shows the same
+- [X] T019 [US2] Implement in src/ptlog/views.py, interfaces/cli.py, interfaces/app.py; checkpoint commit
 
 ## Phase 5: User Story 3 - Installation defaults (P3)
 

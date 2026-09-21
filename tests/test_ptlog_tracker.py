@@ -341,3 +341,47 @@ class TestQueue:
         t0 = time.perf_counter(); q = tracker.queue(store, now=D0); t_queue = time.perf_counter() - t0
         assert len(rows) == 50 and q.count > 0
         assert t_roster < 3.0 and t_queue < 3.0, (t_roster, t_queue)
+
+
+class TestPerPatientThresholds:
+    """Feature 005 US2: roster and queue use each patient's effective adherence and gap thresholds."""
+
+    def _low(self, store):
+        return [i.patient_id for i in tracker.queue(store, now=D0).items["low_adherence"]]
+
+    def _needs(self, store):
+        return {r.patient_id: r.needs_attention for r in tracker.roster(store, now=D0)}
+
+    def test_adherence_override_and_reset(self, fixed_store, caseload):
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        pct = {r.patient_id: r.adherence_pct for r in tracker.roster(store, now=D0)}["P-019"]
+        assert pct is not None and pct < 60
+        assert self._low(store) == ["P-019"] and self._needs(store)["P-019"] is True
+        store.set_patient_threshold("P-019", "adherence", pct)          # "below the threshold" is strict
+        assert self._low(store) == [] and self._needs(store)["P-019"] is False
+        store.reset_patient_threshold("P-019", "adherence")
+        store.set_installation_threshold("adherence", pct)
+        assert self._low(store) == []
+        store.set_patient_threshold("P-019", "adherence", 90)
+        (item,) = tracker.queue(store, now=D0).items["low_adherence"]
+        assert "below the 90% threshold" in item.description
+
+    def test_gap_threshold_per_patient(self, fixed_store, caseload):
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        gaps = lambda: [i.patient_id for i in tracker.queue(store, now=D0).items["practice_gap"]]  # noqa: E731
+        assert "P-018" in gaps()                                          # 9 days since the last session
+        store.set_patient_threshold("P-018", "practice_gap", 14)
+        assert "P-018" not in gaps()
+
+    def test_roster_loads_thresholds_once(self, fixed_store, caseload, monkeypatch):
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        calls = {"one": 0, "all": 0}
+        real_one, real_all = store.effective_thresholds, store.effective_thresholds_all
+        monkeypatch.setattr(store, "effective_thresholds", lambda pid: calls.__setitem__("one", calls["one"] + 1) or real_one(pid))
+        monkeypatch.setattr(store, "effective_thresholds_all", lambda: calls.__setitem__("all", calls["all"] + 1) or real_all())
+        tracker.roster(store, now=D0)
+        tracker.queue(store, now=D0)
+        assert calls == {"one": 0, "all": 2}
