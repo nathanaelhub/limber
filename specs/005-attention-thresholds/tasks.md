@@ -47,8 +47,8 @@ Suite: `.venv/bin/python -m pytest tests`.
 
 ## Phase 6: User Story 4 - Thresholds in exports (P4)
 
-- [ ] T022 [P] [US4] Write failing tests in tests/test_ptlog_review_exports.py: `ReviewSummary.thresholds`; the report has a thresholds section listing eight values with units and marks overrides with origin, or states built-in defaults were used; the CSV carries threshold rows; existing golden expectations updated only for the added section
-- [ ] T023 [US4] Implement in src/ptlog/review.py, src/ptlog/exports/review_report.py, src/ptlog/exports/review_csv.py; checkpoint commit
+- [X] T022 [P] [US4] Write failing tests in tests/test_ptlog_review_exports.py: `ReviewSummary.thresholds`; the report has a thresholds section listing eight values with units and marks overrides with origin, or states built-in defaults were used; the CSV carries threshold rows; existing golden expectations updated only for the added section
+- [X] T023 [US4] Implement in src/ptlog/review.py, src/ptlog/exports/review_report.py, src/ptlog/exports/review_csv.py; checkpoint commit
 
 ## Phase 7: Polish
 

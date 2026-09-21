@@ -95,7 +95,7 @@ class TestReport:
 class TestCsv:
     HEADER = ("date,session_id,exercise,reps_completed,target_reps,avg_form_score_0_100,avg_rom_degrees,"
               "avg_rep_duration_seconds,tempo_consistency_seconds,partial_rep_share_percent,interrupted,"
-              "review_status,next_step,reviewed_at")
+              "review_status,next_step,reviewed_at,thresholds_in_use")
 
     def test_rows(self, patient_history):
         store, _, ids = patient_history
@@ -103,8 +103,8 @@ class TestCsv:
         assert "\r\n" in text
         rows = text.strip().split("\r\n")
         assert rows[0] == self.HEADER and len(rows) == 6
-        assert rows[1] == f"2026-03-22,{ids[2]},Knee Extension,8,10,88.0,88.0,2.2,0.0,0.0,false,pending,,"
-        assert rows[3] == f"2026-03-13,{ids[1]},Knee Extension,8,10,86.0,84.0,2.3,0.0,0.0,false,reviewed,progress,2026-03-23T09:15:00"
+        assert rows[1].startswith(f"2026-03-22,{ids[2]},Knee Extension,8,10,88.0,88.0,2.2,0.0,0.0,false,pending,,,practice_gap=30")
+        assert rows[3].startswith(f"2026-03-13,{ids[1]},Knee Extension,8,10,86.0,84.0,2.3,0.0,0.0,false,reviewed,progress,2026-03-23T09:15:00,")
         assert rows[5].startswith(f"2026-03-03,{ids[0]},Knee Extension,8,10,85.0")
 
     def test_empty_cells_for_missing_values(self, fixed_store, make_session):
@@ -112,7 +112,7 @@ class TestCsv:
         store.add_patient("P-018")
         sid = make_session(store, clock, "P-018", "Squat", D0, [], interrupted=True)
         rows = to_review_csv(review.review_summary(store, "P-018", "all", now=D0)).strip().split("\r\n")
-        assert rows[1] == f"2026-03-23,{sid},Squat,0,10,,,,,,true,pending,,"
+        assert rows[1].startswith(f"2026-03-23,{sid},Squat,0,10,,,,,,true,pending,,,practice_gap=7;")
 
 
 class TestWriteReviewExport:
@@ -134,3 +134,39 @@ class TestWriteReviewExport:
         store, _, _ = patient_history
         with pytest.raises(ValueError):
             write_review_export(store, "P-017", "all", "pdf", tmp_path, now=D0)
+
+
+class TestThresholdsInExports:
+    """Feature 005 US4: exports state the thresholds that produced the flags."""
+
+    def test_summary_carries_the_effective_set(self, patient_history):
+        store, _, _ = patient_history
+        s = review.review_summary(store, "P-017", "all", now=D0)
+        assert s.thresholds.practice_gap == 30 and s.thresholds.origin("practice_gap") == "patient"
+        assert s.gap_days == 30
+
+    def test_report_section_marks_overrides(self, patient_history):
+        store, _, _ = patient_history
+        store.set_installation_threshold("form_drop", 8)
+        lines = to_review_report(review.review_summary(store, "P-017", "all", now=D0)).splitlines()
+        start = lines.index("THRESHOLDS IN USE")
+        assert lines.index("FLAGS") < start < lines.index("GOALS")
+        block = lines[start + 1:start + 9]
+        assert "Practice gap: 30 days (patient override; built-in default 7)" in block
+        assert "Form drop: 8 points (installation value; built-in default 10)" in block
+        assert "ROM regression: 10 degrees" in block and len(block) == 8
+
+    def test_report_says_when_builtin_defaults_were_used(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-030")
+        make_session(store, clock, "P-030", "Knee Extension", D0 - timedelta(days=2), [(90.0, 80.0, 2.4)])
+        lines = to_review_report(review.review_summary(store, "P-030", "all", now=D0)).splitlines()
+        assert lines[lines.index("THRESHOLDS IN USE") + 1] == "Built-in defaults were used for every threshold."
+
+    def test_csv_column(self, patient_history):
+        store, _, _ = patient_history
+        rows = to_review_csv(review.review_summary(store, "P-017", "all", now=D0)).strip().split("\r\n")
+        assert rows[0].endswith(",reviewed_at,thresholds_in_use")
+        cell = rows[1].rsplit(",", 1)[1]
+        assert cell.startswith("practice_gap=30 (patient); form_drop=10; rom_regression=10;") and cell.endswith("adherence=60")
+        assert all(r.rsplit(",", 1)[1] == cell for r in rows[1:])

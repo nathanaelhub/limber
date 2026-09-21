@@ -191,10 +191,11 @@ def review_summary(store: SessionStore, patient_id: str, period: str = "all", no
             "latest_reps": latest.reps_completed if latest else None,
             "latest_target": latest.target_reps if latest else None,
         })
+    effective = store.effective_thresholds(patient_id)
     session_entries = [{"session": s, "measures": measures_for_session(s), "review": store.get_review(s.id)}
                        for s in reversed(sessions)]
     return ReviewSummary(
         patient_id=patient_id, period=period, period_start=since.isoformat() if since else None,
-        generated_at=now.isoformat(), gap_days=store.get_gap_days(patient_id), trends=trends,
-        flags=_flags_from_sessions(store, patient_id, sessions, now), goals=goals, sessions=session_entries,
+        generated_at=now.isoformat(), gap_days=effective.practice_gap, trends=trends, thresholds=effective,
+        flags=_flags_from_sessions(store, patient_id, sessions, now, effective), goals=goals, sessions=session_entries,
     )
