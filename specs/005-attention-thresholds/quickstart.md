@@ -10,7 +10,7 @@
 4. `review thresholds P-017 --set form_drop=0` → exit code 1, message with `1-50 points`.
 5. `review thresholds --installation --set adherence=50`, `tracker roster` → attention changes for
    patients without overrides; `--restore-defaults` reverts.
-6. `review export P-017 --format review_report` → thresholds section marks overrides.
+6. `review export P-017 --format report` → thresholds section marks overrides.
 7. Web: Review → Goals & settings → change a threshold → Flags section updates.
 
 Done when steps 1-6 pass and `docs/UPDATES.md` has an entry.

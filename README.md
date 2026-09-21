@@ -91,6 +91,9 @@ python interfaces/cli.py tracker assign P-017 --program knee_rehab --per-week 3
 python interfaces/cli.py tracker roster --needs-attention
 python interfaces/cli.py tracker queue
 
+# Tune when a patient needs attention (per patient, or --installation)
+python interfaces/cli.py review thresholds P-017 --set rom_regression=5
+
 # Launch web interface
 streamlit run interfaces/app.py
 ```

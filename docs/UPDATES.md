@@ -2,6 +2,57 @@
 
 ---
 
+## Update 7 — 2026-09-20 — Configurable Attention Thresholds
+
+Feature spec: `specs/005-attention-thresholds/`. The numbers that decide when a patient needs
+attention can now be tuned per patient and per installation. Schema moved to version 4
+(`patient_thresholds`, `installation_thresholds`), applied automatically on first open; existing
+practice-gap overrides and a changed installation adherence value are carried over.
+
+### 1. Eight thresholds, one definition
+
+`src/ptlog/thresholds.py` defines each threshold once, with unit, meaning, default, and range:
+
+| Threshold | Unit | Default | Range |
+|-----------|------|---------|-------|
+| Practice gap | days | 7 | 1-90 |
+| Form drop | points | 10 | 1-50 |
+| ROM regression | degrees | 10 | 1-60 |
+| ROM plateau | degrees | 3 | 1-30 |
+| Sessions below target | sessions | 3 | 2-10 |
+| Partial-rep share | percent | 25 | 1-100 |
+| Partial-rep rise | percentage points | 10 | 1-100 |
+| Adherence | percent | 60 | 1-100 |
+
+The value in use for a patient is the patient's override, else the installation value, else the
+built-in default. How many sessions a rule looks at is part of the rule and stays fixed.
+
+### 2. Where it shows
+
+- Every threshold-driven flag now ends with the threshold that applied, for example
+  `(threshold 5 degrees)`. With no overrides the flags themselves are unchanged.
+- The roster and queue use each patient's adherence and practice-gap thresholds; the adherence
+  view prints `Attention threshold: 50% (patient)`.
+- The review report has a `THRESHOLDS IN USE` section that marks overrides; the review CSV has a
+  new last column `thresholds_in_use`.
+
+### 3. How to change them
+
+```bash
+python interfaces/cli.py review thresholds P-017
+python interfaces/cli.py review thresholds P-017 --set rom_regression=5 form_drop=8
+python interfaces/cli.py review thresholds P-017 --reset rom_regression      # or --reset-all
+python interfaces/cli.py review thresholds --installation --set adherence=50
+python interfaces/cli.py review thresholds --installation --restore-defaults
+```
+
+Web: Review → Goals & settings → Attention thresholds (per patient); Tracker → Settings
+(installation). The adherence control that sat on the Queue section moved to Tracker → Settings.
+`review settings --gap-days` and `tracker settings --adherence-threshold` still work. Invalid
+values are rejected with the allowed range and unit, and nothing is written.
+
+---
+
 ## Update 6 — 2026-09-20 — Live Web Session Recording
 
 Feature spec: `specs/004-live-session-recording/`. The web app's Live Session page now runs the

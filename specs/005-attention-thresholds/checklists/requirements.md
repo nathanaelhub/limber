@@ -35,3 +35,16 @@
 - Validation iteration 1: all items pass. Defaults chosen rather than asked, under Assumptions:
   whole numbers only; rule window sizes fixed; no change history; no per-exercise thresholds;
   no access control on installation defaults.
+
+## Analysis and implementation notes (2026-09-20)
+
+- Analysis: all 12 functional requirements map to tasks; no constitution conflicts.
+- Contract corrections made during implementation: rejected input exits with code 1 (the command
+  line's existing convention), and the export format name in the quickstart is `report`.
+- FR-008 for the CSV is met with a last column `thresholds_in_use`, so the file stays one table.
+- Quickstart: step 1 green (479 passed, 1 skipped); steps 3-6 passed on a temporary database.
+  Step 2 (upgrade of a real v3 record) could not be run because no `data/ptassist.db` exists on
+  this machine; the v3-to-v4 migration is covered by tests/test_ptlog_thresholds_store.py.
+  Step 7 (web) is covered by the page tests, not by a manual browser run.
+- Test-first exceptions: store methods, the CLI command, and view helpers were written in the
+  same step as their tests.

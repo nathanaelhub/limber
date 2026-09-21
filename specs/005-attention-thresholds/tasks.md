@@ -52,8 +52,8 @@ Suite: `.venv/bin/python -m pytest tests`.
 
 ## Phase 7: Polish
 
-- [ ] T024 [P] Update docs/UPDATES.md (Update 7), README.md, docs/PROJECT_OVERVIEW.md
-- [ ] T025 Run quickstart steps 1-6 under bash against a temp copy of the database; record results in checklists/requirements.md; final commit and merge
+- [X] T024 [P] Update docs/UPDATES.md (Update 7), README.md, docs/PROJECT_OVERVIEW.md
+- [X] T025 Run quickstart steps 1-6 under bash against a temp copy of the database; record results in checklists/requirements.md; final commit and merge
 
 ## Dependencies
 

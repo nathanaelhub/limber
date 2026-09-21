@@ -64,6 +64,7 @@ ai-pt-assistant/
 │       ├── recorder.py     # The only engine-facing adapter
 │       ├── measures.py     # Per-session per-exercise measures (derived, never stored)
 │       ├── flags.py        # Seven attention rules with thresholds and evidence
+│       ├── thresholds.py   # Attention thresholds: units, defaults, ranges, per-patient resolution
 │       ├── review.py       # Trends, comparison, reviews, flags, review summary
 │       ├── programs.py     # Exercise and program catalog from config.yaml
 │       ├── adherence.py    # Assignment weeks, coverage, adherence percentage
