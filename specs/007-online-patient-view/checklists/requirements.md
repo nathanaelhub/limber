@@ -46,3 +46,24 @@
   compared with each other), and the Assumptions carry the measured numbers.
 - The spec names one change to an earlier feature: 004's "one running session per installation"
   becomes "one running session per patient" (FR-012).
+
+## Implementation notes (2026-09-21)
+
+- Suite: 639 passed, 1 skipped, with no network, camera, model, or browser.
+- Quickstart 1 to 5: run. Sign-in, Today's plan, a guided session, refusals, revocation, the access
+  history, and two sessions at once are covered by tests; steps 3 and 4 were also driven in Chrome.
+- Quickstart 7: run twice in headless Chrome with a fake camera fed from the sample squat clip:
+  sign-in, Today's plan, camera start, reps counted (3), next exercise, finish, summary; the stored
+  session has origin `portal`; the page made no request to any other site; the console was clean under
+  the content security policy (`wasm-unsafe-eval` was enough for the WebGL backend).
+- Quickstart 6 (a real phone through an HTTPS tunnel): NOT run. It needs the owner's device and a
+  tunnel they accept for the study.
+- Not yet tried by a person: a real camera with a real person at home.
+- Added at the owner's request during implementation: US6 (one front page, therapist sign-in gating
+  the therapist app; schema v7) and the Limber brand.
+- Known: after the therapist hand-over the single-use pass can stay visible in the address bar of a
+  real browser; it cannot be reused and expires after one minute.
+- Known: the engine's "Shoulders uneven by 178 deg" message appears in side-on views at home as in
+  the clinic; an engine matter, not changed here.
+- Test-first exceptions: the access module and the therapist sign-in module were written in the same
+  step as their tests.

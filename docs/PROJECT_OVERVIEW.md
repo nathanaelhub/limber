@@ -58,6 +58,12 @@ ai-pt-assistant/
 │   ├── form_assessment.py  # Biomechanical form checking
 │   ├── session_summary.py  # Clinical summary of one session
 │   ├── live_session.py     # LiveSession: engine + recorder per browser frame (web live page)
+│   ├── portal/             # Limber patient portal logic (no web framework inside)
+│   │   ├── access.py       # Access codes, keyed hashes, login limiter, patient sign-ins
+│   │   ├── admin.py        # Therapist password, single-use passes, therapist sign-ins
+│   │   ├── viewmodels.py   # Today's plan, streak, progress: the patient's own data only
+│   │   ├── frames.py       # Body-point message validation, scaling to 720p, rate meter
+│   │   └── live.py         # Guided home session wrapping LiveSession; one per patient
 │   └── ptlog/              # Canonical session record and review
 │       ├── models.py       # Entities with units and definitions
 │       ├── store.py        # SQLite store: single writer, reads, migrations, recovery

@@ -109,6 +109,18 @@ exercise, target reps, and camera, and press START. The page runs the same engin
 line and records the session as it happens; STOP shows the stored summary with a link to the
 session. Switch exercise, Reset reps, and Save Screenshot work while streaming.
 
+**Limber for patients (home use, demo and study only):** one front page with two doors.
+
+```bash
+python scripts/fetch_portal_assets.py                    # once: pose model for patients' browsers, hash-checked
+python interfaces/cli.py portal admin set-password       # therapist sign-in (optional on a private machine)
+python interfaces/cli.py portal code create P-017        # the patient's access code, shown once
+python interfaces/cli.py portal serve                    # front page on http://127.0.0.1:8600
+```
+
+Patients see today's plan, run a guided camera session (their video never leaves their device; only
+body-point positions are sent), and see their progress. Details: `specs/007-online-patient-view/`.
+
 **Try it with simulated data:** `python scripts/seed_demo.py` writes an invented caseload (pseudonymous
 IDs only) to `data/demo.db`; run the app on it with `PTASSIST_DB=data/demo.db streamlit run interfaces/app.py`.
 The script refuses to write into the real record.

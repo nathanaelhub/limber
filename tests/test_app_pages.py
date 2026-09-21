@@ -484,3 +484,33 @@ def test_a_pass_from_the_front_page_opens_the_app_once(seeded_env):
 def test_without_a_password_the_app_opens_as_before(seeded_env):
     at = AppTest.from_file(str(APP), default_timeout=180).run()
     assert any("Tracker" in b.label for b in at.button) and not any(t.key == "therapist_password" for t in at.text_input)
+
+
+# ----------------------------------------------------------------------------- feature 007 US5: home access on the Patients page
+
+def _patients_page(db, monkeypatch, patient="P-017"):
+    monkeypatch.setenv("PTASSIST_PORTAL_KEY", "ab" * 32)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.session_state["patient_id"] = patient
+    return at.run()
+
+
+def test_patients_page_issues_a_code_once_and_revokes_it(seeded_env, monkeypatch):
+    import re
+    at = _patients_page(seeded_env, monkeypatch)
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("Home access" in m.value for m in at.markdown) and any("none" in c.value.lower() for c in at.caption)
+    at.button(key="home_access_issue").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    shown = [c.value for c in at.code]
+    assert len(shown) == 1 and re.fullmatch(r"[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}", shown[0])
+    assert any("only once" in w.value.lower() and "study" in w.value.lower() for w in at.warning)
+    with SessionStore(seeded_env).open() as store:
+        assert store.portal_status("P-017").state == "active"
+    at = _patients_page(seeded_env, monkeypatch)                     # a fresh visit never shows the code again
+    assert not at.code and any("active until" in c.value for c in at.caption)
+    at.button(key="home_access_revoke").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.portal_status("P-017").state == "revoked"
+        assert [a.event for a in store.portal_audit_list("P-017")][:2] == ["code_revoked", "code_created"]

@@ -2,6 +2,71 @@
 
 ---
 
+## Update 9 — 2026-09-21 — Limber for Patients (home use) and One Front Page
+
+Feature spec: `specs/007-online-patient-view/`. For demo and consented study participants only; not
+for real clinic patients until a compliance review approves it. The constitution moved to 1.1.0 for
+this (what a networked feature must guarantee; the patient portal as the one patient-facing
+interface). Schema moved to version 7, applied automatically.
+
+### 1. What a patient gets
+
+One address. On the front page they choose "I'm a patient" and enter the access code their therapist
+gave them. They see **Today's plan** (assigned exercises, target reps, what is done today, sessions
+this week, weekly streak), run a **guided session** with their own camera (rep count, form status,
+feedback, next exercise, summary), and see **Your progress** (range of motion and form per session,
+change since the first session, progress toward the goal, all with units and plain meanings).
+
+### 2. Privacy by construction
+
+The camera video never leaves the patient's device. Their browser finds 17 body points (MoveNet,
+served by Limber itself after `python scripts/fetch_portal_assets.py`, which checks every file's
+SHA-256) and sends only those numbers, fifteen times a second. The service runs the clinic's own
+engine on them through the existing `LiveSession` adapter and records through the existing
+recorder, so no rep or form logic was written twice. A patient only ever receives their own data:
+no request names a patient, and tests search every response for other patients' IDs, labels, notes,
+reviews, flags, and thresholds. Access codes are stored as keyed hashes, shown once, expire after 90
+days, and can be revoked at once. Failed sign-ins are limited and every refusal reads the same.
+
+### 3. Home and clinic numbers are kept apart
+
+Measured on the sample clips, the browser's pose model and the clinic's agree on rep counts and form
+scores but differ on range of motion by 3° to 24° (details in `research.md`). Every session now has a
+capture origin, `clinic` or `home`, and trends, changes, goal progress, session comparison, and every
+attention rule that compares sessions run within one origin only, for therapist and patient alike.
+Session lists, trend tables, the review report, and the review CSV (new last column `recorded`) say
+where each session was recorded. Adherence, pending reviews, and practice gaps count all sessions.
+
+### 4. One front page, therapist sign-in
+
+The front page also has a **Therapist sign-in** door. Set the password on the machine itself:
+
+```bash
+python interfaces/cli.py portal admin set-password      # asked for; 12 characters or more
+python interfaces/cli.py portal code create P-017        # prints the patient's code once
+python interfaces/cli.py portal serve                    # http://127.0.0.1:8600
+streamlit run interfaces/app.py                          # the therapist app the door hands over to
+```
+
+With a password set, the therapist app shows nothing but a sign-in until it receives a single-use,
+one-minute pass from the front page or the password itself; sign-ins last eight hours. With no
+password set (a private machine) it opens as before. The Patients page has a **Home access** block
+(issue a code, shown once; revoke; access history), and `portal audit` lists the history without
+codes or addresses.
+
+### 5. Other changes
+
+- Two people can now exercise at once: starting a session supersedes only the same patient's running
+  session (feature 004's rule was one per installation).
+- `requirements.txt` pins starlette, uvicorn, websockets, and httpx, which already came with
+  Streamlit and are now used directly. No new package is installed.
+- Known: reaching the service from a phone needs HTTPS (browsers only allow the camera on HTTPS or
+  localhost); see `specs/007-online-patient-view/quickstart.md`. The engine's message "Shoulders
+  uneven by 178°" appears in side-on views, at home as in the clinic; it is an engine matter and was
+  not changed here.
+
+---
+
 ## Brand — 2026-09-21 — The app is now Limber
 
 The product name is **Limber** ("physical therapy, between visits"). The brand sheets supplied by

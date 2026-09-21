@@ -1076,7 +1076,48 @@ def page_patients():
             st.error(str(exc))
 
     _patient_program_section(pid)
+    _patient_home_access_section(pid, current)
     _patient_discharge_section(pid)
+
+
+def _patient_home_access_section(pid, patient):
+    """Home access through the Limber patient view (feature 007): issue or revoke the access code."""
+    st.markdown("### Home access")
+    if patient.is_builtin:
+        st.caption("Home access cannot be given to the built-in patient.")
+        return
+    with _open_store() as store:
+        status = store.portal_status(pid)
+    state = f"active until {status.expires_at[:10]}" if status.state == "active" else status.state
+    used = f" · last used {status.last_used_at[:16].replace('T', ' ')}" if status.last_used_at else ""
+    st.caption(f"Access code: {state}{used}. For demo and study use only.")
+    fresh = st.session_state.pop("home_access_code", None)
+    if fresh and fresh[0] == pid:
+        st.warning("This code is shown only once. Give it to the patient now. For demo and study use only.")
+        st.code(fresh[1], language=None)
+    c1, c2 = st.columns(2)
+    with c1:
+        label = "Issue a new code" if status.state != "none" else "Issue access code"
+        if st.button(label, key="home_access_issue", help="A new code replaces the old one and signs the patient out."):
+            try:
+                with _open_store() as store:
+                    key = ptaccess.load_key(ptaccess.default_key_path(default_db_path()))
+                    code, _ = ptaccess.issue_code(store, key, pid)
+                st.session_state["home_access_code"] = (pid, code)
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+    with c2:
+        if st.button("Revoke", key="home_access_revoke", disabled=status.state != "active"):
+            with _open_store() as store:
+                ptaccess.revoke_code(store, pid)
+            st.rerun()
+    with _open_store() as store:
+        history = store.portal_audit_list(pid, limit=20)
+    if history:
+        with st.expander("Access history"):
+            st.dataframe(pd.DataFrame([{"When": h.at[:16].replace("T", " "), "Event": h.event, "Detail": h.detail or ""}
+                                       for h in history]), use_container_width=True, hide_index=True)
 
 
 def _patient_discharge_section(pid):

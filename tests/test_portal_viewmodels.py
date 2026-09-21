@@ -99,3 +99,58 @@ class TestTodayView:
         store, _ = patient
         with pytest.raises(PatientNotFoundError):
             vm.today_view(store, "P-404", now=D0)
+
+
+# ----------------------------------------------------------------------------- progress (US3)
+
+def _mark_home(store, sid):
+    store.conn.execute("UPDATE sessions SET source = 'webcam', source_ref = 'home', source_extras = ? WHERE id = ?",
+                       (json.dumps({"origin": "portal"}), sid))
+    store.conn.commit()
+
+
+class TestProgressView:
+    @pytest.fixture
+    def progress_patient(self, fixed_store, make_session):
+        store, clock = fixed_store
+        store.add_patient("P-017", label="Post-op knee")
+        store.add_patient("P-018")
+        for d, rom in zip((20, 16, 12), (78.0, 82.0, 86.0)):
+            make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=d), [(88.0, rom, 2.4)])
+        for d, rom in zip((8, 4), (95.0, 97.0)):
+            _mark_home(store, make_session(store, clock, "P-017", "Knee Extension", D0 - timedelta(days=d), [(90.0, rom, 2.4)]))
+        make_session(store, clock, "P-017", "Squat", D0 - timedelta(days=3), [(85.0, 100.0, 2.4)])
+        make_session(store, clock, "P-018", "Squat", D0 - timedelta(days=2), [(70.0, 60.0, 2.4)])
+        sid = store.list_sessions("P-017")[0].id
+        store.set_review(sid, "hold", notes="Pain reported at end range")
+        store.set_goal("P-017", "Knee Extension", target_rom=100.0)
+        return store
+
+    def test_series_per_origin_changes_and_goal(self, progress_patient):
+        view = vm.progress_view(progress_patient, "P-017", now=D0)
+        knee = next(e for e in view["exercises"] if e["name"] == "Knee Extension")
+        assert [p["avg_rom"] for p in knee["series"]["clinic"]] == [78.0, 82.0, 86.0]
+        assert [p["avg_rom"] for p in knee["series"]["home"]] == [95.0, 97.0]
+        assert knee["series"]["home"][0].keys() == {"date", "avg_rom", "avg_form", "reps"}
+        assert knee["change"]["clinic"] == {"avg_rom": 8.0, "avg_form": 0.0} and knee["change"]["home"]["avg_rom"] == 2.0
+        assert knee["goal"]["target_rom"] == 100.0 and knee["goal"]["recorded"] == "home"      # the latest session's origin
+        assert knee["goal"]["percent"] == 97 and knee["goal"]["sentence"] == "97° of your 100° goal"
+
+    def test_too_few_sessions_and_definitions(self, progress_patient):
+        view = vm.progress_view(progress_patient, "P-017", now=D0)
+        squat = next(e for e in view["exercises"] if e["name"] == "Squat")
+        assert squat["change"]["clinic"] is None and "more sessions" in squat["message"].lower() and squat["goal"] is None
+        for key in ("avg_rom", "avg_form"):
+            d = view["definitions"][key]
+            assert d["unit"] and len(d["meaning"]) > 15 and d["label"]
+        assert "home" in view["note"] and "clinic" in view["note"]
+
+    def test_only_the_patients_own_numbers(self, progress_patient):
+        text = json.dumps(vm.progress_view(progress_patient, "P-017", now=D0)).lower()
+        assert "p-018" not in text and "pain reported" not in text and "post-op" not in text and "hold" not in text
+        assert not any(word in text for word in ("flag", "review", "threshold", "next_step"))
+
+    def test_no_sessions_yet(self, progress_patient):
+        progress_patient.add_patient("P-040")
+        view = vm.progress_view(progress_patient, "P-040", now=D0)
+        assert view["exercises"] == [] and "no sessions" in view["message"].lower()

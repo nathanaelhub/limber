@@ -62,18 +62,18 @@ suite needs no network, camera, model, or browser: `.venv/bin/python -m pytest t
 
 ## Phase 6: User Story 3 - Progress (P2) and User Story 4 - Streak (P2)
 
-- [ ] T030 [P] [US3] Failing tests for `progress_view` (per-origin series, change, goal sentence, too-few message, definitions, allowed keys) and `/api/progress`; streak shown on today and progress pages
-- [ ] T031 [US3] Implement in src/portal/viewmodels.py, interfaces/patient_portal.py, progress.html; suite; checkpoint commit
+- [X] T030 [P] [US3] Failing tests for `progress_view` (per-origin series, change, goal sentence, too-few message, definitions, allowed keys) and `/api/progress`; streak shown on today and progress pages
+- [X] T031 [US3] Implement in src/portal/viewmodels.py, interfaces/patient_portal.py, progress.html; suite; checkpoint commit
 
 ## Phase 7: User Story 5 - Therapist control (P3)
 
-- [ ] T032 [P] [US5] Failing page test: Patients page Home access block (state, issue shows the code once, revoke); audit view
-- [ ] T033 [US5] Implement in interfaces/app.py; suite; checkpoint commit
+- [X] T032 [P] [US5] Failing page test: Patients page Home access block (state, issue shows the code once, revoke); audit view
+- [X] T033 [US5] Implement in interfaces/app.py; suite; checkpoint commit
 
 ## Phase 8: Polish
 
-- [ ] T034 [P] scripts/seed_demo.py: home sessions for one patient and an optional demo code; docs/UPDATES.md (Update 9), README.md, docs/PROJECT_OVERVIEW.md
-- [ ] T035 Quickstart steps 1-5 and 7 (scripted fake-camera browser run outside the repo); record results, including whether step 6 was run; final commit and merge
+- [X] T034 [P] scripts/seed_demo.py: home sessions for one patient and an optional demo code; docs/UPDATES.md (Update 9), README.md, docs/PROJECT_OVERVIEW.md
+- [X] T035 Quickstart steps 1-5 and 7 (scripted fake-camera browser run outside the repo); record results, including whether step 6 was run; final commit and merge
 
 ## Dependencies
 

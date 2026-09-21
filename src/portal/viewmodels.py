@@ -114,3 +114,58 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
         view["notes"] = [SKIPPED_ONE if skipped == 1 else SKIPPED_MANY.format(n=skipped)]
     view.update(adherence_view(store, patient_id, now))
     return view
+
+
+# ----------------------------------------------------------------------------- progress (US3)
+
+PROGRESS_NOTE = ("Sessions done at home and in the clinic are measured with different camera software, so they are "
+                 "shown separately and their numbers should not be compared with each other.")
+NEED_MORE = "More sessions are needed before a change can be shown."
+NO_SESSIONS = "No sessions yet. Your progress will appear here after your first session."
+_PATIENT_WORDING = {
+    "avg_rom": ("Range of motion", "How far the joint moved on average in a session."),
+    "avg_form": ("Form score", "How closely your movement matched good form, on average, out of 100."),
+}
+
+
+def _definitions() -> Dict[str, Dict[str, str]]:
+    from src.ptlog.models import METRIC_DEFINITIONS
+    result = {}
+    for key, (label, plain) in _PATIENT_WORDING.items():
+        unit = METRIC_DEFINITIONS[key]["unit"]
+        result[key] = {"label": label, "unit": "out of 100" if unit == "score 0-100" else unit, "meaning": plain}
+    return result
+
+
+def progress_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Per exercise: range of motion and form per session, the change from first to latest, and
+    progress toward a range-of-motion goal, always within one capture origin (spec FR-013, FR-020).
+    Never flags, reviews, notes, or thresholds."""
+    from src.ptlog import review
+
+    _require(store, patient_id)
+    now = now or datetime.now()
+    view: Dict[str, Any] = {"patient_id": patient_id, "definitions": _definitions(), "note": PROGRESS_NOTE,
+                            "exercises": [], "message": None}
+    for name in review.exercise_names(store, patient_id):
+        trend = review.trend(store, patient_id, name, "all", now=now)
+        series, change = {}, {}
+        for origin, part in trend.by_origin.items():
+            series[origin] = [{"date": m.start_time[:10], "avg_rom": m.avg_rom, "avg_form": m.avg_form,
+                               "reps": m.reps_completed} for m in part.points]
+            change[origin] = ({k: part.summary[k]["change"] for k in ("avg_rom", "avg_form")}
+                              if part.enough_for_trend else None)
+        goal = None
+        if trend.goal is not None and trend.goal.target_rom:
+            latest = next((m.avg_rom for m in reversed(trend.by_origin[trend.primary_origin].points)
+                           if m.avg_rom is not None), None)
+            if latest is not None:
+                goal = {"target_rom": float(trend.goal.target_rom), "percent": trend.rom_progress_pct,
+                        "recorded": trend.primary_origin,
+                        "sentence": f"{latest:g}° of your {trend.goal.target_rom:g}° goal"}
+        view["exercises"].append({
+            "name": name, "series": series, "change": change, "goal": goal,
+            "message": NEED_MORE if all(c is None for c in change.values()) else None})
+    if not view["exercises"]:
+        view["message"] = NO_SESSIONS
+    return view

@@ -42,7 +42,7 @@ class Clock:
 
 
 def record(store, clock, rng, pid, name, days_ago, form, rom, reps=10, target=10, partials=0,
-           warnings=0, stop=False, hour=9, source="webcam", interrupted=False):
+           warnings=0, stop=False, hour=9, source="webcam", interrupted=False, home=False):
     start = (datetime.now() - timedelta(days=days_ago)).replace(hour=hour, minute=rng.choice((0, 15, 30, 45)),
                                                                  second=0, microsecond=0)
     if start > datetime.now():
@@ -50,7 +50,9 @@ def record(store, clock, rng, pid, name, days_ago, form, rom, reps=10, target=10
     clock.now = start
     key, up, down, side = EXERCISES[name]
     extras = {"camera_id": 0, "imgsz": 320, "frame_skip": 1} if source == "webcam" else None
-    sid = store.start_session(pid, source, "0" if source == "webcam" else "home_clip.mp4", extras)
+    if home:          # recorded by the patient at home through the Limber patient view (browser pose model)
+        source, extras = "webcam", {"origin": "portal", "pose_model": "movenet-lightning-4", "fps_nominal": 15}
+    sid = store.start_session(pid, source, "home" if home else ("0" if source == "webcam" else "home_clip.mp4"), extras)
     set_id = store.open_set(sid, ExerciseSetInfo(key, name, side, target, up, down))
     t = start
     for n in range(1, reps + 1):
@@ -96,6 +98,10 @@ def build(db_path: Path, seed: int = 7) -> None:
         for d, rom, form in zip(days, knee_rom, ramp(78, 89, 11) + [85]):
             record(s, clock, rng, "P-017", "Knee Extension", d, form, rom, warnings=1 if d == 2 else 0)
             record(s, clock, rng, "P-017", "Squat", d, 82, 92 + (40 - d) * 0.15, reps=9, hour=10, partials=1 if d < 8 else 0)
+        # ...and practises at home between visits; home numbers sit on their own scale (different pose model)
+        for d, rom in zip([10, 7, 4, 1], [79, 80, 82, 83]):
+            record(s, clock, rng, "P-017", "Knee Extension", d, 86, rom, hour=18, home=True)
+            record(s, clock, rng, "P-017", "Squat", d, 80, 104, reps=10, hour=18, home=True)
         review_all("P-017", leave=2)
         s.assign_program("P-017", "knee_rehab", "Knee Rehabilitation", ["knee_extension", "squat"], 3, today - timedelta(days=35))
         s.set_goal("P-017", "Knee Extension", target_rom=95.0, target_reps=10)

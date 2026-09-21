@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0E6B64">
   <link rel="icon" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/portal.css">
-  <title>Limber</title>
+  <title>Limber · Progress</title>
 </head>
 <body data-page="progress">
   <header class="bar">
@@ -14,7 +14,14 @@
     <nav><a href="/today">Today</a><a href="/progress" aria-current="page">Progress</a></nav>
     <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
   </header>
-  <main class="card wide"><h1>Coming soon</h1><p class="lead">This page is not available yet.</p></main>
+  <main class="card wide">
+    <h1>Your progress</h1>
+    <p id="progress-message" class="lead" hidden></p>
+    <div id="progress"></div>
+    <p id="progress-note" class="small"></p>
+    <dl id="definitions" class="small definitions"></dl>
+  </main>
   <script src="/static/portal.js"></script>
+  <script src="/static/progress.js"></script>
 </body>
 </html>

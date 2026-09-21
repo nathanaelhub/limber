@@ -195,3 +195,16 @@ class TestPagesAndHeaders:
         for script in patient_portal.STATIC_DIR.glob("*.js"):
             text = script.read_text().replace('"http://www.w3.org/2000/svg"', "")     # an XML namespace, never fetched
             assert not re.findall(r"""["']https?://""", text), script.name
+
+
+class TestProgress:
+    def test_needs_a_sign_in_and_returns_the_view(self, client, seeded):
+        assert client.get("/api/progress").status_code == 401
+        login(client, seeded[1]["P-017"])
+        r = client.get("/api/progress")
+        body = r.json()
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-store" and body["patient_id"] == "P-017"
+        assert body["exercises"][0]["name"] == "Knee Extension" and "clinic" in body["exercises"][0]["series"]
+        assert "P-018" not in r.text and "hip hiking" not in r.text and "Post-op" not in r.text
+        page = client.get("/progress").text
+        assert 'id="progress"' in page and "Coming soon" not in page

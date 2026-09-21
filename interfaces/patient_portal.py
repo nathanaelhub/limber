@@ -160,6 +160,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             except PTLogError as err:
                 return _json({"error": str(err)}, 400)
 
+    def progress(request: Request):
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json(viewmodels.progress_view(store, patient_id, now=clock()))
+
     def health(_request: Request):
         with open_store() as store:
             therapist = admin.password_is_set(store)
@@ -306,6 +313,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
+        Route("/api/progress", progress),
         Route("/api/health", health),
         Route("/api/admin/login", admin_login, methods=["POST"]),
         Route("/favicon.ico", lambda _r: FileResponse(static_dir / "favicon.png")),
