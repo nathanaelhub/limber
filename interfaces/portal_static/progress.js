@@ -55,7 +55,7 @@
     var defs = document.getElementById("definitions");
     Object.keys(d.definitions).forEach(function (k) {
       var def = d.definitions[k];
-      defs.appendChild(node("dt", null, def.label + " (" + def.unit + ")"));
+      defs.appendChild(node("dt", null, def.name + " (" + def.unit + ")"));
       defs.appendChild(node("dd", null, def.meaning));
     });
   });

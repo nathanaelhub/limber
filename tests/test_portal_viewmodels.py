@@ -142,7 +142,7 @@ class TestProgressView:
         assert squat["change"]["clinic"] is None and "more sessions" in squat["message"].lower() and squat["goal"] is None
         for key in ("avg_rom", "avg_form"):
             d = view["definitions"][key]
-            assert d["unit"] and len(d["meaning"]) > 15 and d["label"]
+            assert d["unit"] and len(d["meaning"]) > 15 and d["name"]
         assert "home" in view["note"] and "clinic" in view["note"]
 
     def test_only_the_patients_own_numbers(self, progress_patient):

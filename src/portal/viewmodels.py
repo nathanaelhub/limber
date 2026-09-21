@@ -156,7 +156,7 @@ def _definitions() -> Dict[str, Dict[str, str]]:
     result = {}
     for key, (label, plain) in _PATIENT_WORDING.items():
         unit = METRIC_DEFINITIONS[key]["unit"]
-        result[key] = {"label": label, "unit": "out of 100" if unit == "score 0-100" else unit, "meaning": plain}
+        result[key] = {"name": label, "unit": "out of 100" if unit == "score 0-100" else unit, "meaning": plain}
     return result
 
 

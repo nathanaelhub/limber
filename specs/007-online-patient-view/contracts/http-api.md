@@ -29,8 +29,8 @@ no active assignment.
 
 ```json
 {"patient_id": "P-017",
- "definitions": {"avg_rom": {"label": "Range of motion", "unit": "degrees", "meaning": "..."},
-                 "avg_form": {"label": "Form score", "unit": "0-100", "meaning": "..."}},
+ "definitions": {"avg_rom": {"name": "Range of motion", "unit": "degrees", "meaning": "..."},
+                 "avg_form": {"name": "Form score", "unit": "0-100", "meaning": "..."}},
  "exercises": [{"name": "Knee Extension",
    "goal": {"target_rom": 95.0, "sentence": "86° of your 95° goal", "percent": 72},
    "series": {"home": [{"date": "2026-09-19", "avg_rom": 84.1, "avg_form": 88.0, "reps": 10}],
