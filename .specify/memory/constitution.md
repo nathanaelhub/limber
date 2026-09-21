@@ -1,3 +1,16 @@
+<!--
+Sync Impact Report (temporary; remove before the next amendment)
+Version change: 1.0.0 -> 1.1.0 (MINOR: materially expanded guidance, no principle removed)
+Rationale: the owner decided that patients will use PT Assist at home over the internet
+(feature 007). Principle III already allowed an explicit, separately specified opt-in network
+feature; this amendment states what such a feature must guarantee. The Technical Constraints
+named two interface surfaces; a patient-facing third one is added with the same separation rule.
+Modified: Principle III (one bullet added); Technical Constraints "User interface" bullet.
+Added sections: none. Removed sections: none.
+Follow-ups: specs/007-online-patient-view must carry the Principle III check; real-patient use
+stays blocked on a compliance review.
+-->
+
 # PT Assist Constitution
 
 PT Assist is an AI physical-therapy assistant that uses YOLO11 pose estimation to count reps,
@@ -54,6 +67,12 @@ Patient data stays on the user's machine, and patients are never identifiable fr
 - All data MUST be stored locally by default. No feature MAY send patient data over the network
   unless it is an explicit, separately specified opt-in feature whose spec includes a
   Constitution Check against this principle.
+- A networked feature's spec MUST state exactly which data crosses the network, which data
+  never does, and who may use the feature. It MUST be off until a therapist turns it on for a
+  specific patient, MUST expose to a signed-in patient only that patient's own data, and MUST
+  NOT be used with real clinic patients until a compliance review has approved it; until then
+  it is limited to demo and consented study participants. Camera video MUST NOT leave the
+  patient's device.
 - Patients MUST be identified by pseudonymous IDs. Names, dates of birth, medical record
   numbers, and contact details MUST NOT appear in filenames, log lines, screenshots, test
   fixtures, commit messages, or committed files.
@@ -111,8 +130,12 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
   SQLite through the standard library `sqlite3` module is the default choice; a plan MAY choose
   otherwise only with a justification under Principle V.
 - **User interface**: the Streamlit app in `interfaces/app.py` and the CLI in
-  `interfaces/cli.py` remain the interface surfaces for this phase. Business logic MUST live in
-  `src/` and be testable without Streamlit; interface code only renders and dispatches.
+  `interfaces/cli.py` remain the therapist's interface surfaces for this phase. The patient
+  portal in `interfaces/patient_portal.py` is the one patient-facing surface; it is a separate
+  launch that contains no therapist pages. Business logic MUST live in `src/` and be testable
+  without Streamlit or a running server; interface code only renders and dispatches. Browser
+  JavaScript MUST stay free of clinical logic (rep counting, form wording, program order), so
+  that behaviour is covered by the Python test suite.
 - **Engine surface**: the public outputs listed in Principle I are the only supported
   integration points. The model weights file `models/yolo11m-pose.pt` is a runtime
   requirement, never a test requirement.
@@ -153,4 +176,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-14
+**Version**: 1.1.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-21
