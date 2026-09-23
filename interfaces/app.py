@@ -1265,7 +1265,7 @@ def page_sessions():
 # PAGE: REVIEW (trends, flags, comparison, session reviews, goals, exports)
 # =============================================================================
 
-REVIEW_SECTIONS = ["Trends", "Flags", "Compare", "Session review", "Goals & settings", "Export"]
+REVIEW_SECTIONS = ["Trends", "Flags", "Compare", "Session review", "From the patient", "Goals & settings", "Export"]
 
 
 def page_review():
@@ -1283,6 +1283,8 @@ def page_review():
         _review_compare(pid)
     elif section == "Goals & settings":
         _review_goals_settings(pid)
+    elif section == "From the patient":
+        _review_from_the_patient(pid)
     elif section == "Export":
         _review_export(pid)
 
@@ -1550,6 +1552,46 @@ def _review_goals_settings(pid):
                 cleared = store.clear_goal(pid, exercise)
             st.success(f"Cleared goal for {exercise}") if cleared else st.info(f"No goal set for {exercise}")
             if cleared:
+                st.rerun()
+
+
+def _review_from_the_patient(pid):
+    """What the patient reported from their phone (feature 010): pain check-ins now; more kinds later."""
+    from src.ptlog import entries as entry_rules
+    st.markdown("### Pain and symptom check-ins")
+    with _open_store() as store:
+        rows = store.entries(pid, "checkin", newest_first=True, limit=200)
+        pain_flags = [f for f in ptreview.flags_for(store, pid, "all").flags if f.rule in ("pain_rising", "pain_high")]
+    for f in pain_flags:
+        st.warning(f"[{f.rule}] {f.message}")
+    if not rows:
+        st.info("No check-ins yet. Patients make them from Today or around a guided session in Limber.")
+        return
+    series = entry_rules.pain_series(rows)
+    chart = pd.DataFrame({"when": [t[:16].replace("T", " ") for t, _, _ in series], "pain": [s for _, s, _ in series]}).set_index("when")
+    st.line_chart(chart, y="pain", height=180)
+    defs = entry_rules.definitions("checkin")
+    st.caption(f"Pain ({defs['pain']['unit']}): {defs['pain']['meaning']}")
+    table = pd.DataFrame([{
+        "When": e.recorded_at[:16].replace("T", " ") + (" (time adjusted)" if e.time_adjusted else ""),
+        "Around": {"before": f"before session {e.session_id}", "after": f"after session {e.session_id}"}.get(e.phase, "on its own"),
+        "Pain": int(e.score) if e.score is not None else None, "Where": e.payload.get("area", ""),
+        "Stiffness": e.payload.get("stiffness", ""), "Swelling": e.payload.get("swelling", ""),
+        "Note": ("(note removed)" if e.note_removed else (e.payload.get("note") or "")) + (" · sent after a privacy warning" if e.warned else ""),
+    } for e in rows])
+    st.dataframe(table, use_container_width=True, hide_index=True)
+    with st.expander("Definitions"):
+        for key, d in defs.items():
+            st.caption(f"**{d['name']}** ({d['unit']}): {d['meaning']}")
+    with_notes = [e for e in rows if e.payload.get("note") and not e.note_removed]
+    if with_notes:
+        st.markdown("**Remove a note** (for one that contains identifying details; a marker stays)")
+        for e in with_notes[:20]:
+            c1, c2 = st.columns([5, 1.3])
+            c1.text(f"{e.recorded_at[:16].replace('T', ' ')}: {e.payload['note']}")
+            if c2.button("Remove", key=f"entry_remove_note_{e.id}"):
+                with _open_store() as store:
+                    store.entry_remove_note(e.id)
                 st.rerun()
 
 

@@ -158,3 +158,31 @@ class TestIssueAndSignIn:
         access.sign_out(store, token, "c")
         assert access.current_patient(store, token, clock=fake_clock) is None
         assert store.portal_audit_list("P-017")[0].event == "logout"
+
+
+class TestDeviceSignIn:
+    """Feature 010: an installed patient app stays signed in on the device for 30 days."""
+
+    def test_device_sign_in_ignores_idle_and_lasts_thirty_days(self, store, fake_clock):
+        code, _ = access.issue_code(store, KEY, "P-017")
+        lim = access.LoginLimiter(clock=fake_clock)
+        token = access.sign_in(store, KEY, code, "phone", lim, clock=fake_clock, device=True)
+        fake_clock.advance(20 * 86400)                                       # idle for twenty days
+        assert access.current_patient(store, token, clock=fake_clock) == "P-017"
+        fake_clock.advance(11 * 86400)
+        assert access.current_patient(store, token, clock=fake_clock) is None
+
+    def test_browser_sign_in_keeps_the_short_limits(self, store, fake_clock):
+        code, _ = access.issue_code(store, KEY, "P-017")
+        token = access.sign_in(store, KEY, code, "pc", access.LoginLimiter(clock=fake_clock), clock=fake_clock)
+        fake_clock.advance(31 * 60)
+        assert access.current_patient(store, token, clock=fake_clock) is None
+
+    def test_revoke_or_reissue_ends_device_sign_ins_and_three_devices_max(self, store, fake_clock):
+        code, _ = access.issue_code(store, KEY, "P-017")
+        lim = access.LoginLimiter(clock=fake_clock)
+        tokens = [access.sign_in(store, KEY, code, f"d{i}", lim, clock=fake_clock, device=True) for i in range(4)]
+        assert access.current_patient(store, tokens[0], clock=fake_clock) is None          # fourth device pushed the first out
+        assert all(access.current_patient(store, t, clock=fake_clock) == "P-017" for t in tokens[1:])
+        access.issue_code(store, KEY, "P-017")
+        assert all(access.current_patient(store, t, clock=fake_clock) is None for t in tokens)

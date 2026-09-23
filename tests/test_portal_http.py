@@ -148,11 +148,15 @@ class TestOnlyOwnData:
             conversation.send(s, "P-018", "patient", "a private note from the other patient")
             conversation.send(s, "P-017", "therapist", "well done this week")
         login(client, seeded[1]["P-017"])
-        for route in ("/api/today", "/api/health", "/", "/today", "/api/progress", "/progress", "/api/messages", "/messages"):
+        with SessionStore(seeded[0]).open() as s:
+            s.entry_add("P-018", "checkin", {"pain": 9, "note": "other patient's private note"}, 9.0,
+                        "2026-09-20T09:00:00", "x", "standalone", None, False, False)
+        for route in ("/api/today", "/api/health", "/", "/today", "/api/progress", "/progress", "/api/messages", "/messages",
+                      "/api/entries", "/checkin", "/manifest.webmanifest"):
             r = client.get(route)
             text = r.text
             assert "P-018" not in text and "P-019" not in text, route
-            for secret in ("Post-op knee", "prefers mornings", "hip hiking", "Shoulder", "other patient"):
+            for secret in ("Post-op knee", "prefers mornings", "hip hiking", "Shoulder", "other patient", "private note"):
                 assert secret not in text, (route, secret)
             if r.headers["content-type"].startswith("application/json"):
                 assert not (set(self._walk(r.json())) & FORBIDDEN_KEYS), route
@@ -286,3 +290,74 @@ class TestHealthProvesTheRecordWorks:
         r = client.get("/api/health")
         assert r.status_code == 503 and r.json()["ok"] is False and r.json()["record"] == "unavailable"
         assert "readonly" not in r.text                     # no internals in a public response
+
+
+class TestDeviceLogin:
+    def test_device_flag_gives_a_long_cookie(self, client, seeded):
+        r = client.post("/api/login", json={"code": seeded[1]["P-017"], "device": True}, headers={"Origin": ORIGIN})
+        assert r.status_code == 200
+        cookie = r.headers["set-cookie"].lower()
+        assert "max-age=2592000" in cookie and "httponly" in cookie
+        r = client.post("/api/login", json={"code": seeded[1]["P-017"]}, headers={"Origin": ORIGIN})
+        assert "max-age=43200" in r.headers["set-cookie"].lower()
+
+
+# ----------------------------------------------------------------------------- feature 010: check-ins
+
+CHECKIN = {"pain": 4, "area": "knee", "stiffness": "mild", "swelling": "none", "note": ""}
+
+
+def _checkin(client, body):
+    return client.post("/api/entries", json=body, headers={"Origin": ORIGIN})
+
+
+class TestCheckins:
+    def test_needs_a_sign_in(self, client):
+        assert _checkin(client, {"kind": "checkin", "client_id": "c1", "data": CHECKIN}).status_code == 401
+        assert client.get("/api/entries").status_code == 401
+
+    def test_store_list_and_resend_once(self, client, seeded):
+        login(client, seeded[1]["P-017"])
+        r = _checkin(client, {"kind": "checkin", "client_id": "c1", "data": CHECKIN, "phase": "standalone",
+                              "recorded_at": "2020-01-01T09:00:00"})
+        assert r.status_code == 201, r.text
+        body = r.json()
+        assert body["kind"] == "checkin" and body["score"] == 4 and body["time_adjusted"] is True and body["payload"]["area"] == "knee"
+        again = _checkin(client, {"kind": "checkin", "client_id": "c1", "data": {**CHECKIN, "pain": 9}})
+        assert again.status_code == 200 and again.json()["id"] == body["id"] and again.json()["score"] == 4
+        listing = client.get("/api/entries").json()
+        assert [e["id"] for e in listing["entries"]] == [body["id"]] and listing["definitions"]["checkin"]["pain"]["unit"] == "0-10"
+        assert client.get("/api/today").json()["checkin"] == {"prompt": True, "today": 1}
+
+    def test_validation_warning_and_confirm(self, client, seeded):
+        login(client, seeded[1]["P-017"])
+        assert _checkin(client, {"kind": "checkin", "client_id": "c2", "data": {**CHECKIN, "pain": 11}}).status_code == 400
+        assert _checkin(client, {"kind": "horoscope", "client_id": "c3", "data": CHECKIN}).status_code == 400
+        assert _checkin(client, {"kind": "checkin", "data": CHECKIN}).status_code == 400          # client_id required
+        warned = _checkin(client, {"kind": "checkin", "client_id": "c4", "data": {**CHECKIN, "note": "call me on 615-555-0142"}})
+        assert warned.status_code == 409 and warned.json()["reasons"] == ["phone number"]
+        ok = _checkin(client, {"kind": "checkin", "client_id": "c4", "data": {**CHECKIN, "note": "call me on 615-555-0142"}, "confirm": True})
+        assert ok.status_code == 201 and ok.json()["warned"] is True
+
+    def test_session_link_must_be_the_patients_own(self, client, seeded):
+        db, codes = seeded
+        with SessionStore(db).open() as s:
+            mine = s.list_sessions("P-017")[0].id
+            theirs = s.list_sessions("P-018")[0].id
+        login(client, codes["P-017"])
+        assert _checkin(client, {"kind": "checkin", "client_id": "c5", "data": CHECKIN, "phase": "before", "session_id": mine}).status_code == 201
+        assert _checkin(client, {"kind": "checkin", "client_id": "c6", "data": CHECKIN, "phase": "before", "session_id": theirs}).status_code == 400
+
+    def test_discharged_patient_is_refused(self, client, seeded):
+        db, codes = seeded
+        login(client, codes["P-017"])
+        with SessionStore(db).open() as s:
+            s.discharge("P-017")
+        assert _checkin(client, {"kind": "checkin", "client_id": "c7", "data": CHECKIN}).status_code == 401
+
+    def test_progress_carries_pain(self, client, seeded):
+        login(client, seeded[1]["P-017"])
+        _checkin(client, {"kind": "checkin", "client_id": "c8", "data": CHECKIN})
+        body = client.get("/api/progress").json()
+        assert body["pain"]["series"][0]["pain"] == 4 and body["pain"]["definition"]["unit"] == "0-10"
+        assert client.get("/checkin").status_code == 200

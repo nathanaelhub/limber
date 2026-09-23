@@ -95,6 +95,28 @@ def done_today_keys(store: SessionStore, patient_id: str, now: datetime) -> set:
     return adherence_mod._exercises_with_counted_reps(sessions)
 
 
+def checkin_badge(store: SessionStore, patient_id: str, now: datetime) -> Dict[str, Any]:
+    """Whether Today should offer a check-in, and how many were made today."""
+    from src.ptlog.entries import pain_series
+    today = now.date().isoformat()
+    made = [e for e in store.entries(patient_id, "checkin", newest_first=True, limit=20) if e.recorded_at[:10] == today]
+    return {"prompt": True, "today": len(made)}
+
+
+def entry_json(e) -> Dict[str, Any]:
+    return {"id": e.id, "kind": e.kind, "recorded_at": e.recorded_at[:16], "phase": e.phase, "session_id": e.session_id,
+            "score": e.score, "payload": e.payload, "warned": e.warned, "time_adjusted": e.time_adjusted,
+            "note_removed": e.note_removed}
+
+
+def entries_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
+    from src.ptlog import entries as reg
+    _require(store, patient_id)
+    rows = store.entries(patient_id, newest_first=True, limit=200)
+    return {"patient_id": patient_id, "entries": [entry_json(e) for e in rows],
+            "definitions": {kind: reg.definitions(kind) for kind in reg.ENTRY_KINDS}}
+
+
 def messages_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     """Whether the patient has a conversation with their therapist, and how much of it is unread."""
     from src.portal import messages
@@ -123,7 +145,8 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
     today = now.date()
     view: Dict[str, Any] = {"patient_id": patient_id, "date": today.isoformat(), "program": None, "exercises": [],
                             "week": None, "streak_weeks": None, "message": None,
-                            "messages": messages_badge(store, patient_id)}
+                            "messages": messages_badge(store, patient_id),
+                            "checkin": checkin_badge(store, patient_id, now)}
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         view["message"] = NO_PROGRAM
@@ -191,4 +214,8 @@ def progress_view(store: SessionStore, patient_id: str, now: Optional[datetime] 
             "message": NEED_MORE if all(c is None for c in change.values()) else None})
     if not view["exercises"]:
         view["message"] = NO_SESSIONS
+    from src.ptlog import entries as reg
+    series = reg.pain_series(store.entries(patient_id, "checkin"))
+    view["pain"] = {"series": [{"date": t[:10], "time": t[11:16], "pain": s} for t, s, _ in series],
+                    "definition": reg.definitions("checkin")["pain"]}
     return view

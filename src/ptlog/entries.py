@@ -58,7 +58,7 @@ ENTRY_KINDS: Dict[str, EntryKind] = {
 
 def definitions(kind: str) -> Dict[str, Dict[str, str]]:
     k = ENTRY_KINDS[kind]
-    return {f.key: {"label": f.label, "unit": f.unit, "meaning": f.meaning} for f in k.fields}
+    return {f.key: {"name": f.label, "unit": f.unit, "meaning": f.meaning} for f in k.fields}
 
 
 def validate(kind: str, data: Any) -> Tuple[Dict[str, Any], Optional[float]]:

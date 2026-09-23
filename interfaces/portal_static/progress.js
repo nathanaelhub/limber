@@ -51,6 +51,25 @@
       if (e.message) { box.appendChild(node("p", "small", e.message)); }
       host.appendChild(box);
     });
+    if (d.pain && d.pain.series.length) {
+      var box = node("section", "progress-exercise");
+      box.appendChild(node("h2", null, "Pain"));
+      var pts = d.pain.series.map(function (p) { return { avg_rom: p.pain }; });
+      var W = 320, H = 120, pad = 14;
+      var x = function (i) { return pts.length === 1 ? W / 2 : pad + i * (W - 2 * pad) / (pts.length - 1); };
+      var y = function (v) { return H - pad - v * (H - 2 * pad) / 10; };
+      var root = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Pain by check-in, 0 to 10", "class": "chart" });
+      var path = "";
+      pts.forEach(function (p, i) { path += (path ? " L" : "M") + x(i) + " " + y(p.avg_rom); });
+      root.appendChild(svg("path", { d: path, fill: "none", stroke: "#F2684A", "stroke-width": 3, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      pts.forEach(function (p, i) { root.appendChild(svg("circle", { cx: x(i), cy: y(p.avg_rom), r: 4.5, fill: "#F2684A" })); });
+      box.appendChild(node("h3", null, d.pain.series.length + (d.pain.series.length === 1 ? " check-in" : " check-ins")));
+      box.appendChild(root);
+      var last = d.pain.series[d.pain.series.length - 1];
+      box.appendChild(node("p", "muted", "Latest: " + last.pain + " out of 10 on " + last.date));
+      box.appendChild(node("p", "small", d.pain.definition.name + " (" + d.pain.definition.unit + "): " + d.pain.definition.meaning));
+      host.appendChild(box);
+    }
     if (d.exercises.length) { document.getElementById("progress-note").textContent = d.note; }
     var defs = document.getElementById("definitions");
     Object.keys(d.definitions).forEach(function (k) {

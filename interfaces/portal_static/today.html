@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0E6B64">
   <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
   <link rel="stylesheet" href="/static/portal.css">
   <title>Limber · Today</title>
 </head>
@@ -14,6 +20,7 @@
     <nav><a href="/today" aria-current="page">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
     <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
   </header>
+  <p id="offline" class="offline" hidden>Not connected. Showing your plan as last seen; check-ins you make now are sent when you are back online.</p>
   <main class="card wide">
     <h1>Today's plan</h1>
     <p id="program-name" class="lead"></p>
@@ -24,12 +31,25 @@
     </div>
     <ol id="exercises" class="exercises"></ol>
     <ul id="notes" class="small"></ul>
-    <a id="start" class="button" href="/session" hidden>Start today's session</a>
+    <div class="actions">
+      <a id="start" class="button" href="/session" hidden>Start today's session</a>
+      <a id="checkin-link" class="button secondary" href="/checkin">How are you feeling?</a>
+    </div>
+    <p id="checkin-done" class="small" hidden></p>
     <div id="week" class="stats" hidden>
       <div><span id="week-done" class="big"></span><span class="unit">sessions this week</span></div>
       <div><span id="streak" class="big"></span><span class="unit">week streak</span></div>
     </div>
   </main>
+  <aside id="install-hint" class="card install" hidden>
+    <h2>Add Limber to your home screen</h2>
+    <p id="install-steps-ios" hidden>On iPhone: tap the Share button, then <strong>Add to Home Screen</strong>. Limber then opens like an app and stays signed in.</p>
+    <p id="install-steps-android" hidden>Tap <strong>Install</strong> below, or use your browser's menu and choose <strong>Add to Home Screen</strong>.</p>
+    <div class="actions">
+      <button id="install-now" type="button" hidden>Install</button>
+      <button id="install-dismiss" type="button" class="secondary">Not now</button>
+    </div>
+  </aside>
   <script src="/static/portal.js"></script>
 </body>
 </html>

@@ -33,6 +33,8 @@ from starlette.websockets import WebSocket, WebSocketDisconnect  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
 from src.deploy import preflight  # noqa: E402
+from src.portal import pwa  # noqa: E402
+from src.ptlog import entries as entry_rules  # noqa: E402
 from src.portal import access, admin, frames, live, messages, viewmodels  # noqa: E402
 from src.ptlog.models import PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
@@ -124,12 +126,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         try:
             body = await request.json()
             code = body.get("code") if isinstance(body, dict) else None
+            device = isinstance(body, dict) and body.get("device") is True
         except ValueError:
             return _json({"error": "Send JSON."}, 400)
         client = client_of(request)
         with open_store() as store:
             try:
-                token = access.sign_in(store, key, code if isinstance(code, str) else None, client, limiter, clock=clock)
+                token = access.sign_in(store, key, code if isinstance(code, str) else None, client, limiter,
+                                       clock=clock, device=device)
                 patient_id = access.current_patient(store, token, clock=clock)
             except access.LockedOut as locked:
                 return _json({"error": str(locked), "retry_after_seconds": locked.retry_after}, 429,
@@ -137,7 +141,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             except access.AccessDenied as denied:
                 return _json({"error": str(denied)}, 401)
         response = _json({"patient_id": patient_id})
-        response.set_cookie(COOKIE, token, max_age=int(access.ABSOLUTE_LIMIT.total_seconds()), path="/",
+        lifetime = access.DEVICE_LIMIT if device else access.ABSOLUTE_LIMIT
+        response.set_cookie(COOKIE, token, max_age=int(lifetime.total_seconds()), path="/",
                             httponly=True, samesite="strict", secure=secure_cookie)
         return response
 
@@ -202,6 +207,70 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 except PTLogError as err:
                     return _json({"error": str(err)}, 400)
         return await run_in_threadpool(work)
+
+    def entries_get(request: Request):
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json(viewmodels.entries_view(store, patient_id))
+
+    async def entries_post(request: Request):
+        """A patient-reported entry (check-in). Idempotent on client_id, so an offline queue may resend."""
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+
+        def work():
+            with open_store() as store:
+                patient_id = signed_in(request, store)
+                if patient_id is None or store.get_discharge(patient_id) is not None:
+                    return _json({"error": "Please sign in."}, 401)
+                client_id = body.get("client_id")
+                if not isinstance(client_id, str) or not 1 <= len(client_id) <= 64:
+                    return _json({"error": "A check-in needs a client id."}, 400)
+                phase = body.get("phase") or "standalone"
+                if phase not in ("before", "after", "standalone"):
+                    return _json({"error": "phase must be before, after, or standalone."}, 400)
+                session_id = body.get("session_id")
+                if session_id is not None:
+                    if not isinstance(session_id, int) or isinstance(session_id, bool):
+                        return _json({"error": "session_id must be a number."}, 400)
+                    try:
+                        if store.load_session(session_id).patient_id != patient_id:
+                            raise PTLogError("not yours")
+                    except PTLogError:
+                        return _json({"error": "That session is not yours."}, 400)
+                try:
+                    payload, score = entry_rules.validate(body.get("kind"), body.get("data"))
+                except PTLogError as err:
+                    return _json({"error": str(err)}, 400)
+                note = payload.get("note") or ""
+                reasons = messages.check_text(note) if note else []
+                if reasons and body.get("confirm") is not True:
+                    return _json({"error": "This note looks like it contains a " + " and a ".join(reasons) +
+                                  ". Limber works without names or contact details. Edit it, or send it anyway.",
+                                  "reasons": reasons}, 409)
+                recorded_at, adjusted = entry_rules.accept_recorded_at(body.get("recorded_at"), clock())
+                before = {e.client_id for e in store.entries(patient_id, body.get("kind"), newest_first=True, limit=50)}
+                entry = store.entry_add(patient_id, body.get("kind"), payload, score, recorded_at, client_id, phase,
+                                        session_id, warned=bool(reasons), time_adjusted=adjusted)
+                return _json(viewmodels.entry_json(entry), 200 if client_id in before else 201)
+        return await run_in_threadpool(work)
+
+    def manifest(_request: Request):
+        return _json(pwa.manifest(), headers={"Content-Type": "application/manifest+json"})
+
+    _precache = pwa.precache(static_dir)
+    _sw = pwa.service_worker(_precache)
+
+    def service_worker(_request: Request):
+        return Response(_sw, media_type="application/javascript", headers={"Cache-Control": "no-store"})
 
     def health(_request: Request):
         """Used by the proxy and the uptime check: proves the record can be read and written."""
@@ -351,12 +420,17 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/session", inner_page("session")),
         Route("/progress", inner_page("progress")),
         Route("/messages", inner_page("messages")),
+        Route("/checkin", inner_page("checkin")),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
         Route("/api/progress", progress),
         Route("/api/messages", messages_get, methods=["GET"]),
         Route("/api/messages", messages_post, methods=["POST"]),
+        Route("/api/entries", entries_get, methods=["GET"]),
+        Route("/api/entries", entries_post, methods=["POST"]),
+        Route("/manifest.webmanifest", manifest),
+        Route("/sw.js", service_worker),
         Route("/api/health", health),
         Route("/api/admin/login", admin_login, methods=["POST"]),
         Route("/favicon.ico", lambda _r: FileResponse(static_dir / "favicon.png")),

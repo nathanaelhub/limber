@@ -27,6 +27,7 @@ CODE_LENGTH = 12                                  # 60 bits
 DEFAULT_DAYS, MAX_DAYS = 90, 365
 IDLE_LIMIT = timedelta(minutes=30)
 ABSOLUTE_LIMIT = timedelta(hours=12)
+DEVICE_LIMIT = timedelta(days=30)        # an installed patient app on the patient's own phone (feature 010)
 SIGN_INS_PER_PATIENT = 3
 DENIED_MESSAGE = "That code did not work. Check it, or ask your therapist for a new one."
 DENIED_ADMIN_MESSAGE = "That password did not work."
@@ -181,9 +182,11 @@ def revoke_code(store: SessionStore, patient_id: str) -> bool:
 
 
 def sign_in(store: SessionStore, key: bytes, code: Optional[str], client: str, limiter: LoginLimiter,
-            clock: Callable[[], datetime] = datetime.now) -> str:
+            clock: Callable[[], datetime] = datetime.now, device: bool = False) -> str:
     """Check the code and open a sign-in. Returns the cookie token (only its hash is stored).
-    Raises LockedOut or AccessDenied; every refusal reads the same to the visitor."""
+    A device sign-in (the installed app) lasts DEVICE_LIMIT with no idle limit; a browser sign-in
+    keeps the idle and absolute limits. Raises LockedOut or AccessDenied; every refusal reads the
+    same to the visitor."""
     wait = limiter.retry_after(client)
     if wait:
         store.portal_audit_add("locked_out", None, client)
@@ -207,8 +210,9 @@ def sign_in(store: SessionStore, key: bytes, code: Optional[str], client: str, l
         refuse("discharged", status.patient_id)
 
     limiter.success(client)
-    token = secrets.token_urlsafe(32)
-    store.portal_signin_create(token_hash(token), status.patient_id, clock() + ABSOLUTE_LIMIT, keep=SIGN_INS_PER_PATIENT)
+    token = ("d." if device else "b.") + secrets.token_urlsafe(32)      # the prefix says which rules apply
+    store.portal_signin_create(token_hash(token), status.patient_id,
+                               clock() + (DEVICE_LIMIT if device else ABSOLUTE_LIMIT), keep=SIGN_INS_PER_PATIENT)
     store.portal_touch(status.patient_id)
     store.portal_audit_add("login_ok", status.patient_id, client)
     return token
@@ -227,6 +231,8 @@ def current_patient(store: SessionStore, token: Optional[str],
     now = clock()
     idle = now - datetime.fromisoformat(signin.last_seen_at)
     expired = _ts_key(signin.expires_at) <= _ts_key(now.isoformat())
+    if token.startswith("d."):
+        idle = timedelta(0)                                              # a device sign-in has no idle limit
     if (idle > IDLE_LIMIT or expired or store.portal_status(signin.patient_id).state != "active"
             or store.get_discharge(signin.patient_id) is not None):
         store.portal_signin_delete(digest)

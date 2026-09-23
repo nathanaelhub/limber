@@ -3,6 +3,72 @@
   "use strict";
   var page = document.body.getAttribute("data-page");
 
+  // ---- installable app (feature 010): shell caching, per-patient snapshot, offline queue ----
+  var store = { get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+                del: function (k) { try { localStorage.removeItem(k); } catch (e) {} } };
+  function wipeLocal() {                                  // sign-out or a refused request: nothing stays readable
+    Object.keys(localStorage).forEach(function (k) { if (k.indexOf("limber.") === 0) { store.del(k); } });
+  }
+  function uuid() {
+    if (window.crypto && window.crypto.randomUUID) { return window.crypto.randomUUID(); }
+    return "x" + Date.now().toString(16) + Math.random().toString(16).slice(2);
+  }
+  function localIso(d) {
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
+  function post(path, body) {
+    return fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { status: r.status, data: d }; }); });
+  }
+  function sendEntry(entry) {
+    if (!navigator.onLine) { queue(entry); return Promise.resolve({ queued: true }); }
+    return post("/api/entries", entry).then(function (res) {
+      if (res.status === 401) { wipeLocal(); window.location.href = "/"; }
+      return res;
+    }).catch(function () { queue(entry); return { queued: true }; });
+  }
+  function queue(entry) { var q = store.get("limber.queue") || []; q.push(entry); store.set("limber.queue", q); }
+  function replayQueue() {
+    var q = store.get("limber.queue") || [];
+    if (!q.length || !navigator.onLine) { return Promise.resolve(); }
+    var rest = q.slice(1);
+    return post("/api/entries", q[0]).then(function (res) {
+      if (res.status === 200 || res.status === 201 || res.status === 400 || res.status === 409) {
+        store.set("limber.queue", rest);                 // sent, already known, or unsendable: drop it and go on
+        return replayQueue();
+      }
+      if (res.status === 401) { wipeLocal(); }
+    }).catch(function () {});
+  }
+  function offlineBanner() { var b = document.getElementById("offline"); if (b) { b.hidden = navigator.onLine; } }
+  if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js").catch(function () {}); }
+  window.addEventListener("online", function () { offlineBanner(); replayQueue(); });
+  window.addEventListener("offline", offlineBanner);
+  offlineBanner(); replayQueue();
+  window.limber = { uuid: uuid, localIso: localIso, sendEntry: sendEntry, replayQueue: replayQueue, wipeLocal: wipeLocal };
+
+  function installHint() {
+    var hint = document.getElementById("install-hint");
+    if (!hint || store.get("limber.install-dismissed")) { return; }
+    var standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    if (standalone) { return; }
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    var deferred = null;
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault(); deferred = e;
+      document.getElementById("install-now").hidden = false;
+    });
+    document.getElementById(ios ? "install-steps-ios" : "install-steps-android").hidden = false;
+    hint.hidden = false;
+    document.getElementById("install-now").addEventListener("click", function () {
+      if (deferred) { deferred.prompt(); deferred = null; }
+      hint.hidden = true;
+    });
+    document.getElementById("install-dismiss").addEventListener("click", function () { store.set("limber.install-dismissed", true); hint.hidden = true; });
+  }
+
   function api(path, options) {
     options = options || {};
     options.credentials = "same-origin";
@@ -17,7 +83,7 @@
   var signout = document.getElementById("signout");
   if (signout) {
     signout.addEventListener("click", function () {
-      api("/api/logout", { method: "POST", body: "{}" }).then(function () { window.location.href = "/"; });
+      api("/api/logout", { method: "POST", body: "{}" }).then(function () { wipeLocal(); window.location.href = "/"; });
     });
   }
 
@@ -54,7 +120,8 @@
       event.preventDefault();
       var error = document.getElementById("error");
       error.hidden = true;
-      api("/api/login", { method: "POST", body: JSON.stringify({ code: document.getElementById("code").value }) })
+      var standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+      api("/api/login", { method: "POST", body: JSON.stringify({ code: document.getElementById("code").value, device: standalone }) })
         .then(function (res) {
           if (res.status === 200) { window.location.href = "/today"; return; }
           error.textContent = res.data.error || "Sign-in is not available right now.";
@@ -80,12 +147,10 @@
     });
   }
 
-  if (page === "today") {
-    api("/api/today").then(function (res) {
-      if (res.status === 401) { window.location.href = "/"; return; }
-      var d = res.data;
+  function renderToday(d) {
       text("patient-id", d.patient_id);
       messagesLink(d.messages);
+      if (d.checkin && d.checkin.today) { var cd = text("checkin-done", "Check-ins today: " + d.checkin.today); cd.hidden = false; }
       if (!d.program) { var m = text("message", d.message); m.hidden = false; return; }
       text("program-name", d.program.name);
       var done = d.exercises.filter(function (e) { return e.done_today; }).length;
@@ -125,6 +190,18 @@
         var li = document.createElement("li"); li.textContent = n; document.getElementById("notes").appendChild(li);
       });
       document.getElementById("start").hidden = d.exercises.length === 0;
+      if (d.exercises.length) { document.getElementById("start").href = "/checkin?phase=before"; }
+  }
+
+  if (page === "today") {
+    installHint();
+    api("/api/today").then(function (res) {
+      if (res.status === 401) { wipeLocal(); window.location.href = "/"; return; }
+      store.set("limber.today", res.data);                 // the offline snapshot, this patient only
+      renderToday(res.data);
+    }).catch(function () {
+      var snap = store.get("limber.today");                // offline: show the plan as last seen
+      if (snap) { renderToday(snap); } else { var m = text("message", "Not connected, and no plan saved on this phone yet."); m.hidden = false; }
     });
   }
 }());

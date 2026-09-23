@@ -598,3 +598,26 @@ def test_thread_shows_context_and_can_turn_messaging_off_and_remove(seeded_env):
     at.toggle(key="inbox_enabled").set_value(False).run()
     with SessionStore(seeded_env).open() as store:
         assert messages.is_enabled(store, "P-017") is False
+
+
+# ----------------------------------------------------------------------------- feature 010: From the patient
+
+def test_review_from_the_patient_tab(seeded_env):
+    with SessionStore(seeded_env).open() as store:
+        for i, pain in enumerate((2, 3, 2, 8)):
+            store.entry_add("P-017", "checkin", {"pain": pain, "area": "knee", "stiffness": "mild", "swelling": "none",
+                                                 "note": "Jane Smith was here" if i == 3 else ""},
+                            float(pain), (datetime.now() - timedelta(days=4 - i)).isoformat(), f"c{i}", "standalone",
+                            None, warned=(i == 3), time_adjusted=False)
+    at = _review_page(seeded_env, "From the patient")
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
+    assert "Pain" in text and "0-10" in text
+    table = next(d.value for d in at.dataframe if "Pain" in d.value.columns)
+    assert list(table["Pain"]) == [8, 2, 3, 2] and "privacy warning" in str(table.to_dict()).lower()
+    assert any("pain_rising" in w.value or "pain_high" in w.value for w in list(at.warning) + list(at.markdown))
+    with SessionStore(seeded_env).open() as store:
+        target = store.entries("P-017", newest_first=True)[0].id
+    at.button(key=f"entry_remove_note_{target}").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.entries("P-017", newest_first=True)[0].note_removed is True
