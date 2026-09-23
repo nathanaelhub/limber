@@ -226,3 +226,39 @@ class TestPerExerciseThresholds:
         t = resolve({"rom_regression": 5})
         assert flags.evaluate(by_ex, {}, starts, t, now) == flags.evaluate(by_ex, {}, starts, t, now, per_exercise={})
         assert len(flags.evaluate(by_ex, {}, starts, t, now).flags) == 2
+
+
+# ----------------------------------------------------------------------------- feature 010: pain
+
+from src.ptlog.models import Entry  # noqa: E402
+
+
+def checkin(i, pain, days=0):
+    return Entry(id=i, patient_id="P", kind="checkin", recorded_at=(D0 + timedelta(days=days)).isoformat(),
+                 received_at="", phase="standalone", session_id=None, score=float(pain), payload={}, client_id=str(i))
+
+
+class TestPain:
+    def test_thresholds_are_patient_level(self):
+        from src.ptlog.thresholds import EXERCISE_KEYS, THRESHOLDS
+        assert (THRESHOLDS["pain_rise"].default, THRESHOLDS["pain_rise"].unit) == (3, "points")
+        assert (THRESHOLDS["pain_high"].default, THRESHOLDS["pain_high"].minimum, THRESHOLDS["pain_high"].maximum) == (7, 1, 10)
+        assert "pain_rise" not in EXERCISE_KEYS and "pain_high" not in EXERCISE_KEYS
+
+    def test_pain_rising_needs_four_checkins_and_states_the_threshold(self):
+        rows = [checkin(1, 2), checkin(2, 3, 1), checkin(3, 2, 2), checkin(4, 6, 3)]      # mean 2.3, latest 6
+        assert flags.pain_rules(rows[:3], Thresholds.defaults()) == [NotEvaluated("pain_rising", None, 4, 3)]
+        result = flags.pain_rules(rows, Thresholds.defaults())
+        (rising,) = [f for f in result if isinstance(f, Flag) and f.rule == "pain_rising"]
+        assert rising.values["threshold"] == 3 and rising.values["latest"] == 6.0 and "threshold 3 points" in rising.message
+        assert not [f for f in result if isinstance(f, Flag) and f.rule == "pain_high"]
+        assert [f for f in flags.pain_rules(rows, resolve({"pain_rise": 5})) if isinstance(f, Flag)] == []
+
+    def test_pain_high_fires_on_the_latest_alone(self):
+        result = flags.pain_rules([checkin(1, 8)], Thresholds.defaults())
+        (high,) = [f for f in result if isinstance(f, Flag)]
+        assert high.rule == "pain_high" and "threshold 7 points" in high.message and high.values["latest"] == 8.0
+        assert [f for f in flags.pain_rules([checkin(1, 8)], resolve({"pain_high": 9})) if isinstance(f, Flag)] == []
+
+    def test_no_checkins_means_nothing(self):
+        assert flags.pain_rules([], Thresholds.defaults()) == []

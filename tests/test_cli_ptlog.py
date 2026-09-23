@@ -31,6 +31,7 @@ def seed_session(env, patient="unassigned", reps=2):
 import sys; sys.path.insert(0, {str(REPO_ROOT)!r})
 from datetime import datetime, timedelta
 from src.ptlog.store import SessionStore, default_db_path
+from src.ptlog.thresholds import THRESHOLDS
 from src.ptlog.models import ExerciseSetInfo, RepEvent
 with SessionStore(default_db_path()).open() as s:
     sid = s.start_session({patient!r}, "video", "clip.mp4")
@@ -485,7 +486,7 @@ class TestReviewThresholds:
         r = run_cli(cli_env, "review", "thresholds", "P-017")
         assert r.returncode == 0, out(r)
         lines = [line for line in r.stdout.splitlines() if " (default" in line or "; default" in line]
-        assert len(lines) == 8
+        assert len(lines) == len(THRESHOLDS)
         assert any(line.startswith("ROM regression: 10 degrees (default)") and "previous three" in line for line in lines)
         d = json.loads(run_cli(cli_env, "review", "thresholds", "P-017", "--json").stdout)
         assert d["rom_regression"] == {"value": 10, "origin": "default", "default": 10, "unit": "degrees"}

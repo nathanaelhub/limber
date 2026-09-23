@@ -46,12 +46,17 @@ _DEFS = [
                  "the previous three sessions."),
     ThresholdDef("adherence", "Adherence", "percent", 60, 1, 100,
                  "Mark the patient for attention when adherence to the assigned program is below this."),
+    ThresholdDef("pain_rise", "Pain rise", "points", 3, 1, 9,
+                 "Flag when the latest pain check-in is at least this many points above the mean of the previous three."),
+    ThresholdDef("pain_high", "High pain", "points", 7, 1, 10,
+                 "Flag when the latest pain check-in is at least this (0-10 scale)."),
 ]
 THRESHOLDS: Dict[str, ThresholdDef] = {d.key: d for d in _DEFS}
 
 
 # Practice gap and adherence describe the whole patient; every other threshold can differ per exercise.
-EXERCISE_KEYS: List[str] = [k for k in THRESHOLDS if k not in ("practice_gap", "adherence")]
+PATIENT_LEVEL_KEYS = ("practice_gap", "adherence", "pain_rise", "pain_high")
+EXERCISE_KEYS: List[str] = [k for k in THRESHOLDS if k not in PATIENT_LEVEL_KEYS]
 
 
 def validate_exercise_key(key: str, value) -> int:

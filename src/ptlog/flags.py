@@ -152,6 +152,36 @@ def safety_stops(series: Sequence[SessionMeasure]) -> List[Flag]:
     return result
 
 
+PAIN_WINDOW = 4                 # check-ins considered by the pain-rising rule
+
+
+def pain_rules(checkins: Sequence[Any], thresholds: Thresholds) -> List[Union[Flag, NotEvaluated]]:
+    """Pain rising: the latest check-in's pain is at least `pain_rise` points above the mean of the
+    previous three. High pain: the latest check-in is at least `pain_high`. Both are patient-level
+    (feature 010). `checkins` are entries of kind checkin with a score, in time order."""
+    scored = sorted((c for c in checkins if getattr(c, "score", None) is not None), key=lambda c: (c.recorded_at, c.id))
+    if not scored:
+        return []
+    result: List[Union[Flag, NotEvaluated]] = []
+    latest = scored[-1]
+    high = thresholds.pain_high
+    if latest.score >= high:
+        result.append(Flag("pain_high", None, [], {"latest": float(latest.score), "threshold": high, "entry_id": latest.id},
+                           f"Pain {latest.score:g}/10 reported on {latest.recorded_at[:10]} ({_stated('pain_high', high)})."))
+    if len(scored) < PAIN_WINDOW:
+        result.append(NotEvaluated("pain_rising", None, PAIN_WINDOW, len(scored)))
+        return result
+    window = scored[-PAIN_WINDOW:]
+    prev_mean = round(sum(c.score for c in window[:-1]) / (PAIN_WINDOW - 1), 1)
+    rise = thresholds.pain_rise
+    if latest.score - prev_mean >= rise:
+        result.append(Flag("pain_rising", None, [], {"latest": float(latest.score), "previous_mean": prev_mean,
+                                                     "threshold": rise, "entry_id": latest.id},
+                           f"Pain rose to {latest.score:g}/10 on {latest.recorded_at[:10]} from an average of "
+                           f"{prev_mean:g} over the previous three check-ins ({_stated('pain_rise', rise)})."))
+    return result
+
+
 def practice_gap(session_starts: Sequence[Union[str, tuple]], gap_days: int, now: datetime) -> List[Flag]:
     """Practice gap: more days than the patient's gap threshold between consecutive sessions in the
     period, or between the most recent session and today (FR-014)."""

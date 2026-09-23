@@ -125,7 +125,7 @@ def _exercise_order(sessions) -> List[str]:
 
 
 def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: datetime, thresholds=None,
-                         per_exercise=None):
+                         per_exercise=None, checkins=None):
     """`thresholds` is the patient's effective set and `per_exercise` the sets of exercises with their
     own overrides; both are resolved from the store when not supplied."""
     from . import flags as rules
@@ -154,6 +154,10 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
     # Practice is practice wherever it happened: the gap rule sees every session.
     starts = [(s.id, s.start_time) for s in sessions]
     result.flags.extend(rules.practice_gap(starts, thresholds.practice_gap, now))
+    # Pain check-ins (feature 010) are patient-level, not per session.
+    checkins = store.entries(patient_id, "checkin") if checkins is None else checkins
+    for outcome in rules.pain_rules(checkins, thresholds):
+        (result.flags if isinstance(outcome, rules.Flag) else result.not_evaluated).append(outcome)
     return result
 
 

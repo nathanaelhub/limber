@@ -439,3 +439,21 @@ class TestExerciseThresholds:
         assert [f.exercise for f in summary.flags.flags] == ["Knee Extension"]
         assert set(summary.exercise_thresholds) == {"Knee Extension"}
         assert summary.exercise_thresholds["Knee Extension"].origin("rom_regression") == "exercise"
+
+
+class TestPainInReview:
+    def test_flags_for_includes_pain_and_the_queue_and_roster_mark_it(self, fixed_store, make_session, caseload):
+        from src.ptlog import tracker
+        store, clock = fixed_store
+        store.add_patient("P-017")
+        make_session(store, clock, "P-017", "Squat", D0 - timedelta(days=1), [(90.0, 80.0, 2.4)])
+        assert [f.rule for f in review.flags_for(store, "P-017", "all", now=D0).flags if f.rule.startswith("pain")] == []
+        for i, pain in enumerate((2, 3, 2, 8)):
+            store.entry_add("P-017", "checkin", {"pain": pain}, float(pain), (D0 - timedelta(days=4 - i)).isoformat(),
+                            f"c{i}", "standalone", None, False, False)
+        rules = sorted(f.rule for f in review.flags_for(store, "P-017", "all", now=D0).flags if f.rule.startswith("pain"))
+        assert rules == ["pain_high", "pain_rising"]
+        row = {r.patient_id: r for r in tracker.roster(store, now=D0)}["P-017"]
+        assert row.open_flags >= 2 and row.needs_attention
+        items = tracker.queue(store, now=D0).items["attention_flag"]
+        assert any("pain_rising" in i.description for i in items)

@@ -168,7 +168,7 @@ class TestThresholdsInExports:
         rows = to_review_csv(review.review_summary(store, "P-017", "all", now=D0)).strip().split("\r\n")
         assert rows[0].endswith(",reviewed_at,thresholds_in_use,recorded")
         cell = rows[1].rsplit(",", 2)[1]
-        assert cell.startswith("practice_gap=30 (patient); form_drop=10; rom_regression=10;") and cell.endswith("adherence=60")
+        assert cell.startswith("practice_gap=30 (patient); form_drop=10; rom_regression=10;") and "adherence=60" in cell and cell.endswith("pain_high=7")
         assert all(r.rsplit(",", 2)[1] == cell and r.endswith(",clinic") for r in rows[1:])
 
 

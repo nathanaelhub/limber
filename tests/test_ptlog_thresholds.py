@@ -14,6 +14,8 @@ EXPECTED = [  # key, unit, default, minimum, maximum
     ("partial_share", "percent", 25, 1, 100),
     ("partial_rise", "percentage points", 10, 1, 100),
     ("adherence", "percent", 60, 1, 100),
+    ("pain_rise", "points", 3, 1, 9),          # feature 010
+    ("pain_high", "points", 7, 1, 10),
 ]
 
 
