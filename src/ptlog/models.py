@@ -578,6 +578,33 @@ class ConversationSummary:
     last_at: Optional[str]
 
 
+# --------------------------------------------------------------------------------------
+# Patient-reported entries (feature 010)
+# --------------------------------------------------------------------------------------
+
+class EntryValidationError(PTLogError):
+    """A patient-reported entry does not fit its kind's fields or ranges."""
+
+
+@dataclass
+class Entry:
+    """Something a patient reported: a check-in now, questionnaires and logs later."""
+    id: int
+    patient_id: str
+    kind: str                        # checkin | questionnaire | medication | sleep
+    recorded_at: str                 # when the patient made it (bounded; see entries.accept_recorded_at)
+    received_at: str                 # the service clock
+    phase: str                       # before | after | standalone
+    session_id: Optional[int]
+    score: Optional[float]           # the kind's one number (pain 0-10, questionnaire total)
+    payload: Dict[str, Any]
+    client_id: str                   # makes resending from an offline queue idempotent
+    warned: bool = False             # free text sent after a privacy warning
+    time_adjusted: bool = False      # recorded time was replaced by the receive time
+    note_removed: bool = False
+    reviewed_at: Optional[str] = None
+
+
 @dataclass
 class ThresholdChange:
     """One change of a stored attention threshold. None = no stored value (the inherited value applies)."""

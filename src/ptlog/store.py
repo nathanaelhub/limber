@@ -20,6 +20,7 @@ from .privacy import validate_label, validate_notes, validate_patient_id
 from . import thresholds
 from .models import (
     PTLogError,
+    Entry,
     Message,
     AccessStatus,
     AuditEntry,
@@ -59,7 +60,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -373,6 +374,50 @@ CREATE TABLE IF NOT EXISTS message_events (
 );
 """
 
+# v9 (feature 010): patient-reported entries, and new access-history events. SQLite cannot alter a
+# CHECK constraint, so portal_audit is rebuilt by the documented recipe: foreign keys off (outside a
+# transaction), copy, drop, rename, check. A test upgrades a real v8 record and counts every row.
+SCHEMA_V9_SQL = """
+PRAGMA foreign_keys=OFF;
+BEGIN;
+CREATE TABLE IF NOT EXISTS entries (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id    TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    kind          TEXT NOT NULL CHECK (kind IN ('checkin', 'questionnaire', 'medication', 'sleep')),
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    recorded_at   TEXT NOT NULL,
+    received_at   TEXT NOT NULL,
+    phase         TEXT NOT NULL CHECK (phase IN ('before', 'after', 'standalone')),
+    session_id    INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+    score         REAL,
+    payload       TEXT NOT NULL,
+    client_id     TEXT NOT NULL,
+    warned        INTEGER NOT NULL DEFAULT 0 CHECK (warned IN (0, 1)),
+    time_adjusted INTEGER NOT NULL DEFAULT 0 CHECK (time_adjusted IN (0, 1)),
+    note_removed  INTEGER NOT NULL DEFAULT 0 CHECK (note_removed IN (0, 1)),
+    reviewed_at   TEXT,
+    UNIQUE (patient_id, client_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entries_patient_time ON entries(patient_id, kind, recorded_at);
+CREATE TABLE portal_audit_v9 (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    patient_id  TEXT REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    event       TEXT NOT NULL CHECK (event IN ('code_created', 'code_revoked', 'login_ok', 'login_failed',
+                'locked_out', 'logout', 'live_start', 'live_end', 'live_interrupted', 'live_refused',
+                'entry_stored', 'entry_note_removed')),
+    client      TEXT,
+    detail      TEXT
+);
+INSERT INTO portal_audit_v9 (id, at, patient_id, event, client, detail)
+    SELECT id, at, patient_id, event, client, detail FROM portal_audit;
+DROP TABLE portal_audit;
+ALTER TABLE portal_audit_v9 RENAME TO portal_audit;
+CREATE INDEX IF NOT EXISTS idx_portal_audit_patient ON portal_audit(patient_id, id);
+COMMIT;
+PRAGMA foreign_keys=ON;
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -382,6 +427,7 @@ MIGRATIONS: List[tuple] = [
     (6, SCHEMA_V6_SQL),
     (7, SCHEMA_V7_SQL),
     (8, SCHEMA_V8_SQL),
+    (9, SCHEMA_V9_SQL),
 ]
 
 
@@ -1670,6 +1716,68 @@ class SessionStore:
             LEFT JOIN messages m ON m.id = (SELECT MAX(id) FROM messages WHERE patient_id = p.id)
             WHERE p.is_builtin = 0""").fetchall()
         return [dict(r) for r in rows]
+
+    # patient-reported entries (feature 010); the rules live in src/ptlog/entries.py
+
+    @staticmethod
+    def _entry(row) -> Entry:
+        return Entry(id=row["id"], patient_id=row["patient_id"], kind=row["kind"], recorded_at=row["recorded_at"],
+                     received_at=row["received_at"], phase=row["phase"], session_id=row["session_id"],
+                     score=row["score"], payload=json.loads(row["payload"]), client_id=row["client_id"],
+                     warned=bool(row["warned"]), time_adjusted=bool(row["time_adjusted"]),
+                     note_removed=bool(row["note_removed"]), reviewed_at=row["reviewed_at"])
+
+    def entry_add(self, patient_id: str, kind: str, payload: Dict[str, Any], score: Optional[float], recorded_at: str,
+                  client_id: str, phase: str, session_id: Optional[int], warned: bool, time_adjusted: bool) -> Entry:
+        """Store an entry. Resending the same client id for the same patient returns the stored entry."""
+        self._require_patient(patient_id)
+        existing = self.conn.execute("SELECT * FROM entries WHERE patient_id = ? AND client_id = ?",
+                                     (patient_id, client_id)).fetchone()
+        if existing is not None:
+            return self._entry(existing)
+        try:
+            cur = self.conn.execute(
+                "INSERT INTO entries (patient_id, kind, recorded_at, received_at, phase, session_id, score, payload, "
+                "client_id, warned, time_adjusted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (patient_id, kind, recorded_at, self._now(), phase, session_id, score, json.dumps(payload),
+                 client_id, 1 if warned else 0, 1 if time_adjusted else 0))
+            self.conn.execute("INSERT INTO portal_audit (at, patient_id, event, client, detail) VALUES (?, ?, ?, NULL, ?)",
+                              (self._now(), patient_id, "entry_stored", kind))
+            self.conn.commit()
+        except sqlite3.IntegrityError:
+            self.conn.rollback()
+            raise
+        return self._entry(self.conn.execute("SELECT * FROM entries WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+    def entries(self, patient_id: str, kind: Optional[str] = None, newest_first: bool = False,
+                limit: Optional[int] = None) -> List[Entry]:
+        sql, args = "SELECT * FROM entries WHERE patient_id = ?", [patient_id]
+        if kind:
+            sql += " AND kind = ?"
+            args.append(kind)
+        sql += " ORDER BY recorded_at " + ("DESC, id DESC" if newest_first else "ASC, id ASC")
+        if limit:
+            sql += f" LIMIT {int(limit)}"
+        return [self._entry(r) for r in self.conn.execute(sql, args)]
+
+    def entry_remove_note(self, entry_id: int) -> bool:
+        """The therapist removes an entry's free text (for example identifying details); a marker stays."""
+        row = self.conn.execute("SELECT patient_id, payload, note_removed FROM entries WHERE id = ?", (entry_id,)).fetchone()
+        if row is None or row["note_removed"]:
+            return False
+        payload = json.loads(row["payload"])
+        if "note" in payload:
+            payload["note"] = ""
+        self.conn.execute("UPDATE entries SET payload = ?, note_removed = 1 WHERE id = ?", (json.dumps(payload), entry_id))
+        self.portal_audit_add("entry_note_removed", row["patient_id"], None)
+        return True
+
+    def entries_all(self, kind: str) -> Dict[str, List[Entry]]:
+        """Every patient's entries of one kind, oldest first, from one query (roster and queue)."""
+        result: Dict[str, List[Entry]] = {}
+        for r in self.conn.execute("SELECT * FROM entries WHERE kind = ? ORDER BY patient_id, recorded_at, id", (kind,)):
+            result.setdefault(r["patient_id"], []).append(self._entry(r))
+        return result
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(
