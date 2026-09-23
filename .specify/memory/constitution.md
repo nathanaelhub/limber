@@ -1,14 +1,17 @@
 <!--
 Sync Impact Report (temporary; remove before the next amendment)
-Version change: 1.0.0 -> 1.1.0 (MINOR: materially expanded guidance, no principle removed)
-Rationale: the owner decided that patients will use PT Assist at home over the internet
-(feature 007). Principle III already allowed an explicit, separately specified opt-in network
-feature; this amendment states what such a feature must guarantee. The Technical Constraints
-named two interface surfaces; a patient-facing third one is added with the same separation rule.
-Modified: Principle III (one bullet added); Technical Constraints "User interface" bullet.
+Version change: 1.1.0 -> 1.2.0 (MINOR: materially expanded guidance, no principle removed)
+Rationale: the owner decided that patients will use Limber on their phones outside therapy and
+upload short video clips and voice notes for the therapist (features 010-014). Principle III said
+camera video never leaves the device, written for guided sessions; that rule is kept for guided
+sessions, and deliberate patient uploads are allowed under stated guarantees. Principle IV's
+"no model weights in the suite" is widened from the pose model to any model (a speech model
+arrives with transcription). The installed app may keep a device signed in for 30 days.
+Modified: Principle III (video sentence replaced by a bullet on uploads); Principle IV (weights
+wording); Technical Constraints data-directory list (data/media/).
 Added sections: none. Removed sections: none.
-Follow-ups: specs/007-online-patient-view must carry the Principle III check; real-patient use
-stays blocked on a compliance review.
+Follow-ups: specs/010+ carry the Principle III check; retention, consent text, and identifiable
+media must be covered by the compliance review before real-patient use.
 -->
 
 # PT Assist Constitution
@@ -71,13 +74,20 @@ Patient data stays on the user's machine, and patients are never identifiable fr
   never does, and who may use the feature. It MUST be off until a therapist turns it on for a
   specific patient, MUST expose to a signed-in patient only that patient's own data, and MUST
   NOT be used with real clinic patients until a compliance review has approved it; until then
-  it is limited to demo and consented study participants. Camera video MUST NOT leave the
-  patient's device.
+  it is limited to demo and consented study participants. During a guided session only body
+  points are sent; camera video MUST NOT leave the patient's device then.
+- A patient MAY deliberately upload a short video clip or voice note for the therapist, only
+  after a plain notice that it is stored on the Limber host and seen by the therapist. Such
+  uploads MUST be a separately specified feature, stored only under the pseudonymous ID,
+  subject to a stated retention period, deletable by the patient and deleted with the patient,
+  and processed (for example transcribed) only on the Limber host, never by a third-party
+  service. An installed patient app MAY keep a device signed in for up to 30 days, revocable by
+  the therapist at any time.
 - Patients MUST be identified by pseudonymous IDs. Names, dates of birth, medical record
   numbers, and contact details MUST NOT appear in filenames, log lines, screenshots, test
   fixtures, commit messages, or committed files.
-- Data directories (`sessions/`, `observation_logs/`, `pta_logs/`, `logs/`, and the canonical
-  store) MUST remain gitignored. Test fixtures MUST be synthetic.
+- Data directories (`sessions/`, `observation_logs/`, `pta_logs/`, `logs/`, `data/media/`, and the
+  canonical store) MUST remain gitignored. Test fixtures MUST be synthetic.
 - Deleting a patient MUST remove every record and export tied to that patient's ID.
 
 Rationale: this tool is used in a graduate-assistant clinical setting where patient data is
@@ -95,8 +105,8 @@ Every feature is specified by tests before it is implemented.
 - The engine's tests (`tests/test_analysis.py`, `tests/test_form_assessment.py`) are the
   regression guard. They MUST NOT be skipped, marked expected-failure, or loosened to make new
   work pass. A test in those files MAY change only under Principle I.
-- Tests MUST run without camera hardware, without network access, and without the model
-  weights in `models/`. Data-layer tests MUST use temporary directories or in-memory stores and
+- Tests MUST run without camera hardware, without network access, without a browser, and
+  without any model weights (pose or speech) in `models/` or elsewhere. Data-layer tests MUST use temporary directories or in-memory stores and
   MUST NOT write into the project's data directories.
 
 Rationale: the engine has 98 passing tests that protect calibrated behaviour; the new data
@@ -176,4 +186,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-21
+**Version**: 1.2.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-23
