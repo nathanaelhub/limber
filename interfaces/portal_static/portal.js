@@ -42,7 +42,7 @@
       if (res.status === 401) { wipeLocal(); }
     }).catch(function () {});
   }
-  function offlineBanner() { var b = document.getElementById("offline"); if (b) { b.hidden = navigator.onLine; } }
+  function offlineBanner(force) { var b = document.getElementById("offline"); if (b) { b.hidden = navigator.onLine && !force; } }
   if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js").catch(function () {}); }
   window.addEventListener("online", function () { offlineBanner(); replayQueue(); });
   window.addEventListener("offline", offlineBanner);
@@ -200,6 +200,7 @@
       store.set("limber.today", res.data);                 // the offline snapshot, this patient only
       renderToday(res.data);
     }).catch(function () {
+      offlineBanner(true);                                  // the request itself failed: treat as offline
       var snap = store.get("limber.today");                // offline: show the plan as last seen
       if (snap) { renderToday(snap); } else { var m = text("message", "Not connected, and no plan saved on this phone yet."); m.hidden = false; }
     });

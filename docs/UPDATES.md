@@ -2,6 +2,31 @@
 
 ---
 
+## Update 12 — 2026-09-23 — Limber on the Phone: Installable App and Pain Check-ins
+
+Feature spec: `specs/010-installable-app-checkins/`; the first of the phone features planned on
+2026-09-23 (video clips, diary and logs, questionnaires, voice notes follow). Constitution 1.2.0. Schema
+moved to version 9 (`entries`; the access-history table was rebuilt for new events, and a test
+upgrades a real v8 record without losing a row).
+
+- **Installable**: Limber offers "Add to Home Screen" (with iPhone steps, where the browser has no
+  prompt), serves its own manifest and icons, and its shell opens without a connection. The API is
+  never cached; Today's plan is kept as a per-patient snapshot on the phone, wiped on sign-out.
+- **Stays signed in**: a sign-in from the installed app lasts 30 days on that device (three devices at
+  most), and ends at once when the therapist revokes or reissues the code. Browser sign-ins keep the
+  30-minute idle and 12-hour limits.
+- **Check-ins**: pain 0-10, body area, stiffness, swelling, optional note; offered before and after a
+  guided session and from Today. Made offline, they are queued on the phone and sent once, at their
+  recorded time, when the connection returns. Notes go through the messages privacy warning.
+- **For the PT**: Review has a "From the patient" tab (pain trend, check-in table, definitions, note
+  removal). Two whole-patient thresholds, `pain_rise` (3 points over the mean of the previous three) and
+  `pain_high` (7), drive `pain_rising` and `pain_high` flags in flags, the queue, and the roster.
+- **Patient progress** shows pain over time beside the exercise trends.
+- Verified on an emulated iPhone in Chrome: install hint, service worker, online check-in, offline
+  shell with a queued check-in replayed exactly once, sign-out wiping local storage.
+
+---
+
 ## Update 11 — 2026-09-21 — Ready to Host (nothing has been hosted yet)
 
 Feature spec: `specs/009-cloud-deployment/`; runbook: `docs/DEPLOYMENT.md`. Limber can now be run on one

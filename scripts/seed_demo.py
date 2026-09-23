@@ -180,6 +180,15 @@ def build(db_path: Path, seed: int = 7) -> None:
         clock.now = datetime.now() - timedelta(days=2)
         messages.thread(s, "P-017", viewer="patient")            # the patient has read the first reply
 
+        # Pain check-ins (feature 010): P-017 steady then a jump; P-021 climbing.
+        for pid, series in (("P-017", [(9, 3), (7, 2), (5, 3), (3, 2), (1, 6)]), ("P-021", [(8, 4), (6, 5), (4, 6), (2, 7), (1, 8)])):
+            for i, (days_ago, pain) in enumerate(series):
+                when = datetime.now() - timedelta(days=days_ago, hours=1)
+                s.entry_add(pid, "checkin", {"pain": pain, "area": "knee" if pid == "P-017" else "hip",
+                                             "stiffness": "mild" if pain < 5 else "moderate", "swelling": "none",
+                                             "note": "Pinching on the outside of the hip." if pid == "P-021" and i == 4 else ""},
+                            float(pain), when.isoformat(), f"demo-{pid}-{i}", "standalone", None, False, False)
+
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)
         s.set_installation_threshold("adherence", 65)

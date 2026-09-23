@@ -68,8 +68,8 @@ input.plain { letter-spacing: normal; text-transform: none; }
 .form-messages { margin: .6rem 0 0; padding-left: 1.2rem; color: var(--ink); }
 .feedback { min-height: 1.5rem; margin: .5rem 0 0; color: var(--teal); font-weight: 600; }
 .actions { display: flex; gap: .8rem; flex-wrap: wrap; }
-button.secondary { color: var(--teal); background: var(--card); border: 2px solid var(--teal); }
-button.secondary:hover { color: #fff; }
+button.secondary, .button.secondary { color: var(--teal); background: var(--card); border: 2px solid var(--teal); }
+button.secondary:hover, .button.secondary:hover { color: #fff; background: var(--teal); }
 .progress-exercise { padding: 1.1rem 0; border-top: 1px solid var(--line); }
 .progress-exercise h2 { font-size: 1.25rem; font-weight: 800; letter-spacing: -.02em; margin: 0; }
 .progress-exercise h3 { font-size: .95rem; margin: 1rem 0 .3rem; color: var(--muted); font-weight: 600; }
