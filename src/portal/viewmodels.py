@@ -156,6 +156,12 @@ def logs_badge(store: SessionStore, patient_id: str, now: datetime) -> Dict[str,
             "definitions": {kind: reg.definitions(kind) for kind in ("medication", "sleep")}}
 
 
+def questionnaire_badge(store: SessionStore, patient_id: str, now: datetime) -> Dict[str, Any]:
+    """What Today says about assigned questionnaires (feature 013)."""
+    from src.portal import questionnaires
+    return questionnaires.badge(store, patient_id, now)
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     from src.portal import diary
     _require(store, patient_id)
@@ -167,7 +173,8 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
                             "checkin": checkin_badge(store, patient_id, now),
                             "clips": clips_badge(store, patient_id),
                             "diary": diary.options(store, patient_id, now=now),
-                            "logs": logs_badge(store, patient_id, now)}
+                            "logs": logs_badge(store, patient_id, now),
+                            "questionnaires": questionnaire_badge(store, patient_id, now)}
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         view["message"] = NO_PROGRAM

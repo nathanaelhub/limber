@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Questionnaire</title>
+</head>
+<body data-page="questionnaire">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <p id="offline" class="offline" hidden>Not connected. Your answers will be saved on this phone and sent when you are back online.</p>
+  <main class="card wide">
+    <h1 id="title">Questionnaire</h1>
+    <p id="lead" class="lead"></p>
+    <p id="notice" class="notice" hidden></p>
+    <p id="none" class="lead" hidden>Nothing to answer just now. Your therapist will assign one when they need it.</p>
+
+    <form id="questionnaire" autocomplete="off" hidden>
+      <p id="progress" class="small" role="status"></p>
+      <ol id="items" class="questions"></ol>
+      <p id="warn" class="warn" role="alert" hidden></p>
+      <div class="actions">
+        <button id="save" type="submit">Send answers</button>
+        <a class="link-button" href="/today">Finish later</a>
+      </div>
+      <p id="error" class="error" role="alert" hidden></p>
+    </form>
+
+    <div id="done" hidden>
+      <p id="done-total" class="big"></p>
+      <p id="done-meaning" class="lead"></p>
+      <p id="done-next" class="small"></p>
+      <div class="actions"><a class="button" href="/today">Back to Today</a></div>
+    </div>
+  </main>
+  <script src="/static/portal.js"></script>
+  <script src="/static/questionnaire.js"></script>
+</body>
+</html>

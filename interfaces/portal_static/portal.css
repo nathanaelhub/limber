@@ -101,6 +101,16 @@ legend .unit { font-weight: 400; color: var(--muted); font-size: .88rem; }
 .scale-btn:hover, .level-btn:hover { background: var(--line); }
 .scale-btn[aria-checked="true"]:hover, .level-btn[aria-checked="true"]:hover { background: var(--teal-dark); }
 .levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem; }
+/* Two short number fields side by side (the diary's reps and sets). */
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-bottom: 1.1rem; }
+.pair label { display: block; font-weight: 600; }
+.pair input { width: 100%; margin-top: .35rem; padding: .8rem 1rem; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; }
+/* A questionnaire: one card per question, its choices spread over as many columns as fit. */
+.questions { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 1rem; }
+.questions li { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+.questions .question { margin: 0 0 .6rem; font-weight: 600; }
+.questions .levels { grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
+.questions .level-btn { padding: .6rem .4rem; font-size: .92rem; }
 select { width: 100%; padding: .8rem 1rem; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; }
 .link-button { align-self: center; margin-top: 1rem; color: var(--muted); }
 .saved { color: var(--teal); font-weight: 600; }

@@ -140,7 +140,7 @@
   }
 
   if (page === "session" || page === "progress" || page === "messages" || page === "clip" ||
-      page === "diary" || page === "log") {
+      page === "diary" || page === "log" || page === "questionnaire") {
     api("/api/today").then(function (res) {
       if (res.status === 401) { window.location.href = "/"; return; }
       text("patient-id", res.data.patient_id);
@@ -153,6 +153,11 @@
       messagesLink(d.messages);
       if (d.checkin && d.checkin.today) { var cd = text("checkin-done", "Check-ins today: " + d.checkin.today); cd.hidden = false; }
       if (d.diary) { document.getElementById("diary-link").hidden = !d.diary.enabled; }
+      if (d.questionnaires) {
+        var ql = document.getElementById("questionnaire-link");
+        ql.hidden = d.questionnaires.due === 0;
+        if (d.questionnaires.due) { ql.textContent = d.questionnaires.names[0] + " · due"; }
+      }
       if (!d.program) { var m = text("message", d.message); m.hidden = false; return; }
       text("program-name", d.program.name);
       var done = d.exercises.filter(function (e) { return e.done_today; }).length;

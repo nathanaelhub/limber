@@ -35,18 +35,18 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 3: User Story 1 — the patient answers what is due (P1) 🎯 MVP
 
-- [ ] T008 [P] [US1] Failing tests in `tests/test_portal_questionnaires.py`: `/api/questionnaires`
+- [x] T008 [P] [US1] Failing tests in `tests/test_portal_questionnaires.py`: `/api/questionnaires`
       returns only this patient's due and assigned instruments with their items; `POST /api/entries`
       with kind `questionnaire` stores one entry carrying the answers, instrument key and version, the
       total as the score, the subscale scores, and the missing count; refusals (not assigned, unknown
       instrument, unknown item, a value not in the item's choices, too few answered, discharged
       patient); a resent client id stores nothing twice; the no-leak walk covers the new route
-- [ ] T009 [US1] Implement the `questionnaire` entry kind in `src/ptlog/entries.py` (fields defined by
+- [x] T009 [US1] Implement the `questionnaire` entry kind in `src/ptlog/entries.py` (fields defined by
       the instrument, not the registry), the route in `interfaces/patient_portal.py`, and the due list in
       `src/portal/viewmodels.py`
-- [ ] T010 [P] [US1] Failing tests: Today carries what is due with its next due date and shows it as
+- [x] T010 [P] [US1] Failing tests: Today carries what is due with its next due date and shows it as
       done once answered
-- [ ] T011 [US1] Implement `interfaces/portal_static/questionnaire.html` and `questionnaire.js` (one
+- [x] T011 [US1] Implement `interfaces/portal_static/questionnaire.html` and `questionnaire.js` (one
       scrolling form, progress, the half-finished answers kept under `limber.*` and cleared once sent,
       the total and its meaning shown on sending) and the Today entry point
 

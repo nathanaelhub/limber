@@ -59,6 +59,10 @@ ENTRY_KINDS: Dict[str, EntryKind] = {
         Field("note", "Note", "text", "Anything about taking it you want your therapist to know.",
               "text", required=False),
     ], score_field=None),
+    # A questionnaire's fields are the items of the instrument the therapist assigned, so they are not
+    # listed here: src/ptlog/questionnaires.py validates and scores an answer set against its definition,
+    # and a kind with no fields tells the rest of the code to look there rather than at this registry.
+    "questionnaire": EntryKind("questionnaire", "Questionnaire", [], score_field=None),
     "sleep": EntryKind("sleep", "Last night's sleep", [
         Field("hours", "Hours slept", "hours", "How long you slept last night, to the nearest half hour.",
               "half", 0, 14),

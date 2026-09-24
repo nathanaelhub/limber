@@ -36,7 +36,7 @@ from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
-from src.portal import access, admin, diary, frames, live, messages, uploads, viewmodels  # noqa: E402
+from src.portal import access, admin, diary, frames, live, messages, questionnaires, uploads, viewmodels  # noqa: E402
 from src.ptlog import origin  # noqa: E402
 from src.ptlog.models import PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
@@ -251,8 +251,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     except PTLogError:
                         return _json({"error": "That session is not yours."}, 400)
                 try:
-                    payload, score = entry_rules.validate(body.get("kind"), body.get("data"),
-                                                          choices={"item": store.medication_list(patient_id)})
+                    if body.get("kind") == "questionnaire":
+                        # A questionnaire's fields are the items of the assigned instrument, so it is
+                        # validated and scored against its definition rather than the entry registry.
+                        payload, score = questionnaires.accept(store, patient_id, body.get("data"), now=clock())
+                    else:
+                        payload, score = entry_rules.validate(body.get("kind"), body.get("data"),
+                                                              choices={"item": store.medication_list(patient_id)})
                 except PTLogError as err:
                     return _json({"error": str(err)}, 400)
                 note = payload.get("note") or ""
@@ -267,6 +272,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                         session_id, warned=bool(reasons), time_adjusted=adjusted)
                 return _json(viewmodels.entry_json(entry), 200 if client_id in before else 201)
         return await run_in_threadpool(work)
+
+    def questionnaires_get(request: Request):
+        """What this patient has been assigned, what is due, and the items to answer."""
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json(questionnaires.view(store, patient_id, now=clock()))
 
     # ------------------------------------------------------------------ exercise logged without the camera (012)
 
@@ -616,6 +629,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/clip", inner_page("clip")),
         Route("/diary", inner_page("diary")),
         Route("/log", inner_page("log")),
+        Route("/questionnaire", inner_page("questionnaire")),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
@@ -625,6 +639,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/entries", entries_get, methods=["GET"]),
         Route("/api/entries", entries_post, methods=["POST"]),
         Route("/api/diary", diary_post, methods=["POST"]),
+        Route("/api/questionnaires", questionnaires_get),
         Route("/manifest.webmanifest", manifest),
         Route("/api/uploads", upload_begin, methods=["POST"]),
         Route("/api/uploads/{upload_id}", upload_status, methods=["GET"]),
