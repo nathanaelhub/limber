@@ -621,3 +621,33 @@ def test_review_from_the_patient_tab(seeded_env):
     at.button(key=f"entry_remove_note_{target}").click().run()
     with SessionStore(seeded_env).open() as store:
         assert store.entries("P-017", newest_first=True)[0].note_removed is True
+
+
+# ----------------------------------------------------------------------------- feature 011: clips for the PT
+
+def _seed_clip(db, tmp_path, caption="Knee catching"):
+    from src.portal import uploads
+    from tests.fixtures import media as media_fx
+    import hashlib
+    clip = media_fx.make_video(tmp_path / "c.mp4", seconds=2.0)
+    data = clip.read_bytes()
+    with SessionStore(db).open() as store:
+        up = uploads.begin(store, store.media_dir, "P-017", "clip", len(data), hashlib.sha256(data).hexdigest(), chunk_bytes=len(data))
+        uploads.put_part(store, store.media_dir, "P-017", up.id, 0, data)
+        return uploads.finish(store, store.media_dir, "P-017", up.id, caption=caption)
+
+
+def test_review_tab_plays_reviews_and_deletes_a_clip(seeded_env, tmp_path):
+    m = _seed_clip(seeded_env, tmp_path)
+    at = _review_page(seeded_env, "From the patient")
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption) + list(at.text))
+    assert "Knee catching" in text and "waiting for review" in text.lower()
+    assert at.get("video"), "the clip is shown with a player"      # AppTest has no .video accessor; get() finds it by type
+    at.button(key=f"media_review_{m.id}").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.media_get(m.id).reviewed_at is not None
+    at.button(key=f"media_delete_{m.id}").click().run()
+    with SessionStore(seeded_env).open() as store:
+        gone = store.media_get(m.id)
+        assert gone.deleted_by == "therapist" and not (store.media_dir / "P-017" / f"{m.id}.mp4").exists()

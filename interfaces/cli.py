@@ -695,6 +695,35 @@ def cmd_review(args):
         return 2
 
 
+def cmd_media(args):
+    """Uploaded clips (feature 011): list, retention, reconcile. Never prints captions."""
+    from src.portal import uploads
+    try:
+        with SessionStore(default_db_path()).open() as store:
+            if args.media_cmd == "list":
+                print_header("Uploads")
+                rows = store.media_list(args.patient) if args.patient else store.media_list()
+                if not rows:
+                    print("No uploads.")
+                for m in rows:
+                    state = "deleted (" + m.deleted_by + ")" if m.deleted_at else ("reviewed" if m.reviewed_at else "waiting")
+                    print(f"{m.id}  {m.patient_id:<10}{m.kind:<6}{m.created_at[:16].replace('T', ' ')}  {m.duration:5.1f} s  {m.bytes // 1024:6d} KB  {state}")
+            elif args.media_cmd == "retention":
+                report = uploads.run_retention(store, store.media_dir)
+                print("; ".join(f"{k}: {v}" for k, v in report.items()))
+            elif args.media_cmd == "reconcile":
+                cleaned = uploads.clean_expired(store, store.media_dir)
+                report = uploads.reconcile(store, store.media_dir)
+                print("; ".join(f"{k}: {v}" for k, v in report.items()) + f"; expired_uploads: {cleaned}")
+            else:
+                print_error("Usage: media {list,retention,reconcile}")
+                return 1
+        return 0
+    except (PTLogError, OSError) as e:
+        print_error(str(e))
+        return 1
+
+
 def cmd_deploy(args):
     """Hosting helpers (feature 009): start-up checks, first-boot setup, encrypted backups, restore."""
     from pathlib import Path as _Path
@@ -724,7 +753,7 @@ def cmd_deploy(args):
             if not backup.verify(_Path(args.file), key):
                 print_error("That backup cannot be decrypted with this key, or it is damaged. Nothing was changed.")
                 return 1
-            print(f"Restored to {backup.restore(_Path(args.file), db, key, force=args.force)}")
+            print(f"Restored to {backup.restore(_Path(args.file), db, key, force=args.force, media_backup_dir=_Path(args.file).parent / 'media')}")
             return 0
         print_error("Usage: deploy {preflight,init,backup,restore}")
         return 1
@@ -1371,6 +1400,13 @@ Examples:
     # Interactive mode
     subparsers.add_parser("interactive", help="Start interactive menu")
 
+    media_parser = subparsers.add_parser("media", help="Uploaded clips: list, retention, reconcile")
+    media_sub = media_parser.add_subparsers(dest="media_cmd")
+    ml = media_sub.add_parser("list")
+    ml.add_argument("--patient", default=None)
+    media_sub.add_parser("retention", help="Delete files past their retention period (rows stay as markers)")
+    media_sub.add_parser("reconcile", help="Remove expired uploads and files without rows; mark rows without files")
+
     dep_parser = subparsers.add_parser("deploy", help="Hosting: start-up checks, first-boot setup, encrypted backups")
     dep_sub = dep_parser.add_subparsers(dest="deploy_cmd")
     dpf = dep_sub.add_parser("preflight", help="Refuse unsafe configurations before the service starts")
@@ -1462,6 +1498,8 @@ Examples:
         return cmd_messages(args)
     elif args.command == "deploy":
         return cmd_deploy(args)
+    elif args.command == "media":
+        return cmd_media(args)
     elif args.command == "calibrate":
         return cmd_calibrate(args)
     elif args.command == "interactive":

@@ -66,6 +66,7 @@ def create(db_path: Path, dest_dir: Path, key: bytes, now: Optional[datetime] = 
     os.chmod(partial, 0o600)
     partial.replace(out)
     prune(dest_dir, keep)
+    backup_media(db_path, dest_dir, key, now=now)
     return out
 
 
@@ -106,7 +107,57 @@ def verify(backup_file: Path, key: bytes) -> bool:
             conn.close()
 
 
-def restore(backup_file: Path, db_path: Path, key: bytes, force: bool = False) -> Path:
+def backup_media(db_path: Path, dest_dir: Path, key: bytes, now: Optional[datetime] = None) -> int:
+    """Copy each live media file that has not been backed up yet, encrypted, to dest_dir/media/<id>.<ext>.enc.
+    Copied once per file; removed here when its row is deleted. Returns how many were copied."""
+    from src.ptlog.store import SessionStore
+    media_root = Path(dest_dir) / "media"
+    copied = 0
+    with SessionStore(db_path).open() as store:
+        rows = store.media_list()
+        for m in rows:
+            enc = media_root / f"{m.id}.{m.ext}.enc"
+            if m.deleted_at is not None:
+                enc.unlink(missing_ok=True)
+                continue
+            source = store.media_dir / m.patient_id / f"{m.id}.{m.ext}"
+            if m.backed_up_at and enc.is_file():
+                continue
+            if not source.is_file():
+                continue
+            media_root.mkdir(parents=True, exist_ok=True)
+            partial = enc.with_suffix(".part")
+            partial.write_bytes(Fernet(key).encrypt(source.read_bytes()))
+            os.chmod(partial, 0o600)
+            partial.replace(enc)
+            store.media_update(m.id, backed_up_at=(now or datetime.now()).isoformat())
+            copied += 1
+    return copied
+
+
+def restore_media(media_backup_dir: Path, db_path: Path, key: bytes) -> int:
+    """Put every backed-up file that the (restored) record still references back under data/media/."""
+    from src.ptlog.store import SessionStore
+    restored = 0
+    with SessionStore(db_path).open() as store:
+        for m in store.media_list(live_only=True):
+            enc = Path(media_backup_dir) / f"{m.id}.{m.ext}.enc"
+            if not enc.is_file():
+                continue
+            target = store.media_dir / m.patient_id / f"{m.id}.{m.ext}"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.chmod(target.parent, 0o700)
+            try:
+                target.write_bytes(Fernet(key).decrypt(enc.read_bytes()))
+            except (InvalidToken, ValueError):
+                raise PTLogError(f"{enc.name} could not be decrypted with this key") from None
+            os.chmod(target, 0o600)
+            restored += 1
+    return restored
+
+
+def restore(backup_file: Path, db_path: Path, key: bytes, force: bool = False,
+            media_backup_dir: Optional[Path] = None) -> Path:
     """Write the backup's record to `db_path`. Stop the service first. Never overwrites without force."""
     db_path = Path(db_path)
     if db_path.exists() and not force:
@@ -118,4 +169,6 @@ def restore(backup_file: Path, db_path: Path, key: bytes, force: bool = False) -
     partial = db_path.with_suffix(db_path.suffix + ".restoring")
     partial.write_bytes(data)
     partial.replace(db_path)
+    if media_backup_dir is not None and Path(media_backup_dir).is_dir():
+        restore_media(media_backup_dir, db_path, key)
     return db_path

@@ -1555,9 +1555,48 @@ def _review_goals_settings(pid):
                 st.rerun()
 
 
+def _review_clips(pid):
+    """Clips the patient sent from their phone (feature 011): play, mark reviewed, delete."""
+    from src.portal import uploads
+    st.markdown("### Videos from the patient")
+    with _open_store() as store:
+        rows = uploads.list_media(store, pid)
+        media_dir = store.media_dir
+    live = [m for m in rows if m.deleted_at is None]
+    if not rows:
+        st.caption("No videos yet. Patients send them from Today in Limber.")
+        return
+    for m in live:
+        state = "reviewed " + m.reviewed_at[:10] if m.reviewed_at else "waiting for review"
+        st.markdown(f"**{m.created_at[:16].replace('T', ' ')}** · {round(m.duration)} s · {state}"
+                    + (" · caption sent after a privacy warning" if m.warned else ""))
+        if m.caption:
+            st.text(m.caption)
+        path = uploads.media_path(media_dir, m)
+        if path.is_file():
+            st.video(path.read_bytes(), format={"mp4": "video/mp4", "webm": "video/webm"}.get(m.ext, "video/mp4"))
+            st.caption("If the video does not play in this browser (WebM clips in Safari), open it in Chrome.")
+        else:
+            st.warning("The file for this clip is missing.")
+        c1, c2 = st.columns(2)
+        if m.reviewed_at is None and c1.button("Mark reviewed", key=f"media_review_{m.id}"):
+            with _open_store() as store:
+                uploads.mark_reviewed(store, m.id)
+            st.rerun()
+        if c2.button("Delete", key=f"media_delete_{m.id}", help="Removes the file; a marker stays."):
+            with _open_store() as store:
+                uploads.delete_media(store, store.media_dir, None, m.id, by="therapist")
+            st.rerun()
+    removed = [m for m in rows if m.deleted_at is not None]
+    if removed:
+        st.caption(f"{len(removed)} removed clip(s): " + ", ".join(f"{m.created_at[:10]} ({m.deleted_by})" for m in removed))
+
+
 def _review_from_the_patient(pid):
-    """What the patient reported from their phone (feature 010): pain check-ins now; more kinds later."""
+    """What the patient reported from their phone (feature 010, 011)."""
     from src.ptlog import entries as entry_rules
+    _review_clips(pid)
+    st.markdown("---")
     st.markdown("### Pain and symptom check-ins")
     with _open_store() as store:
         rows = store.entries(pid, "checkin", newest_first=True, limit=200)

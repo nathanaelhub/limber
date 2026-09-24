@@ -80,3 +80,26 @@ def test_backup_key_file_is_private(tmp_path):
     path = tmp_path / "k" / "backup.key"
     k1 = backup.load_backup_key(path)
     assert backup.load_backup_key(path) == k1 and stat.S_IMODE(os.stat(path).st_mode) == 0o600
+
+
+def test_media_is_backed_up_encrypted_once_and_restored(record, key, tmp_path):
+    """Feature 011: clips ride along with the record, encrypted, and come back on restore."""
+    from src.ptlog.models import Media
+    media_dir = record.parent / "media"
+    (media_dir / "P-017").mkdir(parents=True)
+    (media_dir / "P-017" / "00000000-0000-4000-8000-000000000001.mp4").write_bytes(b"pretend video bytes " * 50)
+    with SessionStore(record).open() as s:
+        s.media_add(Media(id="00000000-0000-4000-8000-000000000001", patient_id="P-017", kind="clip", ext="mp4", container="mov",
+                          codec="h264", bytes=1000, duration=2.0, sha256="x"))
+    dest = tmp_path / "backups"
+    backup.create(record, dest, key, now=datetime(2026, 9, 24, 2, 0))
+    enc = dest / "media" / "00000000-0000-4000-8000-000000000001.mp4.enc"
+    assert enc.is_file() and b"pretend video" not in enc.read_bytes()
+    mtime = enc.stat().st_mtime
+    backup.create(record, dest, key, now=datetime(2026, 9, 25, 2, 0))
+    assert enc.stat().st_mtime == mtime                                       # copied once, not every night
+    with SessionStore(record).open() as s:
+        assert s.media_get("00000000-0000-4000-8000-000000000001").backed_up_at is not None
+    restored = tmp_path / "restore" / "ptassist.db"
+    backup.restore(sorted(dest.glob("limber-*.db.enc"))[-1], restored, key, media_backup_dir=dest / "media")
+    assert (restored.parent / "media" / "P-017" / "00000000-0000-4000-8000-000000000001.mp4").read_bytes() == b"pretend video bytes " * 50

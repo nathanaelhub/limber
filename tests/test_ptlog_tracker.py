@@ -49,7 +49,7 @@ class TestMigration3:
 class TestModels:
     def test_enums_definitions_exceptions(self):
         assert models.ASSIGNMENT_STATUSES == ("scheduled", "active", "completed", "superseded")
-        assert models.QUEUE_KINDS == ("pending_review", "attention_flag", "practice_gap", "low_adherence", "unread_messages")
+        assert models.QUEUE_KINDS == ("pending_review", "attention_flag", "practice_gap", "low_adherence", "unread_messages", "new_uploads")
         assert METRIC_DEFINITIONS["adherence_pct"]["unit"] == "percent" and METRIC_DEFINITIONS["sessions_per_week"]["unit"] == "count"
         assert issubclass(ProgramValidationError, PTLogError) and issubclass(AssignmentValidationError, PTLogError)
         import dataclasses
@@ -308,7 +308,7 @@ class TestQueue:
         assert [(g.patient_id, g.age_days) for g in gaps] == [("P-018", 9)]
         low = q.items["low_adherence"]
         assert len(low) == 1 and low[0].patient_id == "P-019" and "40%" in low[0].description and "60%" in low[0].description and low[0].target == "adherence:P-019"
-        assert q.totals == {"pending_review": 3, "attention_flag": 1, "practice_gap": 1, "low_adherence": 1, "unread_messages": 0} and q.count == 6
+        assert q.totals == {"pending_review": 3, "attention_flag": 1, "practice_gap": 1, "low_adherence": 1, "unread_messages": 0, "new_uploads": 0} and q.count == 6
 
     def test_items_resolve(self, fixed_store, caseload):
         store, clock = fixed_store
@@ -428,3 +428,24 @@ class TestUnreadMessagesInTracker:
         assert q.totals["unread_messages"] == 1
         messages.thread(store, "P-019", viewer="therapist")
         assert tracker.queue(store, now=D0).items["unread_messages"] == []
+
+
+class TestNewUploadsInTracker:
+    """Feature 011: clips awaiting review show on the roster and in the queue, without captions."""
+
+    def test_roster_and_queue(self, fixed_store, caseload, tmp_path):
+        from src.ptlog.models import Media
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        for i in range(2):
+            store.media_add(Media(id=f"00000000-0000-4000-8000-00000000000{i}", patient_id="P-018", kind="clip", ext="mp4",
+                                  container="mov", codec="h264", bytes=100, duration=5.0, sha256="x", caption="Secret caption"))
+        rows = {r.patient_id: r for r in tracker.roster(store, now=D0)}
+        assert rows["P-018"].unreviewed_uploads == 2 and rows["P-018"].needs_attention is True and rows["P-017"].unreviewed_uploads == 0
+        q = tracker.queue(store, now=D0)
+        (item,) = q.items["new_uploads"]
+        assert item.patient_id == "P-018" and item.target == "uploads:P-018" and "2 clips" in item.description
+        assert "Secret" not in item.description
+        from src.portal import uploads
+        uploads.mark_reviewed(store, "00000000-0000-4000-8000-000000000000")
+        assert "1 clip " in tracker.queue(store, now=D0).items["new_uploads"][0].description

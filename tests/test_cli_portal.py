@@ -77,3 +77,25 @@ def test_messages_from_the_command_line(cli_env):
     assert run_cli(cli_env, "messages", "off", "P-017").returncode == 0
     assert run_cli(cli_env, "messages", "send", "P-017", "again").returncode == 1
     assert run_cli(cli_env, "messages", "show", "P-404").returncode == 1
+
+
+def test_media_commands(cli_env, tmp_path):
+    """Feature 011: list, retention, and reconcile from the command line."""
+    import hashlib
+    from src.ptlog.store import SessionStore
+    from src.portal import uploads
+    from tests.fixtures import media as media_fx
+    run_cli(cli_env, "patients", "add", "P-017")
+    clip = media_fx.make_video(tmp_path / "c.mp4", seconds=2.0)
+    data = clip.read_bytes()
+    with SessionStore(cli_env["PTASSIST_DB"]).open() as store:
+        up = uploads.begin(store, store.media_dir, "P-017", "clip", len(data), hashlib.sha256(data).hexdigest(), chunk_bytes=len(data))
+        uploads.put_part(store, store.media_dir, "P-017", up.id, 0, data)
+        m = uploads.finish(store, store.media_dir, "P-017", up.id, caption="private caption")
+        (store.media_dir / "P-017" / "00000000-0000-4000-8000-0000000000ff.mp4").write_bytes(b"orphan")
+    listing = run_cli(cli_env, "media", "list").stdout
+    assert m.id in listing and "P-017" in listing and "private caption" not in listing
+    r = run_cli(cli_env, "media", "reconcile")
+    assert r.returncode == 0 and "files_without_row: 1" in r.stdout
+    r = run_cli(cli_env, "media", "retention")
+    assert r.returncode == 0 and "deleted: 0" in r.stdout and "kept: 1" in r.stdout

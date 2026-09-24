@@ -35,6 +35,15 @@ class PatientSnapshot:
     gap_days: int
     thresholds: Optional[Thresholds] = None   # the patient's effective attention thresholds
     unread_messages: int = 0                  # from the patient, not yet opened by the therapist
+    unreviewed_uploads: int = 0               # clips awaiting the therapist's review (feature 011)
+
+
+def _unreviewed_by_patient(store: SessionStore) -> dict:
+    result: dict = {}
+    for m in store.media_list(kind="clip", live_only=True):
+        if m.reviewed_at is None:
+            result.setdefault(m.patient_id, []).append(m)
+    return result
 
 
 def _now(now: Optional[datetime]) -> datetime:
@@ -44,7 +53,7 @@ def _now(now: Optional[datetime]) -> datetime:
 def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = None,
              thresholds: Optional[Thresholds] = None,
              per_exercise: Optional[dict] = None, unread_messages: Optional[int] = None,
-             checkins: Optional[list] = None) -> PatientSnapshot:
+             checkins: Optional[list] = None, unreviewed_uploads: Optional[int] = None) -> PatientSnapshot:
     """One load of the patient's sessions, reused for counts, flags, and adherence."""
     now = _now(now)
     today = now.date()
@@ -67,6 +76,8 @@ def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = No
         gap_days=thresholds.practice_gap, thresholds=thresholds,
         unread_messages=(store.messages_unread("patient", patient.id).get(patient.id, 0)
                          if unread_messages is None else unread_messages),
+        unreviewed_uploads=(sum(1 for m in store.media_list(patient.id, "clip", live_only=True) if m.reviewed_at is None)
+                            if unreviewed_uploads is None else unreviewed_uploads),
     )
 
 
@@ -84,7 +95,7 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
     program_name = snap.assignment.program_name if snap.assignment else "none"
     program_status = snap.adherence.status if snap.assignment else "none"
     needs = (bool(open_flags) or bool(snap.pending) or (pct is not None and pct < threshold) or gap
-             or snap.unread_messages > 0)
+             or snap.unread_messages > 0 or snap.unreviewed_uploads > 0)
     return RosterRow(
         patient_id=snap.patient.id, label=snap.patient.label, is_builtin=snap.patient.is_builtin,
         program_id=snap.assignment.program_id if snap.assignment else None,
@@ -95,7 +106,7 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
         adherence_pct=pct, adherence_note=snap.adherence.note,
         pending_reviews=len(snap.pending), open_flags=len(open_flags), practice_gap=gap,
         last_next_step=snap.latest_review.next_step if snap.latest_review else None,
-        needs_attention=needs, unread_messages=snap.unread_messages,
+        needs_attention=needs, unread_messages=snap.unread_messages, unreviewed_uploads=snap.unreviewed_uploads,
     )
 
 
@@ -114,10 +125,11 @@ def roster(store: SessionStore, now: Optional[datetime] = None, sort: str = "att
     by_exercise = store.effective_thresholds_by_exercise_all()
     unread = store.messages_unread("patient")
     checkins_all = store.entries_all("checkin")
+    waiting_uploads = {pid: len(v) for pid, v in _unreviewed_by_patient(store).items()}
     rows: List[RosterRow] = []
     for patient in store.active_patients():
         snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}),
-                        unread.get(patient.id, 0), checkins_all.get(patient.id, []))
+                        unread.get(patient.id, 0), checkins_all.get(patient.id, []), waiting_uploads.get(patient.id, 0))
         if patient.is_builtin and not snap.rows:
             continue
         rows.append(row_from_snapshot(snap, now))
@@ -155,10 +167,11 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
     by_exercise = store.effective_thresholds_by_exercise_all()
     unread = store.messages_unread("patient")
     checkins_all = store.entries_all("checkin")
+    waiting_uploads = {pid: len(v) for pid, v in _unreviewed_by_patient(store).items()}
     keyed = {kind: [] for kind in QUEUE_KINDS}
     for patient in store.active_patients():
         snap = snapshot(store, patient, now, everyone[patient.id], by_exercise.get(patient.id, {}),
-                        unread.get(patient.id, 0), checkins_all.get(patient.id, []))
+                        unread.get(patient.id, 0), checkins_all.get(patient.id, []), waiting_uploads.get(patient.id, 0))
         threshold = snap.thresholds.adherence
         if patient.is_builtin and not snap.rows:
             continue
@@ -185,6 +198,10 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
             keyed["practice_gap"].append((-gap_value, QueueItem(
                 "practice_gap", pid, f"flags:{pid}", None, gap_value,
                 f"{gap_value} days since the last session (threshold {snap.gap_days} days)")))
+        if snap.unreviewed_uploads:
+            n = snap.unreviewed_uploads
+            keyed["new_uploads"].append((-n, QueueItem(
+                "new_uploads", pid, f"uploads:{pid}", None, 0, f"{n} clip{'s' if n != 1 else ''} awaiting review from {pid}")))
         if snap.unread_messages:
             n = snap.unread_messages
             keyed["unread_messages"].append((-n, QueueItem(
