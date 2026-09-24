@@ -1083,7 +1083,44 @@ def page_patients():
 
     _patient_program_section(pid)
     _patient_home_access_section(pid, current)
+    _patient_logs_section(pid, current)
     _patient_discharge_section(pid)
+
+
+def _patient_logs_section(pid, patient):
+    """What the patient may log from their phone (feature 012): exercise done without the camera,
+    and the medication list they choose from."""
+    from src.portal import diary as diary_rules
+    st.markdown("### What the patient can log")
+    if patient.is_builtin:
+        st.caption("The built-in patient has no phone access.")
+        return
+    with _open_store() as store:
+        enabled = store.diary_enabled(pid)
+        medications = store.medication_list(pid)
+    wanted = st.toggle("Let this patient log exercise done without the camera", value=enabled,
+                       key="patient_diary_enabled")
+    if wanted != enabled:
+        with _open_store() as store:
+            store.set_diary_enabled(pid, wanted)
+        st.rerun()
+    st.caption(f"Logged sessions count towards practice, adherence, and the streak, and are marked "
+               f"{diary_rules.LABEL.lower()}. They carry no measured range of motion or form, so they never "
+               f"appear in trends, flags, goal progress, or a comparison.")
+    st.markdown("**Medication list**")
+    st.caption("One medicine per line, as the patient should see it (for example \"ibuprofen 400 mg\"). "
+               "The patient ticks from this list and can never type a medicine name. Leave it empty to "
+               "offer no medication log. Up to 20 items of 60 characters.")
+    text = st.text_area("Medicines", value="\n".join(medications), key="patient_medications",
+                        label_visibility="collapsed", placeholder="ibuprofen 400 mg")
+    if st.button("Save medication list", key="patient_medications_save"):
+        warned = [n.strip() for n in text.splitlines() if n.strip() and ptmessages.check_text(n.strip())]
+        with _open_store() as store:
+            saved = store.set_medication_list(pid, text.splitlines())
+        if warned:
+            st.warning("These look like they contain identifying details: " + ", ".join(warned))
+        st.success(f"Saved {len(saved)} medicine(s)." if saved else "The medication log is now off for this patient.")
+        st.rerun()
 
 
 def _patient_home_access_section(pid, patient):
@@ -1592,10 +1629,87 @@ def _review_clips(pid):
         st.caption(f"{len(removed)} removed clip(s): " + ", ".join(f"{m.created_at[:10]} ({m.deleted_by})" for m in removed))
 
 
+def _review_diary(pid):
+    """Exercise the patient logged without the camera (feature 012 FR-009)."""
+    from src.portal import diary as diary_rules
+    from src.ptlog.origin import DIARY, capture_origin
+    st.markdown(f"### Logged without the camera · {diary_rules.LABEL}")
+    with _open_store() as store:
+        sessions = [s for s in store.sessions_in_period(pid, None) if capture_origin(s) == DIARY]
+        enabled = store.diary_enabled(pid)
+    if not enabled:
+        st.caption("Logging is turned off for this patient. What they logged before stays below.")
+    if not sessions:
+        st.info("Nothing logged yet. Patients log from Today in Limber when they exercise without their phone set up.")
+        return
+    st.caption(f"{len(sessions)} logged session(s). These count as practice and towards adherence and the streak; "
+               f"they carry no measured range of motion or form, so they are in no trend, flag, or comparison.")
+    rows = []
+    for s in sorted(sessions, key=lambda x: x.start_time, reverse=True)[:100]:
+        first = s.sets[0] if s.sets else None
+        note = diary_rules.note_of(s)
+        rows.append({
+            "When": s.start_time[:16].replace("T", " "),
+            "Exercise": first.exercise_name if first else "",
+            "Reported": f"{first.reported_sets or 1} × {first.reported_reps or 0} reps" if first else "",
+            "Total reps": s.total_reps,
+            "Effort": f"{first.effort} {dict(diary_rules.EFFORT).get(first.effort, '')}".strip() if first and first.effort else "",
+            "Note": note["note"] + (" · sent after a privacy warning" if note["warned"] else ""),
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.caption("Reported: sets × reps the patient said they did. Effort: how hard it felt, 1 very easy to 5 very hard.")
+
+
+def _review_logs(pid):
+    """Medication taken and sleep, beside pain (feature 012 US2)."""
+    from src.ptlog import entries as entry_rules
+    with _open_store() as store:
+        meds = store.entries(pid, "medication", newest_first=True, limit=200)
+        sleep = store.entries(pid, "sleep", newest_first=True, limit=200)
+        offered = store.medication_list(pid)
+    st.markdown("### Medication taken")
+    if not offered:
+        st.caption("No medication list is set for this patient, so they are not offered the medication log. "
+                   "Set one on the Patients page.")
+    if not meds:
+        st.info("Nothing logged yet.")
+    else:
+        defs = entry_rules.definitions("medication")
+        st.dataframe(pd.DataFrame([{
+            "When": e.recorded_at[:16].replace("T", " ") + (" (time adjusted)" if e.time_adjusted else ""),
+            "Medicine": e.payload.get("item", ""),
+            "Note": ("(note removed)" if e.note_removed else (e.payload.get("note") or ""))
+                    + (" · sent after a privacy warning" if e.warned else ""),
+        } for e in meds]), use_container_width=True, hide_index=True)
+        st.caption(f"Medicine ({defs['item']['unit']}): {defs['item']['meaning']}")
+
+    st.markdown("### Sleep")
+    if not sleep:
+        st.info("Nothing logged yet.")
+        return
+    nights = entry_rules.nightly(sleep)
+    defs = entry_rules.definitions("sleep")
+    st.dataframe(pd.DataFrame([{
+        "Night": n["night"], "Hours": n["hours"], "Quality": n["quality"],
+        "Note": n["note"], "Corrected": "yes" if n["corrected"] else "",
+    } for n in nights]), use_container_width=True, hide_index=True)
+    st.caption(f"Hours ({defs['hours']['unit']}): {defs['hours']['meaning']} "
+               f"Quality ({defs['quality']['unit']}): {defs['quality']['meaning']} "
+               "One row per night: if the patient logged a night twice, the later entry is shown and marked corrected.")
+    if len(nights) > 1:
+        chart = pd.DataFrame({"night": [n["night"] for n in reversed(nights)],
+                              "hours": [n["hours"] for n in reversed(nights)]}).set_index("night")
+        st.line_chart(chart, y="hours", height=180)
+
+
 def _review_from_the_patient(pid):
-    """What the patient reported from their phone (feature 010, 011)."""
+    """What the patient reported from their phone (features 010, 011, 012)."""
     from src.ptlog import entries as entry_rules
     _review_clips(pid)
+    st.markdown("---")
+    _review_diary(pid)
+    st.markdown("---")
+    _review_logs(pid)
     st.markdown("---")
     st.markdown("### Pain and symptom check-ins")
     with _open_store() as store:

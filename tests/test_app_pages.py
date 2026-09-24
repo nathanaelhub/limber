@@ -651,3 +651,52 @@ def test_review_tab_plays_reviews_and_deletes_a_clip(seeded_env, tmp_path):
     with SessionStore(seeded_env).open() as store:
         gone = store.media_get(m.id)
         assert gone.deleted_by == "therapist" and not (store.media_dir / "P-017" / f"{m.id}.mp4").exists()
+
+
+# ----------------------------------------------------------------------------- feature 012: diary and logs for the PT
+
+def test_patients_page_sets_the_medication_list_and_the_diary_switch(seeded_env):
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.session_state["patients_edit_select"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    at.text_area(key="patient_medications").set_value("ibuprofen 400 mg\nparacetamol").run()
+    at.button(key="patient_medications_save").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.medication_list("P-017") == ["ibuprofen 400 mg", "paracetamol"]
+        assert store.diary_enabled("P-017") is True
+    at.toggle(key="patient_diary_enabled").set_value(False).run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.diary_enabled("P-017") is False
+    text = " ".join(c.value for c in at.caption)
+    assert "self-reported" in text.lower()
+
+
+def _seed_diary_and_logs(db):
+    from src.portal import diary
+    with SessionStore(db).open() as store:
+        store.set_medication_list("P-017", ["ibuprofen 400 mg"])
+        diary.log(store, "P-017", {"exercise": "knee_extension", "reps": 12, "sets": 2, "effort": 4,
+                                   "note": "Did them in the park"}, now=datetime.now() - timedelta(days=1))
+        for at_, hours, quality in ((2, 5.0, 2), (1, 7.5, 4)):
+            store.entry_add("P-017", "sleep", {"hours": hours, "quality": quality, "note": ""}, float(quality),
+                            (datetime.now() - timedelta(days=at_)).isoformat(), f"s{at_}", "standalone", None, False, False)
+        store.entry_add("P-017", "medication", {"item": "ibuprofen 400 mg", "note": "after the session"}, None,
+                        (datetime.now() - timedelta(days=1)).isoformat(), "m1", "standalone", None, False, False)
+
+
+def test_review_from_the_patient_shows_diary_medication_and_sleep(seeded_env):
+    _seed_diary_and_logs(seeded_env)
+    at = _review_page(seeded_env, "From the patient")
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption) + list(at.text))
+    assert "Self-reported" in text and "Medication" in text and "Sleep" in text
+    tables = [d.value for d in at.dataframe]
+    logged = next(t for t in tables if "Reported" in t.columns)
+    assert list(logged["Reported"]) == ["2 × 12 reps"] and list(logged["Effort"]) == ["4 hard"]
+    assert "Did them in the park" in str(logged.to_dict())
+    meds = next(t for t in tables if "Medicine" in t.columns)
+    assert list(meds["Medicine"]) == ["ibuprofen 400 mg"]
+    sleep = next(t for t in tables if "Hours" in t.columns)
+    assert list(sleep["Hours"]) == [7.5, 5.0] and list(sleep["Quality"]) == [4, 2]
