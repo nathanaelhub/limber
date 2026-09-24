@@ -1,0 +1,70 @@
+# Demo Knee Function — written for this project to demonstrate the questionnaire engine.
+#
+# This is NOT a validated or licensed clinical instrument, and no clinical meaning should be read
+# into its score. Real instruments (and their licences) are sourced by the project owner; each one is
+# then added as its own file in this directory, with no code change.
+#
+# The fields:
+#   scoring          sum | mean of the item values
+#   direction        higher_is_better | higher_is_worse (shown wherever the score appears)
+#   reversed         the value is turned round within that item's own range before scoring
+#   missing          how many items must be answered, and whether the mean of the answered items
+#                    stands in for one that is missing
+key: demo_knee_function
+name: Demo Knee Function
+meaning: How much the knee lets the patient do day to day, by their own account, out of 40.
+unit: points (0-40)
+direction: higher_is_better
+version: 1
+notice: >-
+  Demonstration only: this questionnaire was written for this project and is not a validated or
+  licensed instrument. Do not use its score to make a clinical decision.
+scoring: sum
+missing:
+  minimum_answered: 8
+  replace_with_mean: true
+
+choices:
+  - {text: Not at all, value: 0}
+  - {text: With a lot of difficulty, value: 1}
+  - {text: With some difficulty, value: 2}
+  - {text: With a little difficulty, value: 3}
+  - {text: Easily, value: 4}
+
+items:
+  - {key: stairs_up, text: Walking up a flight of stairs}
+  - {key: stairs_down, text: Walking down a flight of stairs}
+  - {key: rising, text: Getting up from a chair without using your arms}
+  - {key: standing, text: Standing for ten minutes}
+  - {key: walking, text: Walking for fifteen minutes}
+  - {key: kneeling, text: Kneeling down and getting up again}
+  - {key: squatting, text: Squatting down to pick something up}
+  - {key: twisting, text: Turning on the spot while standing on that leg}
+  # The two pain items are reversed: a lot of pain scores low, so that the total reads the same way
+  # round as the rest (higher is better).
+  - key: pain_moving
+    text: How much pain do you have when you move the knee
+    reversed: true
+    choices:
+      - {text: None, value: 0}
+      - {text: Mild, value: 1}
+      - {text: Moderate, value: 2}
+      - {text: Severe, value: 3}
+      - {text: Extreme, value: 4}
+  - key: pain_night
+    text: How much pain do you have in bed at night
+    reversed: true
+    choices:
+      - {text: None, value: 0}
+      - {text: Mild, value: 1}
+      - {text: Moderate, value: 2}
+      - {text: Severe, value: 3}
+      - {text: Extreme, value: 4}
+
+subscales:
+  - key: pain
+    name: Pain
+    items: [pain_moving, pain_night]
+  - key: activity
+    name: Activity
+    items: [stairs_up, stairs_down, rising, standing, walking, kneeling, squatting, twisting]

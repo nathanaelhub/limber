@@ -10,21 +10,21 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T002 [P] Failing `tests/test_ptlog_instruments.py`: a valid definition loads with items, choices,
+- [x] T002 [P] Failing `tests/test_ptlog_instruments.py`: a valid definition loads with items, choices,
       reversed items, subscales, method, missing rule, and version; refusals each name the file and the
       problem (unknown method, no items, duplicate item key, a choice value outside the item's range, a
       subscale naming an unknown item, a missing meaning or unit, item text that looks identifying); one
       bad file does not stop the others; an absent `instruments/` directory yields no instruments and no
       error; `yaml.safe_load` only
-- [ ] T003 Implement `src/ptlog/instruments.py` and the models (`Instrument`, `Item`, `Subscale`) in
+- [x] T003 Implement `src/ptlog/instruments.py` and the models (`Instrument`, `Item`, `Subscale`) in
       `src/ptlog/models.py`, with the per-directory cache used by `src/ptlog/programs.py`
-- [ ] T004 [P] Failing `tests/test_ptlog_questionnaires.py` with worked examples: `sum` and `mean`;
+- [x] T004 [P] Failing `tests/test_ptlog_questionnaires.py` with worked examples: `sum` and `mean`;
       reversal within the item's own range; subscale scores over their own items; the missing-item rule
       (below the minimum is refused, the mean of the answered items stands in when the rule says so, and
       the missing count is reported); the scoring snapshot rescores to the same total with the installed
       definition deleted or changed; `next_due` for once, weekly, fortnightly, and monthly, never
       answered and answered, and overdue by more than seven days
-- [ ] T005 Implement `src/ptlog/questionnaires.py` (scoring, snapshot, `next_due`, `accept`)
+- [x] T005 Implement `src/ptlog/questionnaires.py` (scoring, snapshot, `next_due`, `accept`)
 - [ ] T006 [P] Failing `tests/test_ptlog_store_v12.py`: schema v12 adds `instrument_assignments`;
       assign, list, end, and reassign (one live assignment per instrument per patient, the ended one
       kept); deleting a patient removes their assignments and their questionnaire entries; an existing
