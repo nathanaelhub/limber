@@ -20,6 +20,7 @@ from .privacy import validate_label, validate_notes, validate_patient_id
 from . import thresholds
 from .models import (
     PTLogError,
+    Media,
     Entry,
     Message,
     AccessStatus,
@@ -60,7 +61,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -418,6 +419,64 @@ COMMIT;
 PRAGMA foreign_keys=ON;
 """
 
+# v10 (feature 011): media uploads. Files live under data/media/<patient>/<id>.<ext>; these rows
+# are their only index. The access-history table is rebuilt again for the media events.
+SCHEMA_V10_SQL = """
+PRAGMA foreign_keys=OFF;
+BEGIN;
+CREATE TABLE IF NOT EXISTS media (
+    id            TEXT PRIMARY KEY,
+    patient_id    TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    kind          TEXT NOT NULL CHECK (kind IN ('clip', 'voice')),
+    ext           TEXT NOT NULL,
+    container     TEXT NOT NULL,
+    codec         TEXT NOT NULL,
+    bytes         INTEGER NOT NULL,
+    duration      REAL NOT NULL,
+    width         INTEGER NOT NULL DEFAULT 0,
+    height        INTEGER NOT NULL DEFAULT 0,
+    sha256        TEXT NOT NULL,
+    caption       TEXT NOT NULL DEFAULT '',
+    warned        INTEGER NOT NULL DEFAULT 0 CHECK (warned IN (0, 1)),
+    created_at    TEXT NOT NULL,
+    reviewed_at   TEXT,
+    deleted_at    TEXT,
+    deleted_by    TEXT CHECK (deleted_by IN ('patient', 'therapist', 'retention', 'missing')),
+    message_id    INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+    backed_up_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_media_patient ON media(patient_id, created_at);
+CREATE TABLE IF NOT EXISTS media_uploads (
+    id            TEXT PRIMARY KEY,
+    patient_id    TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    kind          TEXT NOT NULL CHECK (kind IN ('clip', 'voice')),
+    total_bytes   INTEGER NOT NULL,
+    chunk_bytes   INTEGER NOT NULL,
+    sha256        TEXT NOT NULL,
+    started_at    TEXT NOT NULL,
+    expires_at    TEXT NOT NULL
+);
+CREATE TABLE portal_audit_v10 (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    patient_id  TEXT REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    event       TEXT NOT NULL CHECK (event IN ('code_created', 'code_revoked', 'login_ok', 'login_failed',
+                'locked_out', 'logout', 'live_start', 'live_end', 'live_interrupted', 'live_refused',
+                'entry_stored', 'entry_note_removed',
+                'upload_started', 'upload_stored', 'upload_rejected', 'media_viewed', 'media_reviewed',
+                'media_deleted')),
+    client      TEXT,
+    detail      TEXT
+);
+INSERT INTO portal_audit_v10 (id, at, patient_id, event, client, detail)
+    SELECT id, at, patient_id, event, client, detail FROM portal_audit;
+DROP TABLE portal_audit;
+ALTER TABLE portal_audit_v10 RENAME TO portal_audit;
+CREATE INDEX IF NOT EXISTS idx_portal_audit_patient ON portal_audit(patient_id, id);
+COMMIT;
+PRAGMA foreign_keys=ON;
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -428,6 +487,7 @@ MIGRATIONS: List[tuple] = [
     (7, SCHEMA_V7_SQL),
     (8, SCHEMA_V8_SQL),
     (9, SCHEMA_V9_SQL),
+    (10, SCHEMA_V10_SQL),
 ]
 
 
@@ -443,8 +503,9 @@ class SessionStore:
     """The single writer and reader of the canonical record."""
 
     def __init__(self, db_path: Path | str, clock: Callable[[], datetime] = datetime.now,
-                 check_same_thread: bool = True):
+                 check_same_thread: bool = True, media_dir: Optional[Path] = None):
         self.db_path = Path(db_path)
+        self.media_dir = Path(media_dir) if media_dir else self.db_path.parent / "media"     # uploaded clips (feature 011)
         self.clock = clock
         # False only for the live web session, whose callbacks run on worker threads (the caller locks).
         self.check_same_thread = check_same_thread
@@ -856,8 +917,11 @@ class SessionStore:
                 f"SELECT path FROM exports WHERE session_id IN ({marks})", sessions)]
         export_paths += [r[0] for r in self.conn.execute(
             "SELECT path FROM review_exports WHERE patient_id = ?", (pid,))]
+        media_files = self.conn.execute("SELECT COUNT(*) FROM media WHERE patient_id = ? AND deleted_at IS NULL", (pid,)).fetchone()[0]
         self.conn.execute("DELETE FROM patients WHERE id = ?", (pid,))   # cascades through every child table
         self.conn.commit()
+        import shutil
+        shutil.rmtree(self.media_dir / pid, ignore_errors=True)         # the patient's uploaded files (feature 011)
         removed_files = 0
         for path in export_paths:
             try:
@@ -1778,6 +1842,73 @@ class SessionStore:
         for r in self.conn.execute("SELECT * FROM entries WHERE kind = ? ORDER BY patient_id, recorded_at, id", (kind,)):
             result.setdefault(r["patient_id"], []).append(self._entry(r))
         return result
+
+    # media (feature 011); the rules live in src/portal/uploads.py
+
+    @staticmethod
+    def _media(row) -> Media:
+        return Media(id=row["id"], patient_id=row["patient_id"], kind=row["kind"], ext=row["ext"], container=row["container"],
+                     codec=row["codec"], bytes=row["bytes"], duration=row["duration"], width=row["width"], height=row["height"],
+                     sha256=row["sha256"], caption=row["caption"], warned=bool(row["warned"]), created_at=row["created_at"],
+                     reviewed_at=row["reviewed_at"], deleted_at=row["deleted_at"], deleted_by=row["deleted_by"],
+                     message_id=row["message_id"], backed_up_at=row["backed_up_at"])
+
+    def media_add(self, media: Media) -> Media:
+        self.conn.execute(
+            "INSERT INTO media (id, patient_id, kind, ext, container, codec, bytes, duration, width, height, sha256, caption, "
+            "warned, created_at, message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (media.id, media.patient_id, media.kind, media.ext, media.container, media.codec, media.bytes, media.duration,
+             media.width, media.height, media.sha256, media.caption, 1 if media.warned else 0, self._now(), media.message_id))
+        self.conn.commit()
+        return self.media_get(media.id)
+
+    def media_get(self, media_id: str) -> Optional[Media]:
+        row = self.conn.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
+        return self._media(row) if row else None
+
+    def media_list(self, patient_id: Optional[str] = None, kind: Optional[str] = None, live_only: bool = False) -> List[Media]:
+        sql, args = "SELECT * FROM media WHERE 1=1", []
+        if patient_id is not None:
+            sql += " AND patient_id = ?"; args.append(patient_id)
+        if kind is not None:
+            sql += " AND kind = ?"; args.append(kind)
+        if live_only:
+            sql += " AND deleted_at IS NULL"
+        return [self._media(r) for r in self.conn.execute(sql + " ORDER BY created_at DESC, id DESC", args)]
+
+    def media_update(self, media_id: str, **fields) -> None:
+        allowed = {"reviewed_at", "deleted_at", "deleted_by", "caption", "warned", "backed_up_at", "message_id"}
+        bad = set(fields) - allowed
+        if bad:
+            raise ValueError(f"cannot update {bad}")
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        self.conn.execute(f"UPDATE media SET {sets} WHERE id = ?", (*fields.values(), media_id))
+        self.conn.commit()
+
+    def media_count_since(self, patient_id: str, kind: str, since: datetime) -> tuple:
+        row = self.conn.execute("SELECT COUNT(*), COALESCE(SUM(bytes), 0) FROM media WHERE patient_id = ? AND kind = ? AND created_at > ?",
+                                (patient_id, kind, since.isoformat())).fetchone()
+        return int(row[0]), int(row[1])
+
+    def upload_add(self, upload_id: str, patient_id: str, kind: str, total_bytes: int, chunk_bytes: int, sha256: str,
+                   expires_at: datetime) -> None:
+        self.conn.execute("INSERT INTO media_uploads (id, patient_id, kind, total_bytes, chunk_bytes, sha256, started_at, expires_at) "
+                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                          (upload_id, patient_id, kind, total_bytes, chunk_bytes, sha256, self._now(), expires_at.isoformat()))
+        self.conn.commit()
+
+    def upload_get(self, upload_id: str) -> Optional[dict]:
+        row = self.conn.execute("SELECT * FROM media_uploads WHERE id = ?", (upload_id,)).fetchone()
+        return dict(row) if row else None
+
+    def uploads_open(self, patient_id: Optional[str] = None) -> List[dict]:
+        if patient_id is None:
+            return [dict(r) for r in self.conn.execute("SELECT * FROM media_uploads")]
+        return [dict(r) for r in self.conn.execute("SELECT * FROM media_uploads WHERE patient_id = ?", (patient_id,))]
+
+    def upload_delete(self, upload_id: str) -> None:
+        self.conn.execute("DELETE FROM media_uploads WHERE id = ?", (upload_id,))
+        self.conn.commit()
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(

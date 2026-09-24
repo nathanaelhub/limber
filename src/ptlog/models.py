@@ -606,6 +606,30 @@ class Entry:
 
 
 @dataclass
+class Media:
+    """An uploaded clip or voice note (feature 011). The file lives on disk; this row is its only index."""
+    id: str
+    patient_id: str
+    kind: str                        # clip | voice
+    ext: str
+    container: str
+    codec: str
+    bytes: int
+    duration: float                  # seconds
+    width: int = 0
+    height: int = 0
+    sha256: str = ""
+    caption: str = ""
+    warned: bool = False
+    created_at: str = ""
+    reviewed_at: Optional[str] = None
+    deleted_at: Optional[str] = None
+    deleted_by: Optional[str] = None # patient | therapist | retention | missing
+    message_id: Optional[int] = None
+    backed_up_at: Optional[str] = None
+
+
+@dataclass
 class ThresholdChange:
     """One change of a stored attention threshold. None = no stored value (the inherited value applies)."""
     id: int
