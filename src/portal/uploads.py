@@ -27,6 +27,9 @@ OPEN_PER_PATIENT = 3
 PER_DAY = {"clip": (10, 250 * 1024 * 1024), "voice": (30, 60 * 1024 * 1024)}
 UPLOAD_LIFETIME = timedelta(hours=1)
 CAPTION_MAX = 200
+NOTICE = ("Your clip is stored on the Limber host and seen by your therapist. It is kept for 90 days after they "
+          "review it (180 days at most) and you can delete it at any time. Do not include other people, and do not say "
+          "your name in the video.")
 RETENTION_REVIEWED = timedelta(days=90)
 RETENTION_UNREVIEWED = timedelta(days=180)
 _ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")

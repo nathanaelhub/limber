@@ -95,6 +95,11 @@ def done_today_keys(store: SessionStore, patient_id: str, now: datetime) -> set:
     return adherence_mod._exercises_with_counted_reps(sessions)
 
 
+def clips_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
+    rows = store.media_list(patient_id, "clip")
+    return {"count": len(rows), "waiting": sum(1 for m in rows if m.deleted_at is None and m.reviewed_at is None)}
+
+
 def checkin_badge(store: SessionStore, patient_id: str, now: datetime) -> Dict[str, Any]:
     """Whether Today should offer a check-in, and how many were made today."""
     from src.ptlog.entries import pain_series
@@ -146,7 +151,8 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
     view: Dict[str, Any] = {"patient_id": patient_id, "date": today.isoformat(), "program": None, "exercises": [],
                             "week": None, "streak_weeks": None, "message": None,
                             "messages": messages_badge(store, patient_id),
-                            "checkin": checkin_badge(store, patient_id, now)}
+                            "checkin": checkin_badge(store, patient_id, now),
+                            "clips": clips_badge(store, patient_id)}
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         view["message"] = NO_PROGRAM

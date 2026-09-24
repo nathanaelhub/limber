@@ -139,7 +139,7 @@
     if (count) { count.hidden = !badge.unread; count.textContent = String(badge.unread); }
   }
 
-  if (page === "session" || page === "progress" || page === "messages") {
+  if (page === "session" || page === "progress" || page === "messages" || page === "clip") {
     api("/api/today").then(function (res) {
       if (res.status === 401) { window.location.href = "/"; return; }
       text("patient-id", res.data.patient_id);

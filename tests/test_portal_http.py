@@ -152,7 +152,7 @@ class TestOnlyOwnData:
             s.entry_add("P-018", "checkin", {"pain": 9, "note": "other patient's private note"}, 9.0,
                         "2026-09-20T09:00:00", "x", "standalone", None, False, False)
         for route in ("/api/today", "/api/health", "/", "/today", "/api/progress", "/progress", "/api/messages", "/messages",
-                      "/api/entries", "/checkin", "/manifest.webmanifest"):
+                      "/api/entries", "/checkin", "/manifest.webmanifest", "/api/media", "/clip"):
             r = client.get(route)
             text = r.text
             assert "P-018" not in text and "P-019" not in text, route
@@ -361,3 +361,92 @@ class TestCheckins:
         body = client.get("/api/progress").json()
         assert body["pain"]["series"][0]["pain"] == 4 and body["pain"]["definition"]["unit"] == "0-10"
         assert client.get("/checkin").status_code == 200
+
+
+# ----------------------------------------------------------------------------- feature 011: clips
+
+import hashlib  # noqa: E402
+from tests.fixtures import media as media_fx  # noqa: E402
+
+
+def _upload_clip(client, path, caption="", confirm=False, chunk=4096):
+    data = path.read_bytes()
+    r = client.post("/api/uploads", json={"kind": "clip", "total_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+                                           "chunk_bytes": chunk}, headers={"Origin": ORIGIN})
+    if r.status_code != 201:
+        return r
+    up = r.json()
+    for n, start in enumerate(range(0, len(data), chunk)):
+        pr = client.put(f"/api/uploads/{up['id']}/parts/{n}", content=data[start:start + chunk],
+                        headers={"Origin": ORIGIN, "Content-Type": "application/octet-stream"})
+        assert pr.status_code == 200, pr.text
+    return client.post(f"/api/uploads/{up['id']}/finish", json={"caption": caption, "confirm": confirm}, headers={"Origin": ORIGIN})
+
+
+@pytest.fixture
+def clip_file(tmp_path):
+    return media_fx.make_video(tmp_path / "clip.mp4", seconds=2.0)
+
+
+class TestClipRoutes:
+    def test_upload_list_play_delete(self, client, seeded, clip_file):
+        login(client, seeded[1]["P-017"])
+        r = _upload_clip(client, clip_file, caption="Knee catching")
+        assert r.status_code == 201, r.text
+        m = r.json()
+        assert m["kind"] == "clip" and m["caption"] == "Knee catching" and m["duration"] >= 1.5 and "path" not in m and "sha256" not in m
+        listing = client.get("/api/media").json()
+        assert [x["id"] for x in listing["media"]] == [m["id"]] and listing["notice"]
+        play = client.get(f"/api/media/{m['id']}")
+        assert play.status_code == 200 and play.headers["content-type"] == "video/mp4" and play.headers["cache-control"] == "private, no-store"
+        assert play.headers["content-security-policy"] == "sandbox" and play.headers["accept-ranges"] == "bytes"
+        assert play.content == clip_file.read_bytes()
+        ranged = client.get(f"/api/media/{m['id']}", headers={"Range": "bytes=0-99"})
+        assert ranged.status_code == 206 and len(ranged.content) == 100
+        assert client.delete(f"/api/media/{m['id']}", headers={"Origin": ORIGIN}).status_code == 200
+        assert client.get(f"/api/media/{m['id']}").status_code == 404
+        assert client.get("/api/media").json()["media"][0]["deleted"] is True
+        assert client.get("/api/today").json()["clips"] == {"count": 1, "waiting": 0}
+
+    def test_resume_reports_missing_parts(self, client, seeded, clip_file):
+        login(client, seeded[1]["P-017"])
+        data = clip_file.read_bytes()
+        up = client.post("/api/uploads", json={"kind": "clip", "total_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+                                                "chunk_bytes": 1024}, headers={"Origin": ORIGIN}).json()
+        client.put(f"/api/uploads/{up['id']}/parts/0", content=data[:1024], headers={"Origin": ORIGIN, "Content-Type": "application/octet-stream"})
+        st = client.get(f"/api/uploads/{up['id']}").json()
+        assert st["received"] == [0] and st["total_parts"] == up["total_parts"]
+        assert client.post(f"/api/uploads/{up['id']}/finish", json={}, headers={"Origin": ORIGIN}).status_code == 409
+        assert client.delete(f"/api/uploads/{up['id']}", headers={"Origin": ORIGIN}).status_code == 200
+        assert client.get(f"/api/uploads/{up['id']}").status_code == 404
+
+    def test_refusals(self, client, seeded, tmp_path):
+        login(client, seeded[1]["P-017"])
+        png = media_fx.make_png_named_mp4(tmp_path / "x.mp4")
+        r = _upload_clip(client, png)
+        assert r.status_code == 415 and r.json()["reason"] == "not_media"
+        assert client.get("/api/media").json()["media"] == []
+        big = client.post("/api/uploads", json={"kind": "clip", "total_bytes": 90 * 1024 * 1024, "sha256": "0" * 64}, headers={"Origin": ORIGIN})
+        assert big.status_code == 400
+        assert client.put("/api/uploads/not-an-id/parts/0", content=b"x", headers={"Origin": ORIGIN, "Content-Type": "application/octet-stream"}).status_code == 404
+        assert client.put("/api/uploads/00000000-0000-4000-8000-000000000000/parts/0", content=b"x",
+                          headers={"Origin": "https://evil.example", "Content-Type": "application/octet-stream"}).status_code == 403
+
+    def test_caption_warning(self, client, seeded, clip_file):
+        login(client, seeded[1]["P-017"])
+        r = _upload_clip(client, clip_file, caption="Filmed by Jane Smith")
+        assert r.status_code == 409 and r.json()["reasons"] == ["name"]
+        assert client.get("/api/media").json()["media"] == []                    # nothing kept after the warning
+        r = _upload_clip(client, clip_file, caption="Filmed by Jane Smith", confirm=True)
+        assert r.status_code == 201 and r.json()["warned"] is True
+
+    def test_other_patients_clip_is_not_found(self, client, seeded, clip_file):
+        db, codes = seeded
+        login(client, codes["P-017"])
+        m = _upload_clip(client, clip_file).json()
+        client.post("/api/logout", json={}, headers={"Origin": ORIGIN})
+        login(client, codes["P-018"])
+        assert client.get(f"/api/media/{m['id']}").status_code == 404
+        assert client.delete(f"/api/media/{m['id']}", headers={"Origin": ORIGIN}).status_code == 404
+        assert m["id"] not in client.get("/api/media").text
+        assert client.get("/clip").status_code == 200 and "stored on the Limber" in client.get("/clip").text

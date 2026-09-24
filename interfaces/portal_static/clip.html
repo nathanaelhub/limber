@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Send a video</title>
+</head>
+<body data-page="clip">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <main class="card wide">
+    <h1>Send a video to your therapist</h1>
+    <p class="lead">Show something you want them to see: where it hurts, or a movement that feels wrong. About a minute at most.</p>
+    <p class="emergency" id="notice">Your clip is stored on the Limber host and seen by your therapist. It is kept for 90 days after they review it (180 days at most) and you can delete it at any time. Do not include other people, and do not say your name in the video.</p>
+    <form id="clip-form" autocomplete="off">
+      <label for="file" class="button">Record or choose a video</label>
+      <input id="file" type="file" accept="video/*" capture="user" hidden>
+      <p id="file-name" class="small" hidden></p>
+      <video id="preview" controls playsinline hidden></video>
+      <label for="caption">What should your therapist look for? (optional)</label>
+      <input id="caption" class="plain" maxlength="200" placeholder="e.g. the catch on the way down">
+      <p id="warn" class="warn" role="alert" hidden></p>
+      <div class="actions">
+        <button id="send" type="submit" disabled>Send</button>
+        <button id="send-anyway" type="button" class="secondary" hidden>Send anyway</button>
+      </div>
+      <div id="progress-wrap" class="track" hidden><span id="progress-fill"></span></div>
+      <p id="progress-text" class="small" hidden></p>
+      <p id="error" class="error" role="alert" hidden></p>
+      <p id="saved" class="saved" role="status" hidden></p>
+    </form>
+    <h2>Your videos</h2>
+    <ol id="clips" class="exercises"></ol>
+  </main>
+  <script src="/static/portal.js"></script>
+  <script src="/static/clip.js"></script>
+</body>
+</html>

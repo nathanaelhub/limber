@@ -35,7 +35,8 @@ from starlette.staticfiles import StaticFiles  # noqa: E402
 from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
-from src.portal import access, admin, frames, live, messages, viewmodels  # noqa: E402
+from src.media.probe import MediaRejected  # noqa: E402
+from src.portal import access, admin, frames, live, messages, uploads, viewmodels  # noqa: E402
 from src.ptlog.models import PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
@@ -110,12 +111,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     def signed_in(request: Request, store: SessionStore) -> Optional[str]:
         return access.current_patient(store, request.cookies.get(COOKIE), clock=clock)
 
-    def check_post(request: Request) -> Optional[JSONResponse]:
+    def check_post(request: Request, content_type: str = "application/json") -> Optional[JSONResponse]:
         if (request.headers.get("origin") or "").rstrip("/") not in origins:
             return _json({"error": "This request did not come from the Limber page."}, 403)
-        if not request.headers.get("content-type", "").lower().startswith("application/json"):
-            return _json({"error": "Send JSON."}, 415)
+        if not request.headers.get("content-type", "").lower().startswith(content_type):
+            return _json({"error": f"Send {content_type}."}, 415)
         return None
+
+    media_dir = db_path.parent / "media"
 
     # ------------------------------------------------------------------ API
 
@@ -262,6 +265,159 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                         session_id, warned=bool(reasons), time_adjusted=adjusted)
                 return _json(viewmodels.entry_json(entry), 200 if client_id in before else 201)
         return await run_in_threadpool(work)
+
+    # ------------------------------------------------------------------ uploads and media (feature 011)
+
+    UPLOAD_KEYS = ("id", "kind", "total_bytes", "chunk_bytes", "total_parts", "received")
+
+    def _upload_json(st):
+        return {k: getattr(st, k) for k in UPLOAD_KEYS}
+
+    def _media_json(m):
+        return {"id": m.id, "kind": m.kind, "caption": m.caption, "duration": m.duration, "bytes": m.bytes,
+                "width": m.width, "height": m.height, "container": m.container, "created_at": m.created_at[:16],
+                "reviewed": m.reviewed_at is not None, "deleted": m.deleted_at is not None, "warned": m.warned,
+                "type": _mime(m)}
+
+    def _mime(m):
+        return {"mp4": "video/mp4", "webm": "video/webm", "m4a": "audio/mp4", "ogg": "audio/ogg"}.get(m.ext, "application/octet-stream")
+
+    def _who(request, store):
+        pid = signed_in(request, store)
+        if pid is None or store.get_discharge(pid) is not None:
+            return None
+        return pid
+
+    async def upload_begin(request: Request):
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+
+        def work():
+            with open_store() as store:
+                pid = _who(request, store)
+                if pid is None:
+                    return _json({"error": "Please sign in."}, 401)
+                try:
+                    st = uploads.begin(store, media_dir, pid, body.get("kind"), body.get("total_bytes"), body.get("sha256"),
+                                       chunk_bytes=body.get("chunk_bytes", uploads.CHUNK_BYTES))
+                except PTLogError as err:
+                    return _json({"error": str(err)}, 400)
+                return _json(_upload_json(st), 201)
+        return await run_in_threadpool(work)
+
+    def upload_status(request: Request):
+        with open_store() as store:
+            pid = _who(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            try:
+                return _json(_upload_json(uploads.status(store, media_dir, pid, request.path_params["upload_id"])))
+            except PTLogError:
+                return _json({"error": "Unknown upload."}, 404)
+
+    async def upload_part(request: Request):
+        refused = check_post(request, "application/octet-stream")
+        if refused:
+            return refused
+        data = bytearray()
+        async for chunk in request.stream():
+            data.extend(chunk)
+            if len(data) > uploads.MAX_CHUNK + 1024:
+                return _json({"error": "This part is too large."}, 413)
+
+        def work():
+            with open_store() as store:
+                pid = _who(request, store)
+                if pid is None:
+                    return _json({"error": "Please sign in."}, 401)
+                try:
+                    st = uploads.put_part(store, media_dir, pid, request.path_params["upload_id"],
+                                          int(request.path_params["index"]), bytes(data))
+                except PTLogError as err:
+                    return _json({"error": str(err)}, 404 if "Unknown" in str(err) else 400)
+                return _json(_upload_json(st))
+        return await run_in_threadpool(work)
+
+    async def upload_finish(request: Request):
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+
+        def work():
+            with open_store() as store:
+                pid = _who(request, store)
+                if pid is None:
+                    return _json({"error": "Please sign in."}, 401)
+                try:
+                    m = uploads.finish(store, media_dir, pid, request.path_params["upload_id"],
+                                       caption=body.get("caption") or "", confirm=body.get("confirm") is True)
+                except messages.NeedsConfirmation as warn:
+                    return _json({"error": str(warn), "reasons": warn.reasons}, 409)
+                except MediaRejected as rejected:
+                    return _json({"error": str(rejected), "reason": rejected.reason}, 415)
+                except PTLogError as err:
+                    text = str(err)
+                    return _json({"error": text}, 404 if "Unknown" in text else (409 if "missing part" in text else 400))
+                return _json(_media_json(m), 201)
+        return await run_in_threadpool(work)
+
+    def upload_abandon(request: Request):
+        if (request.headers.get("origin") or "").rstrip("/") not in origins:
+            return _json({"error": "This request did not come from the Limber page."}, 403)
+        with open_store() as store:
+            pid = _who(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            try:
+                uploads.abandon(store, media_dir, pid, request.path_params["upload_id"])
+            except PTLogError:
+                return _json({"error": "Unknown upload."}, 404)
+            return _json({})
+
+    def media_list(request: Request):
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            rows = uploads.list_media(store, pid)
+            return _json({"patient_id": pid, "media": [_media_json(m) for m in rows], "notice": uploads.NOTICE})
+
+    def media_file(request: Request):
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            m = uploads.get_media(store, pid, request.path_params["media_id"])
+        if m is None or m.deleted_at is not None:
+            return _json({"error": "Not found."}, 404)
+        path = uploads.media_path(media_dir, m)
+        if not path.is_file():
+            return _json({"error": "Not found."}, 404)
+        return FileResponse(str(path), media_type=_mime(m), headers={
+            "Cache-Control": "private, no-store", "Content-Security-Policy": "sandbox",
+            "Content-Disposition": f'inline; filename="clip.{m.ext}"', "Accept-Ranges": "bytes"})
+
+    def media_delete(request: Request):
+        if (request.headers.get("origin") or "").rstrip("/") not in origins:
+            return _json({"error": "This request did not come from the Limber page."}, 403)
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            if not uploads.delete_media(store, media_dir, pid, request.path_params["media_id"], by="patient"):
+                return _json({"error": "Not found."}, 404)
+            return _json({})
 
     def manifest(_request: Request):
         return _json(pwa.manifest(), headers={"Content-Type": "application/manifest+json"})
@@ -421,6 +577,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/progress", inner_page("progress")),
         Route("/messages", inner_page("messages")),
         Route("/checkin", inner_page("checkin")),
+        Route("/clip", inner_page("clip")),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
@@ -430,6 +587,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/entries", entries_get, methods=["GET"]),
         Route("/api/entries", entries_post, methods=["POST"]),
         Route("/manifest.webmanifest", manifest),
+        Route("/api/uploads", upload_begin, methods=["POST"]),
+        Route("/api/uploads/{upload_id}", upload_status, methods=["GET"]),
+        Route("/api/uploads/{upload_id}", upload_abandon, methods=["DELETE"]),
+        Route("/api/uploads/{upload_id}/parts/{index:int}", upload_part, methods=["PUT"]),
+        Route("/api/uploads/{upload_id}/finish", upload_finish, methods=["POST"]),
+        Route("/api/media", media_list, methods=["GET"]),
+        Route("/api/media/{media_id}", media_file, methods=["GET"]),
+        Route("/api/media/{media_id}", media_delete, methods=["DELETE"]),
         Route("/sw.js", service_worker),
         Route("/api/health", health),
         Route("/api/admin/login", admin_login, methods=["POST"]),
