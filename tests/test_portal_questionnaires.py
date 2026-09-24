@@ -145,3 +145,73 @@ class TestAnswering:
     def test_the_page_is_served(self, client):
         r = client[0].get("/questionnaire")
         assert r.status_code == 200 and "text/html" in r.headers["content-type"]
+
+
+class TestANewInstrumentNeedsNoCode:
+    """Feature 013 US3 — a definition written at test time is assignable and answerable end to end."""
+
+    NEW = """
+key: shoulder_reach
+name: Demo Shoulder Reach
+meaning: How far the patient can reach without pain, by their own account, averaged over four questions.
+unit: mean of 0-3
+direction: higher_is_worse
+version: 2
+notice: Demonstration only; not a validated or licensed instrument.
+scoring: mean
+missing:
+  minimum_answered: 3
+  replace_with_mean: false
+choices:
+  - {text: Easily, value: 0}
+  - {text: With care, value: 1}
+  - {text: With pain, value: 2}
+  - {text: Not at all, value: 3}
+items:
+  - {key: overhead, text: Reaching above your head}
+  - {key: behind, text: Reaching behind your back}
+  - {key: across, text: Reaching across your body}
+  - {key: carry, text: Carrying a bag at your side}
+"""
+
+    @pytest.fixture
+    def folder(self, tmp_path, monkeypatch):
+        d = tmp_path / "instruments"
+        d.mkdir()
+        (d / "shoulder_reach.yaml").write_text(self.NEW)
+        monkeypatch.setattr(instruments, "default_directory", lambda: d)
+        instruments.forget()
+        yield d
+        instruments.forget()
+
+    def test_the_whole_way_through(self, folder, store, tmp_db):
+        from src.ptlog import review as ptreview
+        from src.portal import questionnaires as portal_q
+        store.assign_instrument("P-018", "shoulder_reach", "weekly", NOW.date())
+        codes = {pid: access.issue_code(store, KEY, pid)[0] for pid in ("P-018",)}
+        app = create_app(db_path=tmp_db, key=KEY, allowed_origins=[ORIGIN])
+        with TestClient(app, base_url=ORIGIN) as c:
+            c.post("/api/login", json={"code": codes["P-018"]}, headers={"Origin": ORIGIN})
+            due = c.get("/api/questionnaires").json()["due"]
+            assert [q["name"] for q in due] == ["Demo Shoulder Reach"]
+            assert [i["text"] for i in due[0]["items"]][0] == "Reaching above your head"
+            r = c.post("/api/entries", json={"kind": "questionnaire", "client_id": "n1",
+                                            "data": {"instrument": "shoulder_reach",
+                                                     "answers": {"overhead": 3, "behind": 2, "across": 1, "carry": 0}}},
+                       headers={"Origin": ORIGIN})
+            assert r.status_code == 201, r.text
+            assert r.json()["score"] == 1.5                      # mean of 3, 2, 1, 0
+        entry = store.entries("P-018", "questionnaire")[0]
+        assert entry.payload["version"] == 2 and entry.payload["missing"] == 0
+        assert entry.payload["snapshot"]["direction"] == "higher_is_worse"
+        rows = ptreview.questionnaire_rows(store, "P-018")
+        assert rows[0]["unit"] == "mean of 0-3" and "not a validated" in rows[0]["notice"].lower()
+
+    def test_a_missing_item_without_the_replacement_rule(self, folder, store, tmp_db):
+        from src.portal import questionnaires as portal_q
+        store.assign_instrument("P-018", "shoulder_reach", "weekly", NOW.date())
+        payload, score = portal_q.accept(store, "P-018", {"instrument": "shoulder_reach",
+                                                          "answers": {"overhead": 3, "behind": 3, "across": 3}})
+        assert score == 3 and payload["missing"] == 1            # the mean of what was answered, not of four
+        with pytest.raises(Exception):
+            portal_q.accept(store, "P-018", {"instrument": "shoulder_reach", "answers": {"overhead": 3}})

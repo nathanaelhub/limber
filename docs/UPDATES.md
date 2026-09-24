@@ -2,6 +2,41 @@
 
 ---
 
+## Update 15 — 2026-09-24 — Questionnaires: an Engine, Not a Form
+
+Feature spec: `specs/013-questionnaires/`. Schema moved to version 12 (`instrument_assignments`);
+nothing was rebuilt, because `entries.kind` has allowed `questionnaire` since version 9.
+
+- **An instrument is a file, not code.** Each questionnaire is one YAML file in `instruments/` beside
+  `config.yaml`: its name, what its score means, the unit, whether higher is better or worse, the items
+  with their choices and values, which items are reversed, the subscales, `sum` or `mean`, and the rule
+  for missing answers. Adding one needs no code change and no restart. A file with a mistake in it is
+  named in the therapist's view with the problem and skipped; the other instruments still work, and so
+  does the app with no instruments at all. Definitions are parsed safely and never executed, and an
+  instrument may not ask for a name, a date of birth, or a record number.
+- **Therapist**: assign an instrument to a patient once, weekly, fortnightly, or monthly; see the next
+  due date; end an assignment (the answers stay). Review → From the patient shows each instrument's
+  scores over time with its unit, direction, meaning, and subscale scores, the change from first to
+  latest, and the item answers of any one questionnaire, marking a reversed question as such. More than
+  a week past due reaches the work queue and marks the roster.
+- **Patient**: what is due appears on Today. The questions are answered on one page, each with its own
+  words rather than bare numbers; a half-finished questionnaire is kept on the phone, so an interruption
+  costs nothing; and a finished one goes through the same offline queue as a check-in. On sending, the
+  patient sees their total, its unit, and which direction is better.
+- **A stored score never moves.** Each answer set is stored with a snapshot of the values, ranges,
+  reversals, subscales, and rules that produced its total, so any score can be reproduced years later
+  even if the file has since been edited or deleted. When the installed definition differs, the
+  therapist is told which version each score came from rather than being shown a new number.
+- **Scoring is arithmetic, not judgement.** No attention flag or threshold is derived from a
+  questionnaire score, and the sentence saying what a score means comes from the file.
+- **The one shipped instrument is a demonstration.** "Demo Knee Function" (ten questions, two reversed,
+  two subscales) was written for this project and says so wherever its score appears. Real instruments
+  and their licences are the owner's to source; each is then one more file.
+- Verified on an emulated iPhone in Chrome against the demo record, and in the therapist app. Not
+  verified: a real phone, a real instrument, and how long a twenty-item questionnaire feels to answer.
+
+---
+
 ## Update 14 — 2026-09-24 — Exercise Logged Without the Camera, Medication and Sleep
 
 Feature spec: `specs/012-diary-logs/`. Schema moved to version 11: the `sessions` table was rebuilt so

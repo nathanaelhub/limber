@@ -219,6 +219,31 @@ def build(db_path: Path, seed: int = 7) -> None:
                             None, False, False)
         clock.now = datetime.now()
 
+        # Questionnaires (feature 013): one patient answering twice, one overdue, one just assigned.
+        from src.portal import questionnaires as portal_q
+        from src.ptlog import instruments as instrument_files
+        instrument_files.forget()
+        demo_instrument = "demo_knee_function"
+        if demo_instrument in instrument_files.load().by_key:
+            s.assign_instrument("P-017", demo_instrument, "fortnightly", (datetime.now() - timedelta(days=30)).date())
+            s.assign_instrument("P-019", demo_instrument, "monthly", (datetime.now() - timedelta(days=45)).date())
+            s.assign_instrument("P-021", demo_instrument, "weekly", (datetime.now() - timedelta(days=20)).date())
+            s.assign_instrument("P-023", demo_instrument, "weekly", datetime.now().date())   # due today
+            better = {"stairs_up": 4, "stairs_down": 3, "rising": 3, "standing": 3, "walking": 4,
+                      "kneeling": 2, "squatting": 2, "twisting": 3, "pain_moving": 1, "pain_night": 1}
+            worse = {**better, "stairs_up": 2, "stairs_down": 1, "rising": 1, "walking": 2,
+                     "pain_moving": 3, "pain_night": 2}
+            for days_ago, answers in ((26, worse), (5, better)):
+                when = datetime.now() - timedelta(days=days_ago, hours=5)
+                payload, total = portal_q.accept(s, "P-017", {"instrument": demo_instrument, "answers": answers})
+                s.entry_add("P-017", "questionnaire", payload, total, when.isoformat(),
+                            f"demo-q-P-017-{days_ago}", "standalone", None, False, False)
+            partial = {k: v for k, v in list(better.items())[:8]}          # eight of ten: within the rule
+            when = datetime.now() - timedelta(days=12, hours=4)
+            payload, total = portal_q.accept(s, "P-019", {"instrument": demo_instrument, "answers": partial})
+            s.entry_add("P-019", "questionnaire", payload, total, when.isoformat(),
+                        "demo-q-P-019", "standalone", None, False, False)   # P-019 is now overdue for the next one
+
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)
         s.set_installation_threshold("adherence", 65)

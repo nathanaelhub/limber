@@ -67,7 +67,7 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 5: User Story 3 — a new instrument needs no code (P2)
 
-- [ ] T016 [P] [US3] Failing test: a definition written into a temporary directory at test time is
+- [x] T016 [P] [US3] Failing test: a definition written into a temporary directory at test time is
       offered for assignment and answered end to end without touching any code; the therapist's view
       carries the "not a validated instrument" sentence from the file
 - [x] T017 [US3] Write `instruments/demo_knee_function.yaml` (ten items, 0-4, two reversed, two
@@ -76,13 +76,13 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 6: Polish
 
-- [ ] T018 Demo data in `scripts/seed_demo.py` (two patients assigned, one with two completed
+- [x] T018 Demo data in `scripts/seed_demo.py` (two patients assigned, one with two completed
       questionnaires and one overdue); `docs/UPDATES.md` Update 15; `README`/`docs` note on adding an
       instrument
-- [ ] T019 Phone-emulation run in Chrome (due on Today, answering, the half-finished answers surviving
+- [x] T019 Phone-emulation run in Chrome (due on Today, answering, the half-finished answers surviving
       a reload, offline send and replay, the therapist reading the score and the item answers); record
       what was verified and what was not
-- [ ] T020 Full suite green; checklist notes written; commit and merge to `main`
+- [x] T020 Full suite green; checklist notes written; commit and merge to `main`
 
 ## Dependencies
 
