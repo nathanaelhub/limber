@@ -15,10 +15,14 @@ from .models import Session
 
 CLINIC = "clinic"
 HOME = "home"
-ORIGINS = (CLINIC, HOME)
+DIARY = "self-reported"          # the patient logged it without the camera (feature 012)
+ORIGINS = (CLINIC, HOME, DIARY)
+MEASURED_ORIGINS = (CLINIC, HOME)   # only these carry angles, so only these are ever compared
 
 
 def capture_origin(session: Session) -> str:
+    if session.source == "diary":
+        return DIARY
     extras = session.source_extras or {}
     return HOME if extras.get("origin") == "portal" else CLINIC
 

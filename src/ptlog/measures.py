@@ -10,7 +10,7 @@ from __future__ import annotations
 import statistics
 from typing import Dict, List
 
-from .origin import capture_origin
+from .origin import MEASURED_ORIGINS, capture_origin
 from .models import ExerciseSet, Session, SessionMeasure
 
 
@@ -50,8 +50,9 @@ def measures_for_session(session: Session) -> Dict[str, SessionMeasure]:
 
 
 def measure_series(sessions: List[Session], exercise: str) -> List[SessionMeasure]:
-    """Measures for one exercise across sessions, oldest first, skipping sessions without it."""
-    ordered = sorted(sessions, key=lambda s: (s.start_time, s.id))
+    """Measures for one exercise across sessions, oldest first, skipping sessions without it and
+    sessions the patient only reported (they carry no angles, so there is nothing to measure)."""
+    ordered = sorted((s for s in sessions if capture_origin(s) in MEASURED_ORIGINS), key=lambda s: (s.start_time, s.id))
     series: List[SessionMeasure] = []
     for session in ordered:
         m = measures_for_session(session).get(exercise)

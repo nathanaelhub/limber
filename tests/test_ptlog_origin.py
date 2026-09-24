@@ -158,3 +158,60 @@ class TestShownToTheTherapist:
         header = rows[0].split(",")
         assert header[-1] == "recorded"
         assert {r.rsplit(",", 1)[1] for r in rows[1:]} == {"clinic", "home"}
+
+
+# ----------------------------------------------------------------------------- feature 012: self-reported
+
+def make_diary(store, patient, name, key, when, reps=10, sets=1, effort=3):
+    from src.ptlog.models import ExerciseSetInfo
+    sid = store.start_session(patient, "diary", "self-reported", {"origin": "diary"})
+    store.conn.execute("UPDATE sessions SET start_time = ? WHERE id = ?", (when.isoformat(), sid))
+    set_id = store.open_set(sid, ExerciseSetInfo(key, name, "left", 10, 170.0, 90.0))
+    store.set_reported(set_id, reps=reps, sets=sets, effort=effort)
+    store.conn.commit()
+    store.end_session(sid)
+    return sid
+
+
+class TestDiaryOrigin:
+    def test_origin_and_labels(self, fixed_store, make_session):
+        from src.ptlog import views
+        store, clock = fixed_store
+        store.add_patient("P-040")
+        clinic = make_session(store, clock, "P-040", "Squat", D0 - timedelta(days=3), [(90.0, 80.0, 2.4)])
+        diary = make_diary(store, "P-040", "Squat", "squat", D0 - timedelta(days=1))
+        assert capture_origin(store.load_session(diary)) == "self-reported"
+        rows = {r["id"]: r for r in views.session_table_rows(store, "P-040")}
+        assert rows[diary]["origin"] == "self-reported" and rows[clinic]["origin"] == "clinic"
+        stored = store.load_session(diary)
+        assert stored.total_reps == 10 and stored.avg_rom is None and stored.avg_form_score is None
+
+    def test_counted_as_practice_but_never_measured(self, fixed_store, make_session):
+        from src.ptlog import review, tracker
+        from src.portal import viewmodels as vm
+        store, clock = fixed_store
+        store.add_patient("P-041")
+        store.assign_program("P-041", "custom", "Home", ["squat"], 2, (D0 - timedelta(days=21)).date())
+        for d in (9, 7, 2, 1):
+            make_diary(store, "P-041", "Squat", "squat", D0 - timedelta(days=d))
+        make_diary(store, "P-041", "Squat", "squat", D0 - timedelta(hours=2))        # inside the week in progress
+        row = {r.patient_id: r for r in tracker.roster(store, now=D0)}["P-041"]
+        assert row.sessions_30d == 5 and row.adherence_pct is not None and row.practice_gap is False
+        assert vm.today_view(store, "P-041", now=D0)["week"]["done"] >= 1
+        assert vm.adherence_view(store, "P-041", now=D0)["streak_weeks"] >= 1
+        t = review.trend(store, "P-041", "Squat", "all", now=D0)
+        assert t.points == [] and t.by_origin == {}                     # nothing measured to compare
+        assert review.flags_for(store, "P-041", "all", now=D0).flags == []
+
+    def test_done_today_and_comparison(self, fixed_store, make_session):
+        from src.ptlog import review
+        from src.portal import viewmodels as vm
+        from src.ptlog.models import ComparisonError
+        store, clock = fixed_store
+        store.add_patient("P-042")
+        store.assign_program("P-042", "custom", "Home", ["squat"], 2, (D0 - timedelta(days=21)).date())
+        diary = make_diary(store, "P-042", "Squat", "squat", D0 - timedelta(hours=2))
+        assert vm.today_view(store, "P-042", now=D0)["exercises"][0]["done_today"] is True
+        clinic = make_session(store, clock, "P-042", "Squat", D0 - timedelta(days=4), [(90.0, 80.0, 2.4)])
+        with pytest.raises(ComparisonError):
+            review.compare(store, clinic, diary)

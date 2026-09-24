@@ -62,7 +62,7 @@ def trend(store: SessionStore, patient_id: str, exercise: str, period: str = "al
 
 def _trend_from_sessions(store: SessionStore, patient_id: str, exercise: str, period: str, sessions) -> Trend:
     from .models import TrendPart
-    from .origin import ORIGINS
+    from .origin import MEASURED_ORIGINS as ORIGINS
     points = measure_series(sessions, exercise)
     t = Trend(exercise=exercise, period=period, points=points)
     t.goal = store.get_goal(patient_id, exercise)
@@ -130,7 +130,7 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
     own overrides; both are resolved from the store when not supplied."""
     from . import flags as rules
     from .models import FlagResult, NotEvaluated
-    from .origin import HOME, split_by_origin
+    from .origin import HOME, MEASURED_ORIGINS, split_by_origin
     goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
     if thresholds is None:
         thresholds = store.effective_thresholds(patient_id)
@@ -140,6 +140,8 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
     # Rules that compare sessions run once per capture origin (home and clinic range of motion are
     # not comparable); each origin needs its own minimum number of sessions.
     for origin, own in split_by_origin(sessions).items():
+        if origin not in MEASURED_ORIGINS:
+            continue                                  # self-reported sessions have nothing to compare
         names = _exercise_order(own)
         series_by_exercise = {name: measure_series(own, name) for name in names}
         part = rules.evaluate(series_by_exercise, goals, [], thresholds, now, per_exercise=per_exercise)

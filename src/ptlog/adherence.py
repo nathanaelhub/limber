@@ -40,12 +40,17 @@ def week_index(a: Assignment, on: date) -> int:
     return (on - _d(a.start_date)).days // 7 + 1
 
 
+def _set_counts(es) -> bool:
+    """A set counts as practice when it has a counted rep, or reps the patient reported (feature 012)."""
+    return any(not r.out_of_range for r in es.reps) or bool(es.reported_reps)
+
+
 def _session_counts(session: Session) -> bool:
-    return any(not r.out_of_range for es in session.sets for r in es.reps)
+    return any(_set_counts(es) for es in session.sets)
 
 
 def _exercises_with_counted_reps(sessions: List[Session]) -> set:
-    return {es.exercise_key for s in sessions for es in s.sets if any(not r.out_of_range for r in es.reps)}
+    return {es.exercise_key for s in sessions for es in s.sets if _set_counts(es)}
 
 
 def _build_week(a: Assignment, index: int, sessions: List[Session], complete: bool) -> AdherenceWeek:

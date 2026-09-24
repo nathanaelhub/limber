@@ -1018,7 +1018,8 @@ class SessionStore:
                 id=r["id"], patient_id=r["patient_id"], start_time=r["start_time"], end_time=r["end_time"],
                 source=r["source"], status=r["status"], exercises=names.get(r["id"], []),
                 total_reps=r["total_reps"], avg_form_score=r["avg_form_score"],
-                origin="home" if '"origin": "portal"' in (r["source_extras"] or "") else "clinic",
+                origin=("self-reported" if r["source"] == "diary"
+                        else "home" if '"origin": "portal"' in (r["source_extras"] or "") else "clinic"),
             )
             for r in rows
         ]
