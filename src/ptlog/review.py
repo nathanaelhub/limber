@@ -60,6 +60,18 @@ def trend(store: SessionStore, patient_id: str, exercise: str, period: str = "al
     return _trend_from_sessions(store, patient_id, exercise, period, sessions)
 
 
+def self_reported_count(store: SessionStore, patient_id: str, exercise: str, period: str = "all",
+                        now: Optional[datetime] = None) -> int:
+    """How many sessions of an exercise in the period the patient logged themselves.
+
+    They carry no measurement, so they never appear in a trend; a view with an empty trend uses this
+    to say that sessions were logged rather than that nothing happened (feature 012 FR-004)."""
+    from .origin import DIARY, capture_origin
+    sessions = store.sessions_in_period(patient_id, period_start(period, _now(now)))
+    return sum(1 for s in sessions if capture_origin(s) == DIARY
+               and any(es.exercise_name == exercise for es in s.sets))
+
+
 def _trend_from_sessions(store: SessionStore, patient_id: str, exercise: str, period: str, sessions) -> Trend:
     from .models import TrendPart
     from .origin import MEASURED_ORIGINS as ORIGINS

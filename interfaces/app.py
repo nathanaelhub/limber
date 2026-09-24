@@ -1098,8 +1098,10 @@ def _patient_logs_section(pid, patient):
     with _open_store() as store:
         enabled = store.diary_enabled(pid)
         medications = store.medication_list(pid)
+    # The keys carry the patient id: a widget key alone keeps its value across a rerun, so a shared key
+    # would show (and then save) the patient chosen before this one.
     wanted = st.toggle("Let this patient log exercise done without the camera", value=enabled,
-                       key="patient_diary_enabled")
+                       key=f"patient_diary_enabled_{pid}")
     if wanted != enabled:
         with _open_store() as store:
             store.set_diary_enabled(pid, wanted)
@@ -1111,9 +1113,9 @@ def _patient_logs_section(pid, patient):
     st.caption("One medicine per line, as the patient should see it (for example \"ibuprofen 400 mg\"). "
                "The patient ticks from this list and can never type a medicine name. Leave it empty to "
                "offer no medication log. Up to 20 items of 60 characters.")
-    text = st.text_area("Medicines", value="\n".join(medications), key="patient_medications",
+    text = st.text_area("Medicines", value="\n".join(medications), key=f"patient_medications_{pid}",
                         label_visibility="collapsed", placeholder="ibuprofen 400 mg")
-    if st.button("Save medication list", key="patient_medications_save"):
+    if st.button("Save medication list", key=f"patient_medications_save_{pid}"):
         warned = [n.strip() for n in text.splitlines() if n.strip() and ptmessages.check_text(n.strip())]
         with _open_store() as store:
             saved = store.set_medication_list(pid, text.splitlines())
@@ -1344,8 +1346,11 @@ def _review_trends(pid):
         period = _period_selector("review_trend_period")
     with _open_store() as store:
         t = ptreview.trend(store, pid, exercise, period)
+        logged = ptreview.self_reported_count(store, pid, exercise, period) if not t.points else 0
     if not t.points:
-        st.info(f"No sessions of {exercise} in this period.")
+        st.info(f"No measured sessions of {exercise} in this period."
+                + (f" The patient logged {logged} session(s) of it without the camera, which carry no "
+                   "range of motion or form; they are under \"From the patient\"." if logged else ""))
         return
     rows = ptviews.trend_table_rows(t)
     table = pd.DataFrame(rows).rename(columns={

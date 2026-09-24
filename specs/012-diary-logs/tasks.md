@@ -9,4 +9,4 @@
 - [x] T007 Implement diary rules, entry kinds, routes, diary.html and log.html
 - [x] T008 [P] Failing AppTest: Patients page medication list and diary switch; From the patient shows diary, medication, sleep
 - [x] T009 Implement in interfaces/app.py; CLI if needed
-- [ ] T010 Demo data; docs (Update 14); phone-emulation run; record results; commit and merge
+- [x] T010 Demo data; docs (Update 14); phone-emulation run; record results; commit and merge

@@ -661,12 +661,12 @@ def test_patients_page_sets_the_medication_list_and_the_diary_switch(seeded_env)
     at.session_state["patients_edit_select"] = "P-017"
     at.run()
     assert not at.exception, [e.value for e in at.exception]
-    at.text_area(key="patient_medications").set_value("ibuprofen 400 mg\nparacetamol").run()
-    at.button(key="patient_medications_save").click().run()
+    at.text_area(key="patient_medications_P-017").set_value("ibuprofen 400 mg\nparacetamol").run()
+    at.button(key="patient_medications_save_P-017").click().run()
     with SessionStore(seeded_env).open() as store:
         assert store.medication_list("P-017") == ["ibuprofen 400 mg", "paracetamol"]
         assert store.diary_enabled("P-017") is True
-    at.toggle(key="patient_diary_enabled").set_value(False).run()
+    at.toggle(key="patient_diary_enabled_P-017").set_value(False).run()
     with SessionStore(seeded_env).open() as store:
         assert store.diary_enabled("P-017") is False
     text = " ".join(c.value for c in at.caption)
@@ -700,3 +700,23 @@ def test_review_from_the_patient_shows_diary_medication_and_sleep(seeded_env):
     assert list(meds["Medicine"]) == ["ibuprofen 400 mg"]
     sleep = next(t for t in tables if "Hours" in t.columns)
     assert list(sleep["Hours"]) == [7.5, 5.0] and list(sleep["Quality"]) == [4, 2]
+
+
+def test_the_medication_list_does_not_follow_the_therapist_to_the_next_patient(seeded_env):
+    """A widget key keeps its value across a rerun, so per-patient controls must key on the patient."""
+    with SessionStore(seeded_env).open() as store:
+        store.add_patient("P-018")
+        store.set_medication_list("P-017", ["ibuprofen 400 mg"])
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.session_state["patients_edit_select"] = "P-017"
+    at.run()
+    assert at.text_area(key="patient_medications_P-017").value == "ibuprofen 400 mg"
+    at.session_state["patients_edit_select"] = "P-018"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.text_area(key="patient_medications_P-018").value == ""
+    at.button(key="patient_medications_save_P-018").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.medication_list("P-017") == ["ibuprofen 400 mg"] and store.medication_list("P-018") == []
+        assert store.diary_enabled("P-018") is True

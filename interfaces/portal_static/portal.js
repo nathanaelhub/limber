@@ -27,7 +27,7 @@
     return post("/api/entries", entry).then(function (res) {
       if (res.status === 401) { wipeLocal(); window.location.href = "/"; }
       return res;
-    }).catch(function () { queue(entry); return { queued: true }; });
+    }).catch(function () { queue(entry); offlineBanner(true); return { queued: true }; });
   }
   function queue(entry) { var q = store.get("limber.queue") || []; q.push(entry); store.set("limber.queue", q); }
   function replayQueue() {

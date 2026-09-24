@@ -2,6 +2,44 @@
 
 ---
 
+## Update 14 — 2026-09-24 — Exercise Logged Without the Camera, Medication and Sleep
+
+Feature spec: `specs/012-diary-logs/`. Schema moved to version 11: the `sessions` table was rebuilt so
+its source may be `diary`, `exercise_sets` gained reported reps, sets, and effort, and
+`patient_settings` holds the per-patient switch and medication list. A test upgrades a realistic
+version 10 record and compares every table's row count; only `schema_version` grows.
+
+- **A third capture origin.** Sessions are now recorded in the clinic, at home, or **self-reported**.
+  Self-reported sessions count everywhere "did they practise" is the question — done today, sessions
+  this week, the streak, adherence, the practice gap, the roster, the patient's history — and are
+  excluded everywhere a measurement is compared: trends, first-to-latest change, goal progress,
+  session comparison, and every attention rule. They carry no angles, so they have no range of motion,
+  no form score, and no duration. A trend with nothing to show now says how many sessions were logged
+  rather than that nothing happened.
+- **Patient**: "I did this without the camera" on Today. Exercise (their program first, then the rest
+  of the configuration), reps 1-200, sets 1-20, effort 1-5 with words at both ends, an optional note
+  through the privacy warning, and when they did it — up to seven days back, refused rather than
+  quietly moved if the time is in the future or older.
+- **Medication and sleep**: the therapist writes the medication list; the patient only ticks from it
+  and can never type a medicine name. Sleep is hours 0-14 in halves and quality 1-5, one row per
+  night, where logging the same night again replaces the earlier entry in the therapist's view and
+  both stay in the record. Both go through the offline queue, so they survive a lost connection.
+- **Therapist**: Patients gains the switch and the medication list (with the privacy check on what the
+  therapist types); Review → From the patient gains a logged-session table stating plainly that it
+  counts for practice but enters no trend, a medication table, and a sleep table and chart.
+- **Two bugs the browser run found**: the per-patient controls shared one widget key, so switching
+  patients showed — and would have saved — the previous patient's medication list; and an entry saved
+  to the phone while offline did not raise the offline banner. Both fixed, both now covered by a test.
+- Verified on an emulated iPhone in Chrome against the demo record: the notice, the exercise list with
+  the program first, the privacy warning and edit, "Logged: Squat, 3 × 15 reps, felt hard.
+  Self-reported.", the week count rising from 1 to 2 and the exercise turning green when the session
+  is logged for today, a session logged for yesterday counting in that week instead, medication and
+  sleep saved and corrected, a sleep entry queued offline and sent on reconnecting, the therapist
+  seeing all three tables, and turning the switch off making the option disappear from the phone.
+  Not verified: a real phone, and a real person logging what they actually did.
+
+---
+
 ## Update 13 — 2026-09-24 — Video Clips from the Phone, Reviewed by the PT
 
 Feature spec: `specs/011-video-clips/`. Schema moved to version 10 (`media`, `media_uploads`; the

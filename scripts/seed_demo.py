@@ -189,6 +189,36 @@ def build(db_path: Path, seed: int = 7) -> None:
                                              "note": "Pinching on the outside of the hip." if pid == "P-021" and i == 4 else ""},
                             float(pain), when.isoformat(), f"demo-{pid}-{i}", "standalone", None, False, False)
 
+        # Exercise logged without the camera, medication, and sleep (feature 012).
+        from src.portal import diary
+        s.set_medication_list("P-017", ["ibuprofen 400 mg", "paracetamol 1 g"])
+        s.set_medication_list("P-021", ["naproxen 250 mg"])
+        s.set_diary_enabled("P-023", False)                      # one patient the therapist turned it off for
+        logged = [("P-017", "knee_extension", 4, 12, 2, 3, ""),
+                  ("P-017", "squat", 2, 10, 2, 4, "Did these in the park."),
+                  ("P-019", "knee_extension", 3, 10, 3, 2, ""),
+                  ("P-019", "knee_extension", 1, 10, 3, 3, "No room to set the phone up."),
+                  ("P-021", "hip_abduction", 2, 8, 2, 5, "Felt it pinch again.")]
+        for pid, key, days_ago, reps, sets, effort, note in logged:
+            when = datetime.now() - timedelta(days=days_ago, hours=3)
+            clock.now = when
+            diary.log(s, pid, {"exercise": key, "reps": reps, "sets": sets, "effort": effort,
+                               "note": note, "done_at": when.isoformat()}, now=when)
+        for pid, item, days_ago in (("P-017", "ibuprofen 400 mg", 2), ("P-017", "paracetamol 1 g", 1),
+                                    ("P-021", "naproxen 250 mg", 1)):
+            when = datetime.now() - timedelta(days=days_ago, hours=2)
+            s.entry_add(pid, "medication", {"item": item, "note": ""}, None, when.isoformat(),
+                        f"demo-med-{pid}-{days_ago}", "standalone", None, False, False)
+        for pid, nights in (("P-017", [(5, 7.5, 4), (4, 7.0, 4), (3, 6.5, 3), (2, 8.0, 5), (1, 7.5, 4)]),
+                            ("P-021", [(4, 5.5, 2), (3, 5.0, 2), (2, 4.5, 1), (1, 6.0, 2)])):
+            for days_ago, hours, quality in nights:
+                when = datetime.now() - timedelta(days=days_ago, hours=14)
+                s.entry_add(pid, "sleep", {"hours": hours, "quality": quality,
+                                           "note": "Woke with the hip." if pid == "P-021" and quality == 1 else ""},
+                            float(quality), when.isoformat(), f"demo-sleep-{pid}-{days_ago}", "standalone",
+                            None, False, False)
+        clock.now = datetime.now()
+
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)
         s.set_installation_threshold("adherence", 65)

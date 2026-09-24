@@ -215,3 +215,19 @@ class TestDiaryOrigin:
         clinic = make_session(store, clock, "P-042", "Squat", D0 - timedelta(days=4), [(90.0, 80.0, 2.4)])
         with pytest.raises(ComparisonError):
             review.compare(store, clinic, diary)
+
+    def test_a_trend_with_only_logged_sessions_says_how_many(self, fixed_store, make_session):
+        """The trend view must not say "no sessions" when the patient logged some: they happened, they
+        just carry nothing to measure (feature 012 FR-003, FR-004)."""
+        from src.ptlog import review as ptreview
+        store, clock = fixed_store
+        store.add_patient("P-042")
+        for d in (5, 2):
+            make_diary(store, "P-042", "Squat", "squat", D0 - timedelta(days=d))
+        make_session(store, clock, "P-042", "Knee Extension", D0 - timedelta(days=4), [(90.0, 80.0, 2.4)])
+        assert ptreview.trend(store, "P-042", "Squat", "30d", now=D0).points == []
+        assert ptreview.self_reported_count(store, "P-042", "Squat", "30d", now=D0) == 2
+        # the period is a start, not a window: eleven days on, only the later one is still inside 14 days
+        assert ptreview.self_reported_count(store, "P-042", "Squat", "14d", now=D0 + timedelta(days=11)) == 1
+        assert ptreview.self_reported_count(store, "P-042", "Knee Extension", "30d", now=D0) == 0
+        assert "Squat" in ptreview.exercise_names(store, "P-042")
