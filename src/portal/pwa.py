@@ -10,7 +10,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-PAGES = ["/", "/today", "/checkin", "/progress", "/messages", "/session"]
+PAGES = ["/", "/today", "/checkin", "/progress", "/messages", "/session", "/diary", "/log"]
 SHELL_SUFFIXES = (".css", ".js", ".svg", ".png")
 NEVER = ("sw.js",)
 

@@ -36,8 +36,9 @@ from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
-from src.portal import access, admin, frames, live, messages, uploads, viewmodels  # noqa: E402
-from src.ptlog.models import PTLogError  # noqa: E402
+from src.portal import access, admin, diary, frames, live, messages, uploads, viewmodels  # noqa: E402
+from src.ptlog import origin  # noqa: E402
+from src.ptlog.models import PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "portal_static"
@@ -250,7 +251,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     except PTLogError:
                         return _json({"error": "That session is not yours."}, 400)
                 try:
-                    payload, score = entry_rules.validate(body.get("kind"), body.get("data"))
+                    payload, score = entry_rules.validate(body.get("kind"), body.get("data"),
+                                                          choices={"item": store.medication_list(patient_id)})
                 except PTLogError as err:
                     return _json({"error": str(err)}, 400)
                 note = payload.get("note") or ""
@@ -264,6 +266,40 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 entry = store.entry_add(patient_id, body.get("kind"), payload, score, recorded_at, client_id, phase,
                                         session_id, warned=bool(reasons), time_adjusted=adjusted)
                 return _json(viewmodels.entry_json(entry), 200 if client_id in before else 201)
+        return await run_in_threadpool(work)
+
+    # ------------------------------------------------------------------ exercise logged without the camera (012)
+
+    async def diary_post(request: Request):
+        """A session the patient did without the camera. Always stored as self-reported."""
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+
+        def work():
+            with open_store() as store:
+                patient_id = signed_in(request, store)
+                if patient_id is None:
+                    return _json({"error": "Please sign in."}, 401)
+                data = {k: v for k, v in body.items() if k != "confirm"}
+                try:
+                    session = diary.log(store, patient_id, data, now=clock(), confirm=body.get("confirm") is True)
+                except messages.NeedsConfirmation as warn:
+                    return _json({"error": str(warn), "reasons": warn.reasons}, 409)
+                except PortalError as off:
+                    return _json({"error": str(off)}, 403)
+                except PTLogError as err:
+                    return _json({"error": str(err)}, 400)
+                view = viewmodels.today_view(store, patient_id, now=clock())
+                return _json({"session_id": session.id, "origin": origin.capture_origin(session),
+                              "total_reps": session.total_reps, "summary": diary.summary(session),
+                              "week": view["week"], "streak_weeks": view["streak_weeks"],
+                              "exercises": view["exercises"]}, 201)
         return await run_in_threadpool(work)
 
     # ------------------------------------------------------------------ uploads and media (feature 011)
@@ -578,6 +614,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/messages", inner_page("messages")),
         Route("/checkin", inner_page("checkin")),
         Route("/clip", inner_page("clip")),
+        Route("/diary", inner_page("diary")),
+        Route("/log", inner_page("log")),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
@@ -586,6 +624,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/messages", messages_post, methods=["POST"]),
         Route("/api/entries", entries_get, methods=["GET"]),
         Route("/api/entries", entries_post, methods=["POST"]),
+        Route("/api/diary", diary_post, methods=["POST"]),
         Route("/manifest.webmanifest", manifest),
         Route("/api/uploads", upload_begin, methods=["POST"]),
         Route("/api/uploads/{upload_id}", upload_status, methods=["GET"]),

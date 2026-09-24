@@ -139,7 +139,8 @@
     if (count) { count.hidden = !badge.unread; count.textContent = String(badge.unread); }
   }
 
-  if (page === "session" || page === "progress" || page === "messages" || page === "clip") {
+  if (page === "session" || page === "progress" || page === "messages" || page === "clip" ||
+      page === "diary" || page === "log") {
     api("/api/today").then(function (res) {
       if (res.status === 401) { window.location.href = "/"; return; }
       text("patient-id", res.data.patient_id);
@@ -151,6 +152,7 @@
       text("patient-id", d.patient_id);
       messagesLink(d.messages);
       if (d.checkin && d.checkin.today) { var cd = text("checkin-done", "Check-ins today: " + d.checkin.today); cd.hidden = false; }
+      if (d.diary) { document.getElementById("diary-link").hidden = !d.diary.enabled; }
       if (!d.program) { var m = text("message", d.message); m.hidden = false; return; }
       text("program-name", d.program.name);
       var done = d.exercises.filter(function (e) { return e.done_today; }).length;

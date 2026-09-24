@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Medication and sleep</title>
+</head>
+<body data-page="log">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <p id="offline" class="offline" hidden>Not connected. What you enter will be saved on this phone and sent when you are back online.</p>
+  <main class="card wide">
+    <h1>Medication and sleep</h1>
+    <p id="notice" class="notice">Everything on this page is self-reported: your therapist sees exactly what you enter,
+      beside your pain check-ins.</p>
+
+    <section id="medication-section">
+      <h2>Medication taken</h2>
+      <p id="medication-none" class="lead" hidden>Your therapist has not set a medication list for you, so there is nothing to tick here.</p>
+      <form id="medication" autocomplete="off" hidden>
+        <fieldset>
+          <legend>Which one did you take</legend>
+          <div class="levels" id="items" role="radiogroup"></div>
+        </fieldset>
+        <label for="med-when">When did you take it</label>
+        <select id="med-when"></select>
+        <label for="med-note">Anything else? (optional)</label>
+        <textarea id="med-note" rows="2" maxlength="500"></textarea>
+        <p id="med-warn" class="warn" role="alert" hidden></p>
+        <div class="actions">
+          <button id="med-save" type="submit">Save medication</button>
+          <button id="med-anyway" type="button" class="secondary" hidden>Save anyway</button>
+        </div>
+        <p id="med-error" class="error" role="alert" hidden></p>
+        <p id="med-saved" class="saved" role="status" hidden></p>
+      </form>
+    </section>
+
+    <section id="sleep-section">
+      <h2>Last night's sleep</h2>
+      <form id="sleep" autocomplete="off">
+        <label for="hours">Hours slept <span class="unit">to the nearest half hour</span>
+          <input id="hours" type="number" inputmode="decimal" min="0" max="14" step="0.5" value="7" required>
+        </label>
+        <fieldset>
+          <legend>How well did you sleep <span class="unit">1 poor, 5 very good</span></legend>
+          <div class="levels" id="quality" role="radiogroup"></div>
+        </fieldset>
+        <label for="night">Which night</label>
+        <select id="night"></select>
+        <label for="sleep-note">Anything else? (optional)</label>
+        <textarea id="sleep-note" rows="2" maxlength="500"></textarea>
+        <p id="sleep-warn" class="warn" role="alert" hidden></p>
+        <p class="small">Logging the same night again replaces what you entered before.</p>
+        <div class="actions">
+          <button id="sleep-save" type="submit">Save sleep</button>
+          <button id="sleep-anyway" type="button" class="secondary" hidden>Save anyway</button>
+          <a class="link-button" href="/today">Done</a>
+        </div>
+        <p id="sleep-error" class="error" role="alert" hidden></p>
+        <p id="sleep-saved" class="saved" role="status" hidden></p>
+      </form>
+    </section>
+  </main>
+  <script src="/static/portal.js"></script>
+  <script src="/static/log.js"></script>
+</body>
+</html>

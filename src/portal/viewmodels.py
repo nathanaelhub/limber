@@ -144,7 +144,20 @@ def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
             "messages": [message_json(m) for m in thread]}
 
 
+def logs_badge(store: SessionStore, patient_id: str, now: datetime) -> Dict[str, Any]:
+    """What the patient may log besides exercise: medication is offered only if the therapist set a
+    list to choose from (feature 012 FR-006); sleep is always offered."""
+    from src.ptlog import entries as reg
+    today = now.date().isoformat()
+    made = store.entries(patient_id, newest_first=True, limit=50)
+    return {"medications": store.medication_list(patient_id), "sleep": True,
+            "medication_today": sum(1 for e in made if e.kind == "medication" and e.recorded_at[:10] == today),
+            "sleep_today": sum(1 for e in made if e.kind == "sleep" and e.recorded_at[:10] == today),
+            "definitions": {kind: reg.definitions(kind) for kind in ("medication", "sleep")}}
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+    from src.portal import diary
     _require(store, patient_id)
     now = now or datetime.now()
     today = now.date()
@@ -152,7 +165,9 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
                             "week": None, "streak_weeks": None, "message": None,
                             "messages": messages_badge(store, patient_id),
                             "checkin": checkin_badge(store, patient_id, now),
-                            "clips": clips_badge(store, patient_id)}
+                            "clips": clips_badge(store, patient_id),
+                            "diary": diary.options(store, patient_id, now=now),
+                            "logs": logs_badge(store, patient_id, now)}
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         view["message"] = NO_PROGRAM

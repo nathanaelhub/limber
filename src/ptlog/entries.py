@@ -3,7 +3,7 @@ What a patient reports about themselves (feature 010 onward): the registry of en
 fields, with a unit and a plain-language meaning for each (constitution V), validation, and small
 helpers over stored entries. Storage lives in SessionStore; this module is pure.
 
-Kinds arrive feature by feature: `checkin` (010); questionnaire, medication, sleep later.
+Kinds arrive feature by feature: `checkin` (010), `medication` and `sleep` (012); questionnaire later.
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ class Field:
     label: str
     unit: str
     meaning: str
-    kind: str                                  # int | choice | text
+    kind: str                                  # int | half | choice | text
     minimum: Optional[int] = None
     maximum: Optional[int] = None
-    choices: List[str] = field(default_factory=list)
+    choices: List[str] = field(default_factory=list)   # empty on a choice field means the caller supplies them
     required: bool = True
 
 
@@ -53,6 +53,19 @@ ENTRY_KINDS: Dict[str, EntryKind] = {
         Field("note", "Note", "text", "Anything else you want your therapist to know, in your own words.",
               "text", required=False),
     ], score_field="pain"),
+    "medication": EntryKind("medication", "Medication taken", [
+        Field("item", "Medicine", "medicine", "Which medicine you took, from the list your therapist set for you.",
+              "choice"),                                        # the choices are the therapist's list, not fixed here
+        Field("note", "Note", "text", "Anything about taking it you want your therapist to know.",
+              "text", required=False),
+    ], score_field=None),
+    "sleep": EntryKind("sleep", "Last night's sleep", [
+        Field("hours", "Hours slept", "hours", "How long you slept last night, to the nearest half hour.",
+              "half", 0, 14),
+        Field("quality", "Sleep quality", "1-5", "How well you slept: 1 is poor, 5 is very good.", "int", 1, 5),
+        Field("note", "Note", "text", "Anything about your night you want your therapist to know.",
+              "text", required=False),
+    ], score_field="quality"),
 }
 
 
@@ -61,11 +74,15 @@ def definitions(kind: str) -> Dict[str, Dict[str, str]]:
     return {f.key: {"name": f.label, "unit": f.unit, "meaning": f.meaning} for f in k.fields}
 
 
-def validate(kind: str, data: Any) -> Tuple[Dict[str, Any], Optional[float]]:
-    """(normalised payload, score) or EntryValidationError with a plain message."""
+def validate(kind: str, data: Any, choices: Optional[Dict[str, Sequence[str]]] = None) -> Tuple[Dict[str, Any], Optional[float]]:
+    """(normalised payload, score) or EntryValidationError with a plain message.
+
+    `choices` supplies the allowed values for a choice field the registry leaves open, for example the
+    medication list the therapist set for this patient (feature 012 FR-006)."""
     if kind not in ENTRY_KINDS:
         raise EntryValidationError(f"Unknown entry kind '{kind}'")
     k = ENTRY_KINDS[kind]
+    allowed = {f.key: list(f.choices) or [str(c) for c in (choices or {}).get(f.key, [])] for f in k.fields}
     if not isinstance(data, dict):
         raise EntryValidationError("An entry is a set of named answers")
     known = {f.key for f in k.fields}
@@ -90,9 +107,23 @@ def validate(kind: str, data: Any) -> Tuple[Dict[str, Any], Optional[float]]:
             if not f.minimum <= number <= f.maximum:
                 raise EntryValidationError(f"{f.label} must be between {f.minimum} and {f.maximum}")
             payload[f.key] = number
+        elif f.kind == "half":
+            if isinstance(value, bool):
+                raise EntryValidationError(f"{f.label} must be a number of {f.unit}")
+            try:
+                number = float(str(value).strip())
+            except ValueError:
+                raise EntryValidationError(f"{f.label} must be a number of {f.unit}") from None
+            if not f.minimum <= number <= f.maximum:
+                raise EntryValidationError(f"{f.label} must be between {f.minimum} and {f.maximum}")
+            if (number * 2) % 1 != 0:
+                raise EntryValidationError(f"{f.label} goes in halves, for example 7 or 7.5")
+            payload[f.key] = float(number)
         elif f.kind == "choice":
-            if not isinstance(value, str) or value not in f.choices:
-                raise EntryValidationError(f"{f.label} must be one of: {', '.join(f.choices)}")
+            if not allowed[f.key]:
+                raise EntryValidationError(f"Your therapist has not set a list to choose {f.label.lower()} from")
+            if not isinstance(value, str) or value not in allowed[f.key]:
+                raise EntryValidationError(f"{f.label} must be one of: {', '.join(allowed[f.key])}")
             payload[f.key] = value
         else:
             if not isinstance(value, str):
@@ -117,6 +148,20 @@ def accept_recorded_at(value: Any, now: datetime) -> Tuple[str, bool]:
     if when > now or now - when > RECORDED_AT_MAX_AGE:
         return now.isoformat(), True
     return when.isoformat(), False
+
+
+def nightly(rows: Sequence[Any]) -> List[Dict[str, Any]]:
+    """One sleep entry per night, newest night first (feature 012 FR-007).
+
+    The night is the date the entry is recorded for, so logging again for the same date corrects it:
+    the entry recorded latest for a date wins, and the earlier one stays in the record untouched."""
+    best: Dict[str, Any] = {}
+    for r in sorted((r for r in rows if r.kind == "sleep"), key=lambda r: (r.recorded_at, r.id)):
+        best[r.recorded_at[:10]] = r
+    return [{"night": night, "hours": r.payload.get("hours"), "quality": r.payload.get("quality"),
+             "note": r.payload.get("note") or "", "recorded_at": r.recorded_at, "id": r.id,
+             "corrected": sum(1 for x in rows if x.kind == "sleep" and x.recorded_at[:10] == night) > 1}
+            for night, r in sorted(best.items(), reverse=True)]
 
 
 def pain_series(rows: Sequence[Any]) -> List[Tuple[str, float, int]]:

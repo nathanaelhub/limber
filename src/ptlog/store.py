@@ -1972,6 +1972,25 @@ class SessionStore:
                           (int(reps), int(sets), int(effort) if effort is not None else None, set_id))
         self.conn.commit()
 
+    def add_diary_session(self, patient_id: str, info: ExerciseSetInfo, reps: int, sets: int,
+                          effort: Optional[int], done_at: str, extras: Optional[dict] = None) -> Session:
+        """Exercise the patient says they did without the camera: one completed session at the time
+        they give, carrying reported reps instead of measured ones.
+
+        Nothing here is measured, so the session keeps no average range of motion or form and no
+        duration (the spec does not ask the patient how long it took)."""
+        session_id = self.start_session(patient_id, "diary", "self-reported", extras)
+        set_id = self.open_set(session_id, info)
+        self.set_reported(set_id, reps, sets, effort)
+        total, _, _ = self._compute_summary(session_id)
+        self.conn.execute("UPDATE exercise_sets SET start_time = ?, end_time = ? WHERE id = ?", (done_at, done_at, set_id))
+        self.conn.execute(
+            "UPDATE sessions SET start_time = ?, end_time = ?, status = 'completed', total_reps = ?, "
+            "avg_form_score = NULL, avg_rom = NULL, duration_seconds = NULL WHERE id = ?",
+            (done_at, done_at, total, session_id))
+        self.conn.commit()
+        return self.load_session(session_id)
+
     def _settings(self, patient_id: str) -> dict:
         row = self.conn.execute("SELECT diary_enabled, medications FROM patient_settings WHERE patient_id = ?",
                                 (patient_id,)).fetchone()

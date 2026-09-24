@@ -23,7 +23,7 @@ def seeded(tmp_db):
     """Three patients; P-017 has a program, a goal, a label, notes, a reviewed session, and an override."""
     with SessionStore(tmp_db).open() as s:
         s.add_patient("P-017", label="Post-op knee", notes="prefers mornings")
-        s.add_patient("P-018", label="Shoulder")
+        s.add_patient("P-018", label="Rotator cuff repair")
         s.add_patient("P-019")
         s.assign_program("P-017", "custom", "Knee Home Program", ["knee_extension", "squat"], 3,
                          date.today() - timedelta(days=10))
@@ -156,7 +156,7 @@ class TestOnlyOwnData:
             r = client.get(route)
             text = r.text
             assert "P-018" not in text and "P-019" not in text, route
-            for secret in ("Post-op knee", "prefers mornings", "hip hiking", "Shoulder", "other patient", "private note"):
+            for secret in ("Post-op knee", "prefers mornings", "hip hiking", "Rotator cuff repair", "other patient", "private note"):
                 assert secret not in text, (route, secret)
             if r.headers["content-type"].startswith("application/json"):
                 assert not (set(self._walk(r.json())) & FORBIDDEN_KEYS), route

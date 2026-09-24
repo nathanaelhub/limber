@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Log exercise</title>
+</head>
+<body data-page="diary">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <p id="offline" class="offline" hidden>Not connected. Logging needs a connection, so please try again when you are back online.</p>
+  <main class="card wide">
+    <h1>I did this without the camera</h1>
+    <p class="lead">Tell your therapist what you managed on your own.</p>
+    <p id="notice" class="notice">What you log here counts towards your week and your streak. It is always marked
+      self-reported, because how far you moved and how your form looked can only be measured by a camera session.</p>
+    <p id="off" class="lead" hidden>Your therapist has turned this off. You can still do a camera session from Today.</p>
+    <form id="diary" autocomplete="off">
+      <fieldset>
+        <legend>Which exercise</legend>
+        <select id="exercise" required></select>
+      </fieldset>
+      <div class="pair">
+        <label for="reps">Reps in a set <span class="unit">1-200</span>
+          <input id="reps" type="number" inputmode="numeric" min="1" max="200" step="1" value="10" required>
+        </label>
+        <label for="sets">Sets <span class="unit">1-20</span>
+          <input id="sets" type="number" inputmode="numeric" min="1" max="20" step="1" value="2" required>
+        </label>
+      </div>
+      <fieldset>
+        <legend>How hard did it feel <span class="unit">1 very easy, 5 very hard</span></legend>
+        <div class="levels" id="effort" role="radiogroup"></div>
+      </fieldset>
+      <label for="done-at">When did you do it</label>
+      <select id="done-at"></select>
+      <label for="note">Anything else? (optional)</label>
+      <textarea id="note" rows="2" maxlength="200"></textarea>
+      <p id="warn" class="warn" role="alert" hidden></p>
+      <p class="small">Please do not include your name, phone number, or other personal details.</p>
+      <div class="actions">
+        <button id="save" type="submit">Log it</button>
+        <button id="save-anyway" type="button" class="secondary" hidden>Log it anyway</button>
+        <a class="link-button" href="/today">Cancel</a>
+      </div>
+      <p id="error" class="error" role="alert" hidden></p>
+      <p id="saved" class="saved" role="status" hidden></p>
+    </form>
+  </main>
+  <script src="/static/portal.js"></script>
+  <script src="/static/diary.js"></script>
+</body>
+</html>
