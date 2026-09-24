@@ -75,6 +75,15 @@ Host cron, as the user that runs Docker:
   without its key is useless, and a key stored only beside the backups protects nothing.
 - Copy `/data/backups/` off the host regularly (for example with the provider's snapshot or `rsync`).
 
+## Uploaded clips (feature 011)
+
+Clips live on the volume under `/data/media/<patient id>/`. The nightly backup also copies each clip
+once, encrypted, to `/data/backups/media/`, and `deploy restore` puts them back. Add to the nightly
+cron, after the backup: `python interfaces/cli.py media retention` and `media reconcile`. Size the
+volume for clips: at about 20 MB a minute of phone video, 50 patients sending two clips a week for
+three months is roughly 50 GB before retention removes old ones. The proxy should cap request bodies
+at 5 MB for `/api/uploads/*/parts/*` (parts are 4 MB).
+
 ## Restore (rehearse this before you need it)
 
 ```bash

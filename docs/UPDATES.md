@@ -2,6 +2,34 @@
 
 ---
 
+## Update 13 — 2026-09-24 — Video Clips from the Phone, Reviewed by the PT
+
+Feature spec: `specs/011-video-clips/`. Schema moved to version 10 (`media`, `media_uploads`; the
+access-history table rebuilt again for the media events).
+
+- **Patient**: "Send a video" on Today. A notice comes first (stored on the Limber host, seen by the
+  therapist, kept 90 days after review or 180 unreviewed, deletable). The clip is recorded with the
+  phone camera or picked from the phone, uploaded in parts with progress, and resumed after a dropped
+  connection. About 65 s and 80 MB at most; 10 clips a day. The caption goes through the privacy
+  warning. Patients see, play, and delete their own clips; a marker stays.
+- **The file decides what it is.** The service inspects every upload with the media library in a
+  separate process with a timeout, never trusting the name or the declared type: MP4, MOV, and WebM
+  with one video stream are accepted; images, audio-only, damaged, over-long, and unreadable files are
+  refused with a reason, and nothing is stored. A file that crashes the library cannot take the
+  service down.
+- **Therapist**: Review → From the patient plays the clip with its caption and length, "Mark
+  reviewed", "Delete". Clips awaiting review appear on the roster and in a new "New uploads" section
+  of the work queue, without captions.
+- **Kept safely**: files live under `data/media/<patient id>/` with private permissions and no original
+  filename; deleting a patient removes them; `media retention` deletes files past their period (rows
+  stay as markers); `media reconcile` removes expired uploads and files without rows. Backups now copy
+  each clip once, encrypted, and `deploy restore` brings them back with the record.
+- Verified on an emulated iPhone in Chrome: notice, preview, caption warning and edit, upload in
+  parts, the patient's list, the therapist playing and reviewing the clip, and the patient seeing
+  "seen by your therapist". Not verified: a real phone's camera capture and Safari playback of WebM.
+
+---
+
 ## Update 12 — 2026-09-23 — Limber on the Phone: Installable App and Pain Check-ins
 
 Feature spec: `specs/010-installable-app-checkins/`; the first of the phone features planned on
