@@ -720,3 +720,96 @@ def test_the_medication_list_does_not_follow_the_therapist_to_the_next_patient(s
     with SessionStore(seeded_env).open() as store:
         assert store.medication_list("P-017") == ["ibuprofen 400 mg"] and store.medication_list("P-018") == []
         assert store.diary_enabled("P-018") is True
+
+
+# ----------------------------------------------------------------------------- feature 013: questionnaires
+
+DEMO_INSTRUMENT = "demo_knee_function"
+ANSWERS = {"stairs_up": 4, "stairs_down": 3, "rising": 4, "standing": 2, "walking": 3,
+           "kneeling": 1, "squatting": 2, "twisting": 3, "pain_moving": 1, "pain_night": 0}
+
+
+def _seed_questionnaires(db, days=(20, 6)):
+    """One assignment and one completed questionnaire per date given (the later one scoring higher)."""
+    from src.portal import questionnaires as portal_q
+    from src.ptlog import instruments
+    instruments.forget()
+    with SessionStore(db).open() as store:
+        store.assign_instrument("P-017", DEMO_INSTRUMENT, "fortnightly", (datetime.now() - timedelta(days=21)).date())
+        for i, day in enumerate(days):
+            answers = dict(ANSWERS) if i else {**ANSWERS, "stairs_up": 0, "rising": 0}
+            payload, score = portal_q.accept(store, "P-017", {"instrument": DEMO_INSTRUMENT, "answers": answers})
+            store.entry_add("P-017", "questionnaire", payload, score,
+                            (datetime.now() - timedelta(days=day)).isoformat(), f"q{day}", "standalone",
+                            None, False, False)
+    return ANSWERS
+
+
+def test_patients_page_assigns_a_questionnaire_and_ends_it(seeded_env):
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "patients"
+    at.session_state["patients_edit_select"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    labels = {s.label for s in at.selectbox}
+    assert any("questionnaire" in (label or "").lower() for label in labels), labels
+    at.selectbox(key="assign_instrument_P-017").set_value("Demo Knee Function").run()
+    at.selectbox(key="assign_interval_P-017").set_value("every two weeks").run()
+    at.button(key="assign_instrument_save_P-017").click().run()
+    with SessionStore(seeded_env).open() as store:
+        live = store.assignments("P-017")
+        assert [(a.instrument_key, a.interval) for a in live] == [(DEMO_INSTRUMENT, "fortnightly")]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption))
+    assert "not a validated" in text.lower()
+    assigned = next(d.value for d in at.dataframe if "Next due" in d.value.columns)
+    assert list(assigned["Questionnaire"]) == ["Demo Knee Function"] and list(assigned["How often"]) == ["every two weeks"]
+    assert list(assigned["Last answered"]) == ["not yet"]
+    at.button(key=f"end_assignment_{DEMO_INSTRUMENT}_P-017").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.assignments("P-017") == [] and len(store.assignments("P-017", include_ended=True)) == 1
+
+
+def test_review_from_the_patient_shows_questionnaire_scores(seeded_env):
+    _seed_questionnaires(seeded_env)
+    at = _review_page(seeded_env, "From the patient")
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption) + list(at.text))
+    assert "Demo Knee Function" in text and "points (0-40)" in text and "higher score is better" in text.lower()
+    assert "not a validated" in text.lower()
+    table = next(d.value for d in at.dataframe if "Total" in d.value.columns)
+    assert list(table["Total"]) == [29, 21]     # newest first; the first set answered 0 for two items worth 4
+    assert "Pain" in str(table.columns) and "Activity" in str(table.columns)
+    assert "21 → 29" in text and "+8" in text                    # the change from first to latest
+    items = next(d.value for d in at.dataframe if "Question" in d.value.columns)
+    assert len(items) == 10 and "Walking up a flight of stairs" in list(items["Question"])
+
+
+def test_a_questionnaire_score_survives_its_definition_changing(seeded_env, tmp_path, monkeypatch):
+    """The stored snapshot is what the therapist is shown, with a warning that the file has changed."""
+    _seed_questionnaires(seeded_env, days=(6,))
+    from src.ptlog import instruments
+    edited = tmp_path / "instruments"
+    edited.mkdir()
+    original = (REPO_ROOT / "instruments" / "demo_knee_function.yaml").read_text()
+    (edited / "demo_knee_function.yaml").write_text(original.replace("version: 1", "version: 2"))
+    monkeypatch.setattr(instruments, "default_directory", lambda: edited)
+    instruments.forget()
+    at = _review_page(seeded_env, "From the patient")
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption) + list(at.text))
+    assert "Answered under version 1" in text and "now version 2" in text
+    table = next(d.value for d in at.dataframe if "Total" in d.value.columns)
+    assert list(table["Total"]) == [21]                          # what was worked out at the time, unchanged
+    instruments.forget()
+
+
+def test_tracker_queue_lists_an_overdue_questionnaire(seeded_env):
+    from src.ptlog import instruments
+    instruments.forget()
+    with SessionStore(seeded_env).open() as store:
+        store.assign_instrument("P-017", DEMO_INSTRUMENT, "weekly", (datetime.now() - timedelta(days=30)).date())
+    at = _tracker_page(seeded_env, "Queue")
+    assert not at.exception, [e.value for e in at.exception]
+    notes = " ".join(x.value for x in list(at.info) + list(at.warning))     # queue items render as info boxes
+    assert "Demo Knee Function is 30 days overdue for P-017" in notes
+    assert "questionnaires:P-017" in notes                                   # where the therapist should go

@@ -200,3 +200,65 @@ class TestExerciseThresholdsInExports:
         knee = [r for r in rows[1:] if ",Knee Extension," in r]
         assert squat and all("rom_regression=5 (exercise)" in r for r in squat)
         assert knee and all("rom_regression=10;" in r for r in knee)
+
+
+class TestQuestionnairesInTheExport:
+    """Feature 013 T014 — each completed questionnaire as one row, and its answers in the report."""
+
+    ANSWERS = {"stairs_up": 4, "stairs_down": 3, "rising": 4, "standing": 2, "walking": 3,
+               "kneeling": 1, "squatting": 2, "twisting": 3, "pain_moving": 1, "pain_night": 0}
+
+    @pytest.fixture
+    def with_questionnaires(self, patient_history):
+        from src.portal import questionnaires as portal_q
+        from src.ptlog import instruments
+        instruments.forget()
+        store, clock, ids = patient_history
+        store.assign_instrument("P-017", "demo_knee_function", "fortnightly", (D0 - timedelta(days=20)).date())
+        for day, answers in ((16, {**self.ANSWERS, "walking": 0}), (2, self.ANSWERS)):
+            payload, score = portal_q.accept(store, "P-017", {"instrument": "demo_knee_function", "answers": answers})
+            store.entry_add("P-017", "questionnaire", payload, score, (D0 - timedelta(days=day)).isoformat(),
+                            f"q{day}", "standalone", None, False, False)
+        return store, clock, ids
+
+    def test_the_summary_carries_them_newest_first(self, with_questionnaires):
+        store, _, _ = with_questionnaires
+        s = review.review_summary(store, "P-017", "all", now=D0)
+        assert [q["total"] for q in s.questionnaires] == [29, 26]
+        first = s.questionnaires[0]
+        assert first["instrument"] == "demo_knee_function" and first["name"] == "Demo Knee Function"
+        assert first["unit"] == "points (0-40)" and first["missing"] == 0
+        assert first["subscales"] == {"pain": 7, "activity": 22} and first["version"] == 1
+        assert "not a validated" in first["notice"].lower()
+
+    def test_a_period_leaves_out_older_answers(self, with_questionnaires):
+        store, _, _ = with_questionnaires
+        assert [q["total"] for q in review.review_summary(store, "P-017", "14d", now=D0).questionnaires] == [29]
+
+    def test_one_csv_row_per_questionnaire(self, with_questionnaires):
+        from src.ptlog.exports.review_csv import to_questionnaire_csv
+        store, _, _ = with_questionnaires
+        text = to_questionnaire_csv(review.review_summary(store, "P-017", "all", now=D0))
+        lines = [l for l in text.strip().splitlines() if l]
+        assert lines[0].split(",")[:6] == ["date", "instrument", "version", "total", "unit", "missing"]
+        assert len(lines) == 3 and lines[1].startswith((D0 - timedelta(days=2)).date().isoformat())
+        assert "pain=7" in lines[1] and "activity=22" in lines[1]
+        assert "Demo Knee Function" in lines[1] and "29" in lines[1]
+
+    def test_the_report_lists_them_with_the_answers_of_the_latest(self, with_questionnaires):
+        store, _, _ = with_questionnaires
+        text = to_review_report(review.review_summary(store, "P-017", "all", now=D0))
+        assert "QUESTIONNAIRES" in text
+        assert "Demo Knee Function" in text and "29 points (0-40)" in text
+        assert "higher score is better" in text and "not a validated" in text.lower()
+        assert "Pain 7" in text and "Activity 22" in text
+        assert "Walking up a flight of stairs" in text and "Easily" in text      # the answers of the latest
+        assert "26 points (0-40)" in text                                        # the earlier one is listed too
+
+    def test_with_no_questionnaires_the_exports_are_unchanged(self, patient_history):
+        from src.ptlog.exports.review_csv import to_questionnaire_csv
+        store, _, _ = patient_history
+        summary = review.review_summary(store, "P-017", "all", now=D0)
+        assert summary.questionnaires == []
+        assert "QUESTIONNAIRES" not in to_review_report(summary)
+        assert to_questionnaire_csv(summary).strip().splitlines()[1:] == []

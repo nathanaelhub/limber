@@ -60,6 +60,37 @@ def trend(store: SessionStore, patient_id: str, exercise: str, period: str = "al
     return _trend_from_sessions(store, patient_id, exercise, period, sessions)
 
 
+def questionnaire_rows(store: SessionStore, patient_id: str, since: Optional[datetime] = None) -> List[Dict]:
+    """One row per completed questionnaire in the period, newest first (feature 013).
+
+    Every number comes from what was stored when the patient answered, including the unit and the
+    meaning, so an export of an old review says exactly what the therapist saw at the time."""
+    rows = []
+    for e in store.entries(patient_id, "questionnaire", newest_first=True, limit=500):
+        if since is not None and e.recorded_at < since.isoformat():
+            continue
+        payload = e.payload or {}
+        snap = payload.get("snapshot") or {}
+        rows.append({
+            "recorded_at": e.recorded_at,
+            "instrument": payload.get("instrument", ""),
+            "name": snap.get("name") or payload.get("name", ""),
+            "version": payload.get("version"),
+            "total": payload.get("total"),
+            "unit": snap.get("unit", ""),
+            "direction": snap.get("direction", ""),
+            "meaning": snap.get("meaning", ""),
+            "notice": snap.get("notice", ""),
+            "answered": payload.get("answered"),
+            "missing": payload.get("missing", 0),
+            "subscales": payload.get("subscales") or {},
+            "subscale_names": {s["key"]: s["name"] for s in snap.get("subscales", [])},
+            "snapshot": snap,
+            "time_adjusted": e.time_adjusted,
+        })
+    return rows
+
+
 def self_reported_count(store: SessionStore, patient_id: str, exercise: str, period: str = "all",
                         now: Optional[datetime] = None) -> int:
     """How many sessions of an exercise in the period the patient logged themselves.
@@ -250,8 +281,10 @@ def review_summary(store: SessionStore, patient_id: str, period: str = "all", no
     by_exercise = store.effective_thresholds_by_exercise(patient_id)
     session_entries = [{"session": s, "measures": measures_for_session(s), "review": store.get_review(s.id)}
                        for s in reversed(sessions)]
+    questionnaires = questionnaire_rows(store, patient_id, since)
     return ReviewSummary(
         patient_id=patient_id, period=period, period_start=since.isoformat() if since else None,
         generated_at=now.isoformat(), gap_days=effective.practice_gap, trends=trends, thresholds=effective, exercise_thresholds=by_exercise,
         flags=_flags_from_sessions(store, patient_id, sessions, now, effective, by_exercise), goals=goals, sessions=session_entries,
+        questionnaires=questionnaires,
     )

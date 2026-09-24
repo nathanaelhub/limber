@@ -49,7 +49,8 @@ class TestMigration3:
 class TestModels:
     def test_enums_definitions_exceptions(self):
         assert models.ASSIGNMENT_STATUSES == ("scheduled", "active", "completed", "superseded")
-        assert models.QUEUE_KINDS == ("pending_review", "attention_flag", "practice_gap", "low_adherence", "unread_messages", "new_uploads")
+        assert models.QUEUE_KINDS == ("pending_review", "attention_flag", "practice_gap", "low_adherence",
+                                      "unread_messages", "new_uploads", "overdue_questionnaire")
         assert METRIC_DEFINITIONS["adherence_pct"]["unit"] == "percent" and METRIC_DEFINITIONS["sessions_per_week"]["unit"] == "count"
         assert issubclass(ProgramValidationError, PTLogError) and issubclass(AssignmentValidationError, PTLogError)
         import dataclasses
@@ -308,7 +309,8 @@ class TestQueue:
         assert [(g.patient_id, g.age_days) for g in gaps] == [("P-018", 9)]
         low = q.items["low_adherence"]
         assert len(low) == 1 and low[0].patient_id == "P-019" and "40%" in low[0].description and "60%" in low[0].description and low[0].target == "adherence:P-019"
-        assert q.totals == {"pending_review": 3, "attention_flag": 1, "practice_gap": 1, "low_adherence": 1, "unread_messages": 0, "new_uploads": 0} and q.count == 6
+        assert q.totals == {"pending_review": 3, "attention_flag": 1, "practice_gap": 1, "low_adherence": 1,
+                            "unread_messages": 0, "new_uploads": 0, "overdue_questionnaire": 0} and q.count == 6
 
     def test_items_resolve(self, fixed_store, caseload):
         store, clock = fixed_store

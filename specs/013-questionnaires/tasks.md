@@ -54,14 +54,14 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 4: User Story 2 — the therapist assigns and reads the score (P1)
 
-- [ ] T012 [P] [US2] Failing AppTest in `tests/test_app_pages.py`: the Patients page assigns an
+- [x] T012 [P] [US2] Failing AppTest in `tests/test_app_pages.py`: the Patients page assigns an
       instrument with an interval, shows the next due date, and ends the assignment (keys carry the
       patient id); From the patient shows the scores with unit, direction, meaning, subscales, the
       first-to-latest change, and the item answers of one questionnaire
-- [ ] T013 [US2] Implement both in `interfaces/app.py`
-- [ ] T014 [P] [US2] Failing tests: queue kind `overdue_questionnaire` and the roster mark in
+- [x] T013 [US2] Implement both in `interfaces/app.py`
+- [x] T014 [P] [US2] Failing tests: queue kind `overdue_questionnaire` and the roster mark in
       `src/ptlog/tracker.py`; the review export row and the report lines in `src/ptlog/exports/`
-- [ ] T015 [US2] Implement the tracker, review, and export changes
+- [x] T015 [US2] Implement the tracker, review, and export changes
 
 **Checkpoint**: the therapist can assign, read the scores over time, and export them.
 
@@ -70,7 +70,7 @@ different files from the task beside it. One commit per green checkpoint.
 - [ ] T016 [P] [US3] Failing test: a definition written into a temporary directory at test time is
       offered for assignment and answered end to end without touching any code; the therapist's view
       carries the "not a validated instrument" sentence from the file
-- [ ] T017 [US3] Write `instruments/demo_knee_function.yaml` (ten items, 0-4, two reversed, two
+- [x] T017 [US3] Write `instruments/demo_knee_function.yaml` (ten items, 0-4, two reversed, two
       subscales, `sum`, at least eight answered, its own "not a validated or licensed instrument"
       sentence) and make the therapist's view and the export carry that sentence
 

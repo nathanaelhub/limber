@@ -36,6 +36,7 @@ class PatientSnapshot:
     thresholds: Optional[Thresholds] = None   # the patient's effective attention thresholds
     unread_messages: int = 0                  # from the patient, not yet opened by the therapist
     unreviewed_uploads: int = 0               # clips awaiting the therapist's review (feature 011)
+    overdue_questionnaires: List[tuple] = field(default_factory=list)      # (instrument name, days overdue) (feature 013)
 
 
 def _unreviewed_by_patient(store: SessionStore) -> dict:
@@ -44,6 +45,29 @@ def _unreviewed_by_patient(store: SessionStore) -> dict:
         if m.reviewed_at is None:
             result.setdefault(m.patient_id, []).append(m)
     return result
+
+
+def _overdue_questionnaires(store: SessionStore, patient: Patient, today) -> List[tuple]:
+    """(name, days overdue) for each assigned questionnaire more than a week past due (feature 013).
+
+    The name comes from the installed definition when there is one; an assignment whose file has been
+    removed is left out, since the therapist cannot act on it from here."""
+    from . import instruments as registry
+    from . import questionnaires as qrules
+    if patient.is_builtin:
+        return []
+    installed = registry.load().by_key
+    overdue = []
+    for a in store.assignments(patient.id):
+        instrument = installed.get(a.instrument_key)
+        if instrument is None:
+            continue
+        last = store.last_questionnaire_at(patient.id, a.instrument_key)
+        due = qrules.next_due(a.interval, date.fromisoformat(a.start_date),
+                              date.fromisoformat(last[:10]) if last else None)
+        if qrules.is_overdue(due, today):
+            overdue.append((instrument.name, (today - due).days))
+    return overdue
 
 
 def _now(now: Optional[datetime]) -> datetime:
@@ -78,6 +102,7 @@ def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = No
                          if unread_messages is None else unread_messages),
         unreviewed_uploads=(sum(1 for m in store.media_list(patient.id, "clip", live_only=True) if m.reviewed_at is None)
                             if unreviewed_uploads is None else unreviewed_uploads),
+        overdue_questionnaires=_overdue_questionnaires(store, patient, today),
     )
 
 
@@ -95,7 +120,7 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
     program_name = snap.assignment.program_name if snap.assignment else "none"
     program_status = snap.adherence.status if snap.assignment else "none"
     needs = (bool(open_flags) or bool(snap.pending) or (pct is not None and pct < threshold) or gap
-             or snap.unread_messages > 0 or snap.unreviewed_uploads > 0)
+             or snap.unread_messages > 0 or snap.unreviewed_uploads > 0 or bool(snap.overdue_questionnaires))
     return RosterRow(
         patient_id=snap.patient.id, label=snap.patient.label, is_builtin=snap.patient.is_builtin,
         program_id=snap.assignment.program_id if snap.assignment else None,
@@ -107,6 +132,7 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
         pending_reviews=len(snap.pending), open_flags=len(open_flags), practice_gap=gap,
         last_next_step=snap.latest_review.next_step if snap.latest_review else None,
         needs_attention=needs, unread_messages=snap.unread_messages, unreviewed_uploads=snap.unreviewed_uploads,
+        overdue_questionnaires=len(snap.overdue_questionnaires),
     )
 
 
@@ -202,6 +228,10 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
             n = snap.unreviewed_uploads
             keyed["new_uploads"].append((-n, QueueItem(
                 "new_uploads", pid, f"uploads:{pid}", None, 0, f"{n} clip{'s' if n != 1 else ''} awaiting review from {pid}")))
+        for name, days in snap.overdue_questionnaires:
+            keyed["overdue_questionnaire"].append((-days, QueueItem(
+                "overdue_questionnaire", pid, f"questionnaires:{pid}", None, days,
+                f"{name} is {days} days overdue for {pid}")))
         if snap.unread_messages:
             n = snap.unread_messages
             keyed["unread_messages"].append((-n, QueueItem(

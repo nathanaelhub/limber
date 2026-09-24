@@ -27,7 +27,7 @@ import tempfile
 import time
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 import sys
 import av
 import pandas as pd
@@ -1084,7 +1084,74 @@ def page_patients():
     _patient_program_section(pid)
     _patient_home_access_section(pid, current)
     _patient_logs_section(pid, current)
+    _patient_questionnaire_section(pid, current)
     _patient_discharge_section(pid)
+
+
+def _patient_questionnaire_section(pid, patient):
+    """Which questionnaires this patient answers, and how often (feature 013)."""
+    from src.ptlog import instruments as registry
+    from src.ptlog import questionnaires as qrules
+    st.markdown("### Questionnaires")
+    if patient.is_builtin:
+        st.caption("The built-in patient has no phone access.")
+        return
+    installed = registry.load()
+    for problem in installed.problems:
+        st.warning(f"The questionnaire file {problem.file} could not be used: {problem.message}")
+    with _open_store() as store:
+        live = store.assignments(pid)
+        last = {a.instrument_key: store.last_questionnaire_at(pid, a.instrument_key) for a in live}
+    if live:
+        rows = []
+        for a in live:
+            instrument = installed.by_key.get(a.instrument_key)
+            answered = last.get(a.instrument_key)
+            due = qrules.next_due(a.interval, date.fromisoformat(a.start_date),
+                                  date.fromisoformat(answered[:10]) if answered else None)
+            rows.append({"Questionnaire": instrument.name if instrument else f"{a.instrument_key} (file not installed)",
+                         "How often": qrules.interval_words(a.interval),
+                         "Last answered": (answered or "")[:10] or "not yet",
+                         "Next due": due.isoformat() if due else "nothing more due"})
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        for a in live:
+            instrument = installed.by_key.get(a.instrument_key)
+            if instrument and instrument.notice:
+                st.caption(f"{instrument.name}: {instrument.notice}")
+            if st.button(f"End '{instrument.name if instrument else a.instrument_key}'",
+                         key=f"end_assignment_{a.instrument_key}_{pid}"):
+                with _open_store() as store:
+                    store.end_assignment(a.id)
+                st.rerun()
+    elif not installed.by_key:
+        st.caption("No questionnaires are installed. Add one as a YAML file in the `instruments/` folder; "
+                   "no code change is needed.")
+        return
+    else:
+        st.caption("None assigned. The patient is offered a questionnaire on Today once you assign one.")
+    choices = {i.name: i for i in installed.listed() if i.key not in {a.instrument_key for a in live}}
+    if not choices:
+        return
+    c1, c2, c3 = st.columns([2.2, 1.4, 1])
+    with c1:
+        chosen = st.selectbox("Questionnaire to assign", list(choices), key=f"assign_instrument_{pid}")
+    with c2:
+        words = st.selectbox("How often", [w for _, w in qrules.INTERVALS], index=2, key=f"assign_interval_{pid}")
+    with c3:
+        st.caption("")
+        if st.button("Assign", key=f"assign_instrument_save_{pid}"):
+            interval = next(k for k, w in qrules.INTERVALS if w == words)
+            try:
+                with _open_store() as store:
+                    store.assign_instrument(pid, choices[chosen].key, interval)
+                st.success(f"Assigned {chosen}, {words}.")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+    instrument = choices[chosen]
+    st.caption(f"{instrument.name}: {instrument.meaning} Score in {instrument.unit}; "
+               f"{'a higher score is better' if instrument.direction == 'higher_is_better' else 'a higher score is worse'}. "
+               f"{len(instrument.items)} questions. {instrument.notice}")
 
 
 def _patient_logs_section(pid, patient):
@@ -1707,10 +1774,72 @@ def _review_logs(pid):
         st.line_chart(chart, y="hours", height=180)
 
 
+def _review_questionnaires(pid):
+    """Scores over time from the questionnaires this patient answered (feature 013).
+
+    What is shown is what was stored when the patient answered: the snapshot that produced each total.
+    Nothing is rescored here, so an edited definition can never move a number the therapist has seen."""
+    from src.ptlog import instruments as registry
+    from src.ptlog import questionnaires as qrules
+    st.markdown("### Questionnaires")
+    with _open_store() as store:
+        rows = store.entries(pid, "questionnaire", newest_first=True, limit=200)
+    if not rows:
+        st.info("None answered yet. Assign one on the Patients page and it appears on the patient's Today.")
+        return
+    installed = registry.load().by_key
+    by_instrument = {}
+    for e in rows:
+        by_instrument.setdefault(e.payload.get("instrument", "?"), []).append(e)
+    for key, answers in by_instrument.items():
+        snap = answers[0].payload.get("snapshot") or {}
+        name = snap.get("name") or answers[0].payload.get("name") or key
+        unit = snap.get("unit", "")
+        direction = "a higher score is better" if snap.get("direction") == "higher_is_better" else "a higher score is worse"
+        st.markdown(f"**{name}** — {len(answers)} answered")
+        st.caption(f"{snap.get('meaning', '')} Score in {unit}; {direction}.")
+        if snap.get("notice"):
+            st.caption(f"⚠️ {snap['notice']}")
+        if qrules.differs_from_installed(snap, installed.get(key)):
+            now_installed = installed.get(key)
+            said = (f"is now version {now_installed.version}" if now_installed
+                    else "is no longer installed")
+            st.caption(f"Answered under version {snap.get('version')}; the definition {said}. The scores "
+                       "below are the ones worked out at the time, from the answers given. Nothing has "
+                       "been rescored, so a change to the file can never move a score you have seen.")
+        subscale_names = {s["key"]: s["name"] for s in snap.get("subscales", [])}
+        table = []
+        for e in answers:
+            payload = e.payload
+            row = {"When": e.recorded_at[:16].replace("T", " ") + (" (time adjusted)" if e.time_adjusted else ""),
+                   "Total": payload.get("total"), "Missing": payload.get("missing", 0)}
+            for skey, sname in subscale_names.items():
+                row[sname] = (payload.get("subscales") or {}).get(skey)
+            table.append(row)
+        st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+        totals = [e.payload.get("total") for e in reversed(answers) if e.payload.get("total") is not None]
+        if len(totals) >= 2:
+            change = round(totals[-1] - totals[0], 1)
+            better = (change > 0) == (snap.get("direction") == "higher_is_better")
+            st.caption(f"First to latest: {totals[0]} → {totals[-1]} ({change:+g} {unit}), "
+                       f"{'the direction you want' if change and better else 'not the direction you want' if change else 'no change'}.")
+            chart = pd.DataFrame({"when": [e.recorded_at[:10] for e in reversed(answers)], "total": totals}).set_index("when")
+            st.line_chart(chart, y="total", height=180)
+        which = st.selectbox(f"Answers to look at ({name})", [e.recorded_at[:16].replace("T", " ") for e in answers],
+                             key=f"questionnaire_pick_{key}_{pid}")
+        chosen = next(e for e in answers if e.recorded_at[:16].replace("T", " ") == which)
+        st.dataframe(pd.DataFrame(qrules.answer_rows(chosen.payload.get("snapshot") or {})),
+                     use_container_width=True, hide_index=True)
+        st.caption("Value: what the answer scored, after any reversal. A reversed question is one where a "
+                   "high answer means a low score, so that the total reads the same way round throughout.")
+
+
 def _review_from_the_patient(pid):
-    """What the patient reported from their phone (features 010, 011, 012)."""
+    """What the patient reported from their phone (features 010, 011, 012, 013)."""
     from src.ptlog import entries as entry_rules
     _review_clips(pid)
+    st.markdown("---")
+    _review_questionnaires(pid)
     st.markdown("---")
     _review_diary(pid)
     st.markdown("---")
@@ -1755,10 +1884,17 @@ def _review_from_the_patient(pid):
 
 def _review_export(pid):
     from src.ptlog.exports import to_review_csv, to_review_report
+    from src.ptlog.exports.review_csv import to_questionnaire_csv
     period = _period_selector("review_export_period")
     with _open_store() as store:
         summary = ptreview.review_summary(store, pid, period)
     stamp = datetime.fromisoformat(summary.generated_at).strftime("%Y%m%d_%H%M%S")
+    if summary.questionnaires:
+        st.download_button("Questionnaire scores (CSV)", to_questionnaire_csv(summary),
+                           file_name=f"{pid}_questionnaires_{period}_{stamp}.csv", mime="text/csv",
+                           key="review_dl_questionnaires",
+                           help="One row per completed questionnaire: date, total, unit, subscale scores, "
+                                "and how many questions were left unanswered. The item answers are in the report.")
     c1, c2 = st.columns(2)
     with c1:
         st.download_button("Review report (text)", to_review_report(summary),

@@ -492,6 +492,7 @@ class ReviewSummary:
     flags: FlagResult = field(default_factory=FlagResult)
     goals: List[Dict[str, Any]] = field(default_factory=list)      # {"goal": Goal, "latest_rom", "progress_pct", "latest_reps"}
     sessions: List[Dict[str, Any]] = field(default_factory=list)   # newest first: {"session", "measures", "review"}
+    questionnaires: List[Dict[str, Any]] = field(default_factory=list)   # newest first, feature 013
 
 
 # --------------------------------------------------------------------------------------
@@ -499,7 +500,8 @@ class ReviewSummary:
 # --------------------------------------------------------------------------------------
 
 ASSIGNMENT_STATUSES = ("scheduled", "active", "completed", "superseded")
-QUEUE_KINDS = ("pending_review", "attention_flag", "practice_gap", "low_adherence", "unread_messages", "new_uploads")
+QUEUE_KINDS = ("pending_review", "attention_flag", "practice_gap", "low_adherence", "unread_messages",
+               "new_uploads", "overdue_questionnaire")
 ADHERENCE_THRESHOLD_DEFAULT = 60
 
 METRIC_DEFINITIONS.update({
@@ -748,6 +750,7 @@ class RosterRow:
     needs_attention: bool
     unread_messages: int = 0        # messages from the patient the therapist has not opened (feature 008)
     unreviewed_uploads: int = 0     # clips the therapist has not reviewed (feature 011)
+    overdue_questionnaires: int = 0  # assigned questionnaires more than a week past due (feature 013)
 
 
 @dataclass
