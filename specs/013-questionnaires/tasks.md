@@ -25,11 +25,11 @@ different files from the task beside it. One commit per green checkpoint.
       definition deleted or changed; `next_due` for once, weekly, fortnightly, and monthly, never
       answered and answered, and overdue by more than seven days
 - [x] T005 Implement `src/ptlog/questionnaires.py` (scoring, snapshot, `next_due`, `accept`)
-- [ ] T006 [P] Failing `tests/test_ptlog_store_v12.py`: schema v12 adds `instrument_assignments`;
+- [x] T006 [P] Failing `tests/test_ptlog_store_v12.py`: schema v12 adds `instrument_assignments`;
       assign, list, end, and reassign (one live assignment per instrument per patient, the ended one
       kept); deleting a patient removes their assignments and their questionnaire entries; an existing
       v11 record upgrades with every table's count intact
-- [ ] T007 Implement the v12 migration and the store methods
+- [x] T007 Implement the v12 migration and the store methods
 
 **Checkpoint**: the engine and the record are ready; no interface has changed yet.
 

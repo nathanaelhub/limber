@@ -93,7 +93,7 @@ def test_the_rebuild_keeps_every_row(tmp_db):
     after = _counts(tmp_db)
     for table, n in before.items():
         if table == "schema_version":
-            assert after[table] == n + 1                  # the only table that should grow: the new version row
+            assert after[table] == n + (SCHEMA_VERSION - PREVIOUS)   # one row per migration applied
             continue
         assert after[table] == n, f"{table}: {n} rows before, {after[table]} after"
 

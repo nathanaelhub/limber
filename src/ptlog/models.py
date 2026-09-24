@@ -682,6 +682,22 @@ class Assignment:
 
 
 @dataclass
+class InstrumentAssignment:
+    """Which questionnaire a patient answers, how often, and from when (feature 013).
+
+    One live assignment per instrument per patient; ending it keeps it as history, and the answers
+    always stay. The next due date is derived by src/ptlog/questionnaires.py, never stored, so that
+    changing an interval takes effect at once."""
+    id: int
+    patient_id: str
+    instrument_key: str
+    interval: str                   # once | weekly | fortnightly | monthly
+    start_date: str                 # YYYY-MM-DD
+    created_at: str
+    ended_at: Optional[str] = None
+
+
+@dataclass
 class Discharge:
     patient_id: str
     discharged_on: str              # YYYY-MM-DD

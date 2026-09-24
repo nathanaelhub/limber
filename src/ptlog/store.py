@@ -33,6 +33,7 @@ from .models import (
     GAP_DAYS_DEFAULT,
     Assignment,
     AssignmentValidationError,
+    InstrumentAssignment,
     Discharge,
     NEXT_STEPS,
     UNASSIGNED_ID,
@@ -61,7 +62,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -523,6 +524,24 @@ COMMIT;
 PRAGMA foreign_keys=ON;
 """
 
+# v12 (feature 013): which questionnaire a patient answers, how often, and from when. Nothing is
+# rebuilt: `entries.kind` has allowed 'questionnaire' since v9. The partial unique index is what keeps
+# one live assignment per instrument per patient while every ended one stays as history.
+SCHEMA_V12_SQL = """
+CREATE TABLE IF NOT EXISTS instrument_assignments (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id      TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    instrument_key  TEXT NOT NULL,
+    interval        TEXT NOT NULL CHECK (interval IN ('once', 'weekly', 'fortnightly', 'monthly')),
+    start_date      TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    ended_at        TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_live_assignment
+    ON instrument_assignments(patient_id, instrument_key) WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_assignments_patient ON instrument_assignments(patient_id, id);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -535,6 +554,7 @@ MIGRATIONS: List[tuple] = [
     (9, SCHEMA_V9_SQL),
     (10, SCHEMA_V10_SQL),
     (11, SCHEMA_V11_SQL),
+    (12, SCHEMA_V12_SQL),
 ]
 
 
@@ -1971,6 +1991,72 @@ class SessionStore:
         self.conn.execute("UPDATE exercise_sets SET reported_reps = ?, reported_sets = ?, effort = ? WHERE id = ?",
                           (int(reps), int(sets), int(effort) if effort is not None else None, set_id))
         self.conn.commit()
+
+    # questionnaires assigned to a patient (feature 013)
+
+    def assign_instrument(self, patient_id: str, instrument_key: str, interval: str,
+                          start: Optional[date] = None) -> InstrumentAssignment:
+        """Assign a questionnaire, ending any live assignment of the same instrument for this patient.
+
+        The instrument key is not checked against the installed definitions here: the record outlives
+        any one configuration, and a definition may be added back. The therapist's page offers only
+        instruments that are installed, and a stored answer carries its own scoring snapshot."""
+        self._require_patient(patient_id)
+        key = str(instrument_key or "").strip()
+        if not key:
+            raise AssignmentValidationError("Choose a questionnaire to assign")
+        from .questionnaires import INTERVAL_KEYS
+        if interval not in INTERVAL_KEYS:
+            raise AssignmentValidationError(f"How often must be one of: {', '.join(INTERVAL_KEYS)}")
+        now = self._now()
+        start_date = (start or date.fromisoformat(now[:10])).isoformat()
+        self.conn.execute(
+            "UPDATE instrument_assignments SET ended_at = ? WHERE patient_id = ? AND instrument_key = ? "
+            "AND ended_at IS NULL", (now, patient_id, key))
+        cur = self.conn.execute(
+            "INSERT INTO instrument_assignments (patient_id, instrument_key, interval, start_date, created_at) "
+            "VALUES (?, ?, ?, ?, ?)", (patient_id, key, interval, start_date, now))
+        self.conn.commit()
+        return self._assignment_row(int(cur.lastrowid))
+
+    def assignments(self, patient_id: str, include_ended: bool = False) -> List[InstrumentAssignment]:
+        sql = "SELECT * FROM instrument_assignments WHERE patient_id = ?"
+        if not include_ended:
+            sql += " AND ended_at IS NULL"
+        return [self._to_assignment(r) for r in self.conn.execute(sql + " ORDER BY id", (patient_id,))]
+
+    def instrument_assignment(self, patient_id: str, instrument_key: str) -> Optional[InstrumentAssignment]:
+        row = self.conn.execute(
+            "SELECT * FROM instrument_assignments WHERE patient_id = ? AND instrument_key = ? AND ended_at IS NULL",
+            (patient_id, instrument_key)).fetchone()
+        return self._to_assignment(row) if row else None
+
+    def end_assignment(self, assignment_id: int) -> None:
+        self.conn.execute("UPDATE instrument_assignments SET ended_at = ? WHERE id = ? AND ended_at IS NULL",
+                          (self._now(), int(assignment_id)))
+        self.conn.commit()
+
+    def all_live_assignments(self) -> List[InstrumentAssignment]:
+        return [self._to_assignment(r) for r in self.conn.execute(
+            "SELECT * FROM instrument_assignments WHERE ended_at IS NULL ORDER BY patient_id, id")]
+
+    def last_questionnaire_at(self, patient_id: str, instrument_key: str) -> Optional[str]:
+        """When this patient last answered this questionnaire (the recorded time, not the received one)."""
+        row = self.conn.execute(
+            "SELECT MAX(recorded_at) FROM entries WHERE patient_id = ? AND kind = 'questionnaire' "
+            "AND json_extract(payload, '$.instrument') = ?", (patient_id, instrument_key)).fetchone()
+        return row[0] if row and row[0] else None
+
+    def _assignment_row(self, assignment_id: int) -> InstrumentAssignment:
+        return self._to_assignment(self.conn.execute(
+            "SELECT * FROM instrument_assignments WHERE id = ?", (assignment_id,)).fetchone())
+
+    @staticmethod
+    def _to_assignment(row) -> InstrumentAssignment:
+        return InstrumentAssignment(id=int(row["id"]), patient_id=row["patient_id"],
+                                    instrument_key=row["instrument_key"], interval=row["interval"],
+                                    start_date=row["start_date"], created_at=row["created_at"],
+                                    ended_at=row["ended_at"])
 
     def add_diary_session(self, patient_id: str, info: ExerciseSetInfo, reps: int, sets: int,
                           effort: Optional[int], done_at: str, extras: Optional[dict] = None) -> Session:
