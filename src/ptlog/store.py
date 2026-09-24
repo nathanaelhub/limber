@@ -61,7 +61,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -477,6 +477,52 @@ COMMIT;
 PRAGMA foreign_keys=ON;
 """
 
+# v11 (feature 012): exercise logged without the camera. `sessions.source` must also allow 'diary',
+# and SQLite cannot alter a CHECK constraint, so the table is rebuilt by the documented recipe.
+# Order matters: foreign keys OFF first (outside a transaction), copy, DROP the old table, then
+# RENAME. Never rename first: modern SQLite rewrites child-table references to follow a rename, and
+# with foreign keys ON the DROP would cascade and delete every set, rep, review, and entry. A test
+# upgrades a realistic previous-version record and compares every table's row count.
+SCHEMA_V11_SQL = """
+PRAGMA foreign_keys=OFF;
+BEGIN;
+CREATE TABLE sessions_v11 (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id          TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    schema_version      INTEGER NOT NULL,
+    source              TEXT NOT NULL CHECK (source IN ('webcam', 'video', 'diary')),
+    source_ref          TEXT NOT NULL DEFAULT '',
+    source_extras       TEXT,
+    status              TEXT NOT NULL CHECK (status IN ('running', 'completed', 'interrupted')),
+    start_time          TEXT NOT NULL,
+    end_time            TEXT,
+    total_reps          INTEGER,
+    avg_form_score      REAL,
+    avg_rom             REAL,
+    duration_seconds    REAL,
+    interrupted_reason  TEXT
+);
+INSERT INTO sessions_v11 (id, patient_id, schema_version, source, source_ref, source_extras, status, start_time,
+                          end_time, total_reps, avg_form_score, avg_rom, duration_seconds, interrupted_reason)
+    SELECT id, patient_id, schema_version, source, source_ref, source_extras, status, start_time,
+           end_time, total_reps, avg_form_score, avg_rom, duration_seconds, interrupted_reason FROM sessions;
+DROP TABLE sessions;
+ALTER TABLE sessions_v11 RENAME TO sessions;
+CREATE INDEX IF NOT EXISTS idx_sessions_patient_start ON sessions(patient_id, start_time DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+ALTER TABLE exercise_sets ADD COLUMN reported_reps INTEGER;
+ALTER TABLE exercise_sets ADD COLUMN reported_sets INTEGER;
+ALTER TABLE exercise_sets ADD COLUMN effort INTEGER;
+CREATE TABLE IF NOT EXISTS patient_settings (
+    patient_id     TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    diary_enabled  INTEGER NOT NULL DEFAULT 1 CHECK (diary_enabled IN (0, 1)),
+    medications    TEXT NOT NULL DEFAULT '[]',
+    updated_at     TEXT NOT NULL
+);
+COMMIT;
+PRAGMA foreign_keys=ON;
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -488,6 +534,7 @@ MIGRATIONS: List[tuple] = [
     (8, SCHEMA_V8_SQL),
     (9, SCHEMA_V9_SQL),
     (10, SCHEMA_V10_SQL),
+    (11, SCHEMA_V11_SQL),
 ]
 
 
@@ -774,8 +821,13 @@ class SessionStore:
             (session_id,),
         ).fetchone()
         total = int(row[0] or 0)
-        if total == 0:
-            return 0, None, None
+        # Exercise the patient logged without the camera (feature 012): counted, but never measured.
+        reported = self.conn.execute(
+            "SELECT COALESCE(SUM(reported_reps * COALESCE(reported_sets, 1)), 0) FROM exercise_sets WHERE session_id = ?",
+            (session_id,)).fetchone()[0]
+        total += int(reported or 0)
+        if int(row[0] or 0) == 0:
+            return total, None, None
         return total, round(float(row[1]), 1), round(float(row[2]), 1)
 
     def _last_activity_time(self, session_id: int) -> Optional[str]:
@@ -831,6 +883,7 @@ class SessionStore:
                 id=s["id"], session_id=s["session_id"], ordinal=s["ordinal"], exercise_key=s["exercise_key"],
                 exercise_name=s["exercise_name"], side=s["side"], target_reps=s["target_reps"],
                 up_angle=s["up_angle"], down_angle=s["down_angle"], start_time=s["start_time"], end_time=s["end_time"],
+                reported_reps=s["reported_reps"], reported_sets=s["reported_sets"], effort=s["effort"],
             )
             es.reps = [
                 RepEvent(rep_number=r["rep_number"], min_angle=r["min_angle"], max_angle=r["max_angle"], rom=r["rom"],
@@ -1909,6 +1962,45 @@ class SessionStore:
     def upload_delete(self, upload_id: str) -> None:
         self.conn.execute("DELETE FROM media_uploads WHERE id = ?", (upload_id,))
         self.conn.commit()
+
+    # exercise logged without the camera, and per-patient settings (feature 012)
+
+    def set_reported(self, set_id: int, reps: int, sets: int = 1, effort: Optional[int] = None) -> None:
+        """What the patient said they did, on a set that has no measured reps."""
+        self.conn.execute("UPDATE exercise_sets SET reported_reps = ?, reported_sets = ?, effort = ? WHERE id = ?",
+                          (int(reps), int(sets), int(effort) if effort is not None else None, set_id))
+        self.conn.commit()
+
+    def _settings(self, patient_id: str) -> dict:
+        row = self.conn.execute("SELECT diary_enabled, medications FROM patient_settings WHERE patient_id = ?",
+                                (patient_id,)).fetchone()
+        return {"diary_enabled": bool(row["diary_enabled"]), "medications": json.loads(row["medications"])} if row \
+            else {"diary_enabled": True, "medications": []}
+
+    def _save_settings(self, patient_id: str, **fields) -> None:
+        self._require_patient(patient_id)
+        current = self._settings(patient_id)
+        current.update(fields)
+        self.conn.execute(
+            "INSERT INTO patient_settings (patient_id, diary_enabled, medications, updated_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(patient_id) DO UPDATE SET diary_enabled = excluded.diary_enabled, "
+            "medications = excluded.medications, updated_at = excluded.updated_at",
+            (patient_id, 1 if current["diary_enabled"] else 0, json.dumps(current["medications"]), self._now()))
+        self.conn.commit()
+
+    def diary_enabled(self, patient_id: str) -> bool:
+        return self._settings(patient_id)["diary_enabled"]
+
+    def set_diary_enabled(self, patient_id: str, enabled: bool) -> None:
+        self._save_settings(patient_id, diary_enabled=bool(enabled))
+
+    def medication_list(self, patient_id: str) -> List[str]:
+        return list(self._settings(patient_id)["medications"])
+
+    def set_medication_list(self, patient_id: str, names: List[str]) -> List[str]:
+        cleaned = [str(n).strip()[:60] for n in names if str(n).strip()][:20]
+        self._save_settings(patient_id, medications=cleaned)
+        return cleaned
 
     def latest_review(self, patient_id: str) -> Optional[Review]:
         row = self.conn.execute(

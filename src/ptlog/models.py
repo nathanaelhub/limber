@@ -247,6 +247,9 @@ class ExerciseSet:
     partial_reps: List[PartialRepEvent] = field(default_factory=list)
     form_events: List[FormEvent] = field(default_factory=list)
     samples: List[FrameSample] = field(default_factory=list)
+    reported_reps: Optional[int] = None    # exercise logged without the camera (feature 012)
+    reported_sets: Optional[int] = None
+    effort: Optional[int] = None          # 1 very easy … 5 very hard
 
 
 @dataclass
