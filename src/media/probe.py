@@ -20,12 +20,14 @@ LIMITS = {
     "clip": {"max_seconds": 65.0, "max_bytes": 80 * 1024 * 1024, "max_side": 1920,
              "containers": {"mov,mp4,m4a,3gp,3g2,mj2": None, "matroska,webm": None},
              "video_codecs": {"h264", "hevc", "vp8", "vp9", "av1"}, "needs_video": True},
+    # A voice note (feature 014): whatever a phone records, as long as it is audio and only audio.
     "voice": {"max_seconds": 180.0, "max_bytes": 10 * 1024 * 1024, "max_side": 0,
-              "containers": {"mov,mp4,m4a,3gp,3g2,mj2": None, "matroska,webm": None, "ogg": None},
+              "containers": {"mov,mp4,m4a,3gp,3g2,mj2": None, "matroska,webm": None, "ogg": None,
+                             "mp3": None, "wav": None},
               "video_codecs": set(), "needs_video": False},
 }
 EXT_BY_CONTAINER = {"mov,mp4,m4a,3gp,3g2,mj2": {"clip": "mp4", "voice": "m4a"}, "matroska,webm": {"clip": "webm", "voice": "webm"},
-                    "ogg": {"voice": "ogg"}}
+                    "ogg": {"voice": "ogg"}, "mp3": {"voice": "mp3"}, "wav": {"voice": "wav"}}
 DECODE_FRAMES = 30
 REASONS = {
     "not_media": "This file is not a video Limber can read.",
@@ -35,13 +37,25 @@ REASONS = {
     "too_long": "This clip is longer than the limit of about a minute.",
     "too_large": "This file is larger than the limit.",
     "timeout": "This file took too long to check and was not accepted.",
+    # Voice notes (feature 014)
+    "no_audio": "This file has no sound in it, so it cannot be sent as a voice note.",
+    "has_video": "This file has a picture in it. Send it as a video instead of a voice note.",
+    "too_long_voice": "This voice note is longer than the limit of about three minutes.",
+    "unsupported_voice": "Limber cannot read this recording. Record it with the app and try again.",
 }
 
 
 class MediaRejected(PortalError):
-    def __init__(self, reason: str):
-        super().__init__(REASONS.get(reason, "This file was not accepted."))
+    """A refusal carrying a reason word (never a filename), and a sentence for the patient.
+
+    `kind` picks the wording where a clip and a voice note need to be told different things; the reason
+    word itself stays the same, because that is what the access history records."""
+
+    def __init__(self, reason: str, kind: str = "clip"):
+        wording = REASONS.get(f"{reason}_voice") if kind == "voice" else None
+        super().__init__(wording or REASONS.get(reason, "This file was not accepted."))
         self.reason = reason
+        self.kind = kind
 
 
 @dataclass
@@ -77,13 +91,16 @@ def probe(path: Path, kind: str = "clip", max_bytes: Optional[int] = None) -> Me
             raise MediaRejected("not_media")
         if fmt not in limits["containers"]:
             # MOV files sometimes open under a different name; anything else is refused
-            raise MediaRejected("unsupported")
+            raise MediaRejected("unsupported", kind)
         video = [s for s in container.streams if s.type == "video" and s.codec_context.name not in ("mjpeg", "png")]
         audio = [s for s in container.streams if s.type == "audio"]
         if limits["needs_video"] and not video:
             raise MediaRejected("no_video")
-        if not limits["needs_video"] and not audio:
-            raise MediaRejected("not_media")
+        if not limits["needs_video"]:
+            if video:
+                raise MediaRejected("has_video", kind)      # a picture makes it a clip, not a voice note
+            if not audio:
+                raise MediaRejected("no_audio", kind)
         duration = float(container.duration or 0) / 1_000_000.0
         stream = video[0] if video else audio[0]
         if stream.duration and stream.time_base:
@@ -91,7 +108,7 @@ def probe(path: Path, kind: str = "clip", max_bytes: Optional[int] = None) -> Me
         if duration <= 0:
             raise MediaRejected("damaged")
         if duration > limits["max_seconds"]:
-            raise MediaRejected("too_long")
+            raise MediaRejected("too_long", kind)
         codec = stream.codec_context.name
         if video and codec not in limits["video_codecs"]:
             raise MediaRejected("unsupported")

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 from pathlib import Path
+from typing import Optional
 
 import av
 import numpy as np
@@ -40,15 +41,34 @@ def make_video(path: Path, seconds: float = 2.0, fps: int = 15, size=(64, 64), c
     return path
 
 
-def make_audio(path: Path, seconds: float = 1.0, codec: str = "aac") -> Path:
+# What a phone actually hands over, by extension (feature 014). Opus must be encoded at 48 kHz, which
+# is the rate the codec itself allows; the others are happy at 44.1.
+AUDIO_KINDS = {
+    ".m4a": ("aac", 44100),
+    ".mp3": ("libmp3lame", 44100),
+    ".ogg": ("opus", 48000),
+    ".wav": ("pcm_s16le", 44100),
+    ".webm": ("opus", 48000),
+}
+
+
+def make_audio(path: Path, seconds: float = 1.0, codec: Optional[str] = None, rate: Optional[int] = None,
+               silent: bool = False, chunk: int = 1024) -> Path:
+    """A 440 Hz tone (or silence) in the container the path's extension names.
+
+    `chunk` is how many samples go in each frame handed to the encoder. It costs nothing in accuracy and
+    everything in speed: a long file built 1024 samples at a time takes about a minute, and the same file
+    built in one-second frames takes a tenth of a second, because the work is Python overhead per frame."""
     path = Path(path)
+    default_codec, default_rate = AUDIO_KINDS.get(path.suffix, ("aac", 44100))
+    codec, rate = codec or default_codec, rate or default_rate
     out = av.open(str(path), mode="w")
-    stream = out.add_stream(codec, rate=44100)
-    t = np.arange(1024) / 44100.0
-    tone = (0.2 * np.sin(2 * np.pi * 440 * t)).astype(np.float32).reshape(1, -1)
+    stream = out.add_stream(codec, rate=rate)
+    t = np.arange(chunk) / float(rate)
+    tone = np.zeros((1, chunk), dtype=np.float32) if silent else (0.2 * np.sin(2 * np.pi * 440 * t)).astype(np.float32).reshape(1, -1)
     frame = av.AudioFrame.from_ndarray(tone, format="fltp", layout="mono")
-    frame.sample_rate = 44100
-    for _ in range(int(seconds * 44100 / 1024)):
+    frame.sample_rate = rate
+    for _ in range(max(1, int(seconds * rate / chunk))):
         for packet in stream.encode(frame):
             out.mux(packet)
     for packet in stream.encode():

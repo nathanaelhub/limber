@@ -13,12 +13,12 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 2: Foundational — audio through the existing pipeline
 
-- [ ] T002 [P] Audio fixtures in `tests/fixtures/media.py` (m4a/aac, mp3, ogg/opus, wav, webm/opus, a
+- [x] T002 [P] Audio fixtures in `tests/fixtures/media.py` (m4a/aac, mp3, ogg/opus, wav, webm/opus, a
       silent file, an audio file carrying a video stream, a truncated one) and failing tests in
       `tests/test_media_probe.py`: each accepted container reports its codec and length; a file with a
       video stream is refused `has_video`; a file with no audio is refused `no_audio`; over-long and
       over-large are refused; a damaged file is refused; the isolated probe still survives a crash
-- [ ] T003 Implement the `voice` limits and reasons in `src/media/probe.py`
+- [x] T003 Implement the `voice` limits and reasons in `src/media/probe.py`
 - [ ] T004 [P] Failing `tests/test_ptlog_store_v13.py`: schema v13 adds `messages.media_id` and
       `transcriptions`; a v12 record upgrades with every table's count intact; a message may carry a media
       id; deleting a patient removes messages, media, and transcriptions; deleting a media row leaves the
