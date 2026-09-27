@@ -14,6 +14,13 @@
     text.textContent = m.removed ? "This message was removed." : m.text;
     var meta = document.createElement("p"); meta.className = "bubble-meta";
     meta.textContent = (m.from === "you" ? "You" : "Your therapist") + " · " + m.sent_at.replace("T", " ");
+    if (!m.removed && m.media_id) {                    // a voice note the patient sent (feature 014)
+      text.textContent = "Voice note";
+      var player = document.createElement("audio");
+      player.controls = true; player.preload = "none"; player.src = "/api/media/" + m.media_id;
+      li.appendChild(text); li.appendChild(player); li.appendChild(meta);
+      return li;
+    }
     li.appendChild(text); li.appendChild(meta);
     return li;
   }

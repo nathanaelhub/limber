@@ -52,3 +52,32 @@
 - Deciding to install the speech model and its dependency on the owner's machine is the owner's call, not
   the implementer's: the plan will build and verify Stories 1 and 2 first and stop for that decision
   before installing anything.
+
+## Implementation notes — Slice A (a voice note that arrives and plays)
+
+- **Feature 011 had already reserved the `voice` kind** in the probe (180 s, 10 MB, no video stream), so
+  the audio side was limits and wording rather than new machinery: MP3 and WAV added to the containers a
+  phone may produce, a refusal for a file that carries a picture, and audio-specific sentences behind the
+  same reason words the access history records.
+- **The message link needed no schema change**: `media.message_id` has existed since feature 011, so the
+  recording points at the message and `Message.media_id` is read back through it. v13 is one new table.
+- **Three defects the browser run found that the suite had not**, all now covered by tests:
+  1. `/api/media` listed clips only, so the voice page showed an empty list.
+  2. The patient's conversation page never drew a player for a message carrying audio.
+  3. The service's `permissions-policy` header still said `microphone=()`, so recording was blocked
+     outright — the plan had predicted this one and it was still missed until the browser said so.
+- **A fixture that took a minute**: audio built 1024 samples at a time is dominated by per-frame Python
+  overhead. Handing the encoder one second at a time made a 200-second file cost a tenth of a second.
+- **An unreachable reason word**: `no_audio` cannot be produced by any fixture, because a real file
+  without audio either carries video (refused as a clip's business) or cannot be opened at all. The word
+  stays, with a test that pins its wording and says why.
+- **The suite's own slowness was not a regression**: a 23-minute run turned out to be two full suites
+  competing on one machine. Run alone it is under two minutes.
+- **`src/media/transcribe.py` exists in Slice A** but only answers whether this installation could write
+  audio out at all, so the inbox can say plainly that it cannot. No model, no dependency, no worker.
+
+## The stop before Slice B
+
+Installing `faster-whisper` and downloading model files onto the owner's machine and the host is the
+owner's decision, not the implementer's, so the plan stops here and asks. Slice A is merged and usable
+either way, and the installation behaves identically with no model present.

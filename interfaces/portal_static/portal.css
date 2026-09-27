@@ -111,6 +111,10 @@ legend .unit { font-weight: 400; color: var(--muted); font-size: .88rem; }
 .questions .question { margin: 0 0 .6rem; font-weight: 600; }
 .questions .levels { grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
 .questions .level-btn { padding: .6rem .4rem; font-size: .92rem; }
+/* A voice note: in a conversation bubble and in the patient's own list (feature 014). */
+audio { width: 100%; margin: .5rem 0 0; }
+.bubble audio { max-width: 15rem; }
+.exercises li audio { flex: 1 1 10rem; }
 select { width: 100%; padding: .8rem 1rem; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; }
 .link-button { align-self: center; margin-top: 1rem; color: var(--muted); }
 .saved { color: var(--teal); font-weight: 600; }

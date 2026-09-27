@@ -10,6 +10,7 @@ The real record (data/ptassist.db) is never touched: the script refuses to write
 from __future__ import annotations
 
 import argparse
+import tempfile
 import random
 import sys
 from datetime import date, datetime, timedelta
@@ -243,6 +244,24 @@ def build(db_path: Path, seed: int = 7) -> None:
             payload, total = portal_q.accept(s, "P-019", {"instrument": demo_instrument, "answers": partial})
             s.entry_add("P-019", "questionnaire", payload, total, when.isoformat(),
                         "demo-q-P-019", "standalone", None, False, False)   # P-019 is now overdue for the next one
+
+        # A voice note in the inbox (feature 014), with nothing written out: the demo record must show
+        # what the therapist sees on an installation without a speech model.
+        import hashlib as _hashlib
+        from src.portal import uploads as _uploads, voice as _voice
+        from tests.fixtures import media as _media_fx
+        try:
+            note_path = Path(tempfile.mkdtemp()) / "note.m4a"
+            _media_fx.make_audio(note_path, seconds=18.0, rate=16000, chunk=16000)
+            audio = note_path.read_bytes()
+            clock.now = datetime.now() - timedelta(days=1, hours=2)
+            up = _uploads.begin(s, s.media_dir, "P-021", "voice", len(audio),
+                                _hashlib.sha256(audio).hexdigest(), chunk_bytes=len(audio))
+            _uploads.put_part(s, s.media_dir, "P-021", up.id, 0, audio)
+            _voice.finish(s, s.media_dir, "P-021", up.id)
+        except Exception as exc:                          # a demo record is not worth failing the seed over
+            print(f"  (no demo voice note: {exc})")
+        clock.now = datetime.now()
 
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)

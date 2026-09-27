@@ -174,7 +174,10 @@ class TestPagesAndHeaders:
             assert "default-src 'self'" in csp and "frame-ancestors 'none'" in csp and "connect-src 'self'" in csp
             assert "unsafe-inline" not in csp and "http:" not in csp and "https:" not in csp, route
             assert h["x-content-type-options"] == "nosniff" and h["referrer-policy"] == "no-referrer"
-            assert "camera=(self)" in h["permissions-policy"]
+            # The camera is for a guided session, the microphone for a voice note (feature 014); both are
+            # this page's own and nobody else's, and geolocation is refused outright.
+            assert "camera=(self)" in h["permissions-policy"] and "microphone=(self)" in h["permissions-policy"]
+            assert "geolocation=()" in h["permissions-policy"]
 
     def test_inner_pages_redirect_when_signed_out(self, client, seeded):
         for route in ("/today", "/session", "/progress"):

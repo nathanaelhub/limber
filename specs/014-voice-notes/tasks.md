@@ -52,7 +52,7 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 5: Slice A finish
 
-- [ ] T014 Demo voice note in `scripts/seed_demo.py`; `docs/UPDATES.md` Update 16 (Slice A); browser run
+- [x] T014 Demo voice note in `scripts/seed_demo.py`; `docs/UPDATES.md` Update 16 (Slice A); browser run
       in Chrome with a fake microphone (notice, record, send, the inbox playing it); record what was
       verified; full suite; commit and merge
 

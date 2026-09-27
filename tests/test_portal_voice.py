@@ -156,6 +156,16 @@ class TestOverHttp:
         assert c.delete(f"/api/media/{body['id']}", headers={"Origin": ORIGIN}).status_code == 200
         assert c.get("/api/messages").json()["messages"][0]["removed"] is True
 
+    def test_the_patient_can_list_their_own_voice_notes(self, client):
+        """The media list is what the voice page draws from, so it must not be clips only."""
+        c, note, store, _ = client
+        upload_id = self.upload(c, note)
+        sent = c.post(f"/api/uploads/{upload_id}/finish", json={}, headers={"Origin": ORIGIN}).json()
+        listed = c.get("/api/media").json()["media"]
+        assert [m["id"] for m in listed if m["kind"] == "voice"] == [sent["id"]]
+        assert c.get("/api/media", params={"kind": "voice"}).json()["media"][0]["id"] == sent["id"]
+        assert c.get("/api/media", params={"kind": "clip"}).json()["media"] == []
+
     def test_today_offers_a_voice_note_only_when_messaging_is_on(self, client):
         c, note, store, _ = client
         assert c.get("/api/today").json()["voice"]["enabled"] is True

@@ -2,6 +2,40 @@
 
 ---
 
+## Update 16 — 2026-09-27 — Voice Notes (the Recording; the Transcript Is Separate)
+
+Feature spec: `specs/014-voice-notes/`. Schema moved to version 13 (`transcriptions`). This is the
+**first of two slices**: a spoken note that arrives, plays, and can be reviewed. Writing it out
+automatically needs a new dependency and model files on the host, so it is a separate decision and is
+not installed.
+
+- **Patient**: "Send a voice note" on Today. The notice comes before the microphone opens. The patient
+  records (or picks a recording the phone already has), listens back, re-records if they want, and sends;
+  the upload goes in parts and resumes after a dropped connection. They see their own notes with a player
+  and can delete one.
+- **It arrives as a message.** A voice note is a message from the patient carrying the recording, so the
+  unread count, the inbox, the conversation, and message removal all work without knowing anything about
+  audio. Whether it is offered is the conversation's rule: messaging on, not discharged, and the hourly
+  message limit — all checked before a single byte is stored.
+- **What the service accepts**: M4A/AAC, MP3, Ogg/Opus, WAV, and WebM/Opus, up to about three minutes and
+  10 MB, decided by inspecting the file in a separate process. A file carrying a picture is refused as a
+  clip's business; silence is accepted, because whether a recording says anything is the patient's
+  business. Retention, backups, restore, reconciliation, and deletion with the patient are feature 011's,
+  unchanged.
+- **Therapist**: the inbox thread plays the note with its length, "Mark heard", and "Delete" (which takes
+  the recording, anything written out from it, and the message together, leaving the marker). Voice notes
+  are counted apart from clips on the roster and in a queue of their own.
+- **Three things the browser run found that the suite had not**: the patient's media list was clips only,
+  so the voice page showed nothing; the conversation page never drew a player; and the service's
+  permissions policy still blocked the microphone. All three are fixed and covered by tests.
+- Verified on an emulated iPhone in Chrome with a fake microphone, against the demo record: the notice
+  before the microphone, a recording made and listened back, sent as WebM/Opus and stored with its length,
+  the patient's own list and their conversation both playing it, and the therapist hearing it in the
+  inbox, being told plainly that writing out is not available on this installation, and marking it heard.
+  Not verified: a real phone (iOS Safari's recording support is the open question), and a real voice.
+
+---
+
 ## Update 15 — 2026-09-24 — Questionnaires: an Engine, Not a Form
 
 Feature spec: `specs/013-questionnaires/`. Schema moved to version 12 (`instrument_assignments`);

@@ -52,7 +52,9 @@ SECURITY_HEADERS = {
     "content-security-policy": CSP,
     "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",
-    "permissions-policy": "camera=(self), microphone=(), geolocation=()",
+    # The camera is used by a guided session and the microphone by a voice note (feature 014); both are
+    # allowed only for this origin's own pages, and nothing else is allowed at all.
+    "permissions-policy": "camera=(self), microphone=(self), geolocation=()",
     "cross-origin-opener-policy": "same-origin",
 }
 
@@ -445,11 +447,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             return _json({})
 
     def media_list(request: Request):
+        """Everything this patient sent, clips and voice notes alike; `kind` narrows it."""
         with open_store() as store:
             pid = signed_in(request, store)
             if pid is None:
                 return _json({"error": "Please sign in."}, 401)
-            rows = uploads.list_media(store, pid)
+            wanted = request.query_params.get("kind")
+            kind = wanted if wanted in ("clip", voice.KIND) else None
+            rows = uploads.list_media(store, pid, kind)
             return _json({"patient_id": pid, "media": [_media_json(m) for m in rows], "notice": uploads.NOTICE})
 
     def media_file(request: Request):
