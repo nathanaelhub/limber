@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Voice note</title>
+</head>
+<body data-page="voice">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <p id="offline" class="offline" hidden>Not connected. Sending a voice note needs a connection; your recording stays on this phone until you send it.</p>
+  <main class="card wide">
+    <h1>Send a voice note</h1>
+    <p class="lead">Say what is going on, in your own words. About two minutes is plenty.</p>
+    <p id="notice" class="notice">Your voice note is stored on the Limber host and heard by your therapist. It is kept
+      for 90 days after they listen to it (180 days if they do not), and you can delete it at any time. Please do not
+      say your full name, address, or anything you would not want written down.</p>
+    <p id="off" class="lead" hidden>Messages are not turned on for you, so a voice note cannot be sent. Your therapist
+      can turn them on.</p>
+
+    <div id="recorder">
+      <div class="actions">
+        <button id="record" type="button">Start recording</button>
+        <button id="stop" type="button" class="secondary" hidden>Stop</button>
+        <label id="pick-label" class="link-button" for="pick">Or choose a recording</label>
+        <input id="pick" type="file" accept="audio/*" hidden>
+      </div>
+      <p id="timer" class="big" hidden>0:00</p>
+      <p id="hint" class="small">Your phone will ask for permission to use the microphone.</p>
+      <audio id="preview" controls hidden></audio>
+      <div id="after" class="actions" hidden>
+        <button id="send" type="button">Send to my therapist</button>
+        <button id="again" type="button" class="secondary">Record again</button>
+      </div>
+      <div class="track" id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" hidden><span id="bar-fill"></span></div>
+      <p id="error" class="error" role="alert" hidden></p>
+      <p id="saved" class="saved" role="status" hidden></p>
+    </div>
+
+    <h2>Your voice notes</h2>
+    <ul id="notes" class="exercises"></ul>
+    <p id="none" class="small" hidden>You have not sent any yet.</p>
+    <div class="actions"><a class="link-button" href="/today">Back to Today</a></div>
+  </main>
+  <script src="/static/portal.js"></script>
+  <script src="/static/voice.js"></script>
+</body>
+</html>

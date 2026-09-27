@@ -82,13 +82,18 @@ def send(store: SessionStore, patient_id: str, sender: str, text, confirm: bool 
         raise MessagingOff()
     if store.get_discharge(patient_id) is not None:
         raise MessagingOff("This conversation is closed because the patient was discharged.")
-    if sender == "patient" and store.message_count_since(
-            patient_id, "patient", store.clock() - timedelta(hours=1)) >= PATIENT_PER_HOUR:
-        raise TooManyMessages()
+    if sender == "patient":
+        check_rate(store, patient_id)
     reasons = check_text(body)
     if reasons and not confirm:
         raise NeedsConfirmation(reasons)
     return store.message_add(patient_id, sender, body, warned=bool(reasons))
+
+
+def check_rate(store: SessionStore, patient_id: str) -> None:
+    """How much one patient may send in an hour. A voice note counts as a message, because it is one."""
+    if store.message_count_since(patient_id, "patient", store.clock() - timedelta(hours=1)) >= PATIENT_PER_HOUR:
+        raise TooManyMessages()
 
 
 def thread(store: SessionStore, patient_id: str, viewer: str, mark_read: bool = True) -> List[Message]:

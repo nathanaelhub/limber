@@ -501,7 +501,7 @@ class ReviewSummary:
 
 ASSIGNMENT_STATUSES = ("scheduled", "active", "completed", "superseded")
 QUEUE_KINDS = ("pending_review", "attention_flag", "practice_gap", "low_adherence", "unread_messages",
-               "new_uploads", "overdue_questionnaire")
+               "new_uploads", "new_voice_notes", "overdue_questionnaire")
 ADHERENCE_THRESHOLD_DEFAULT = 60
 
 METRIC_DEFINITIONS.update({
@@ -773,6 +773,7 @@ class RosterRow:
     unread_messages: int = 0        # messages from the patient the therapist has not opened (feature 008)
     unreviewed_uploads: int = 0     # clips the therapist has not reviewed (feature 011)
     overdue_questionnaires: int = 0  # assigned questionnaires more than a week past due (feature 013)
+    unreviewed_voice_notes: int = 0  # spoken notes the therapist has not heard (feature 014)
 
 
 @dataclass

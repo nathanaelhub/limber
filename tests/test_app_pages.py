@@ -813,3 +813,78 @@ def test_tracker_queue_lists_an_overdue_questionnaire(seeded_env):
     notes = " ".join(x.value for x in list(at.info) + list(at.warning))     # queue items render as info boxes
     assert "Demo Knee Function is 30 days overdue for P-017" in notes
     assert "questionnaires:P-017" in notes                                   # where the therapist should go
+
+
+# ----------------------------------------------------------------------------- feature 014: voice notes
+
+def _seed_voice_note(db, tmp_path, seconds=2.0):
+    import hashlib
+    from src.portal import messages as conversation, uploads, voice
+    from tests.fixtures import media as media_fx
+    note = media_fx.make_audio(tmp_path / "note.m4a", seconds=seconds)
+    data = note.read_bytes()
+    with SessionStore(db).open() as store:
+        conversation.set_enabled(store, "P-017", True)
+        up = uploads.begin(store, store.media_dir, "P-017", "voice", len(data),
+                           hashlib.sha256(data).hexdigest(), chunk_bytes=len(data))
+        uploads.put_part(store, store.media_dir, "P-017", up.id, 0, data)
+        return voice.finish(store, store.media_dir, "P-017", up.id)
+
+
+def test_inbox_plays_a_voice_note_and_marks_it_heard(seeded_env, tmp_path):
+    media = _seed_voice_note(seeded_env, tmp_path)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    at.session_state["inbox_patient"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption))
+    assert "Voice note" in text and "2 s" in text.replace("2s", "2 s")
+    assert at.get("audio"), "the recording is offered with a player"
+    at.button(key=f"voice_heard_{media.id}").click().run()
+    with SessionStore(seeded_env).open() as store:
+        assert store.media_get(media.id).reviewed_at is not None
+        assert {r.patient_id: r.unreviewed_voice_notes for r in __import__("src.ptlog.tracker", fromlist=["x"]).roster(store)}["P-017"] == 0
+
+
+def test_inbox_deletes_a_voice_note_and_keeps_the_marker(seeded_env, tmp_path):
+    media = _seed_voice_note(seeded_env, tmp_path)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    at.session_state["inbox_patient"] = "P-017"
+    at.run()
+    at.button(key=f"voice_delete_{media.id}").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        gone = store.media_get(media.id)
+        assert gone.deleted_by == "therapist" and not (store.media_dir / "P-017" / f"{media.id}.m4a").exists()
+        (message,) = store.message_thread("P-017")
+        assert message.removed is True and message.media_id is None
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption))
+    assert "removed" in text.lower()
+
+
+def test_inbox_says_when_writing_out_is_not_available(seeded_env, tmp_path):
+    """Slice B is optional: with no speech model installed the note still plays and one line says so."""
+    _seed_voice_note(seeded_env, tmp_path)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    at.session_state["inbox_patient"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption))
+    assert "written out" in text.lower() and "not available" in text.lower()
+
+
+def test_the_reply_box_still_works_beside_a_voice_note(seeded_env, tmp_path):
+    _seed_voice_note(seeded_env, tmp_path)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    at.session_state["inbox_patient"] = "P-017"
+    at.run()
+    at.text_area(key="inbox_reply").set_value("Thank you, I have listened to that.").run()
+    at.button(key="inbox_send").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    with SessionStore(seeded_env).open() as store:
+        bodies = [m.body for m in store.message_thread("P-017")]
+        assert "Thank you, I have listened to that." in bodies

@@ -131,7 +131,7 @@ def messages_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
 
 def message_json(m) -> Dict[str, Any]:
     return {"id": m.id, "from": "you" if m.sender == "patient" else "therapist", "text": m.body,
-            "sent_at": m.sent_at[:16], "removed": m.removed}
+            "sent_at": m.sent_at[:16], "removed": m.removed, "media_id": m.media_id}
 
 
 def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
@@ -162,6 +162,12 @@ def questionnaire_badge(store: SessionStore, patient_id: str, now: datetime) -> 
     return questionnaires.badge(store, patient_id, now)
 
 
+def voice_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
+    """Whether Today offers a voice note, and what the page will say before the microphone opens."""
+    from src.portal import voice
+    return voice.options(store, patient_id)
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     from src.portal import diary
     _require(store, patient_id)
@@ -174,7 +180,8 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
                             "clips": clips_badge(store, patient_id),
                             "diary": diary.options(store, patient_id, now=now),
                             "logs": logs_badge(store, patient_id, now),
-                            "questionnaires": questionnaire_badge(store, patient_id, now)}
+                            "questionnaires": questionnaire_badge(store, patient_id, now),
+                            "voice": voice_badge(store, patient_id)}
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         view["message"] = NO_PROGRAM

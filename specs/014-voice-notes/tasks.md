@@ -27,28 +27,28 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 3: User Story 1 — the patient sends a spoken note (P1) 🎯 MVP
 
-- [ ] T006 [P] [US1] Failing tests in `tests/test_portal_voice.py`: finishing a `voice` upload creates one
+- [x] T006 [P] [US1] Failing tests in `tests/test_portal_voice.py`: finishing a `voice` upload creates one
       message from the patient carrying the media id and raises the therapist's unread count; the audio is
       stored under `data/media/<patient>/`; refusals store nothing and leave no message; a patient hears and
       deletes only their own note; deleting removes the file and leaves the message marked; refused when
       messaging is off or the patient is discharged; the no-leak walk covers the audio routes
-- [ ] T007 [US1] Implement the voice branch in `src/portal/uploads.py` and `src/portal/messages.py`, and
+- [x] T007 [US1] Implement the voice branch in `src/portal/uploads.py` and `src/portal/messages.py`, and
       the routes in `interfaces/patient_portal.py`
-- [ ] T008 [P] [US1] Failing tests: Today offers a voice note only when messaging is on; the patient's
+- [x] T008 [P] [US1] Failing tests: Today offers a voice note only when messaging is on; the patient's
       conversation carries the player and the length
-- [ ] T009 [US1] Implement `interfaces/portal_static/voice.html` and `voice.js` (notice before the
+- [x] T009 [US1] Implement `interfaces/portal_static/voice.html` and `voice.js` (notice before the
       microphone, record, listen back, re-record, progress, resumption, the file-picker fallback, a plain
       message when the microphone is refused) and the Today and Messages entry points
 
 ## Phase 4: User Story 2 — the therapist listens in the inbox (P1)
 
-- [ ] T010 [P] [US2] Failing tests: queue kind `new_voice_notes` and the roster mark in
+- [x] T010 [P] [US2] Failing tests: queue kind `new_voice_notes` and the roster mark in
       `src/ptlog/tracker.py`, counted separately from clips
-- [ ] T011 [US2] Implement the tracker changes and the queue label
-- [ ] T012 [P] [US2] Failing AppTest: the inbox thread shows the player with length and time, "Mark
+- [x] T011 [US2] Implement the tracker changes and the queue label
+- [x] T012 [P] [US2] Failing AppTest: the inbox thread shows the player with length and time, "Mark
       reviewed" clears the queue entry, "Delete" removes the file and leaves a marker, and the reply box
       still works
-- [ ] T013 [US2] Implement in `interfaces/app.py`
+- [x] T013 [US2] Implement in `interfaces/app.py`
 
 ## Phase 5: Slice A finish
 

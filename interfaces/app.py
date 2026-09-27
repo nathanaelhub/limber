@@ -1912,6 +1912,66 @@ def _review_export(pid):
 TRACKER_SECTIONS = ["Roster", "Queue", "Adherence", "Discharged", "Export", "Settings"]
 
 
+def _inbox_voice_note(pid, media_id):
+    """One spoken note in the thread: the recording, what was written out if anything, and the two
+    things the therapist can do with it (feature 014)."""
+    from src.media import transcribe
+    from src.portal import uploads as ptuploads
+    from src.portal import voice as ptvoice
+    with _open_store() as store:
+        media = store.media_get(media_id)
+        job = store.transcription_for(media_id) if media else None
+        media_dir = store.media_dir
+    if media is None:
+        st.markdown("*This voice note is no longer in the record.*")
+        return
+    st.markdown(f"**Voice note** · {media.duration:.0f} s"
+                + (" · heard" if media.reviewed_at else " · not heard yet"))
+    if media.deleted_at is not None:
+        st.markdown("*The recording was removed.*")
+        return
+    path = ptuploads.media_path(media_dir, media)
+    if path.is_file():
+        st.audio(str(path))
+    else:
+        st.caption("The file is missing from the volume; the record still has its details.")
+
+    if not transcribe.available():
+        st.caption("Written out automatically: not available on this installation. "
+                   "The recording is the record; a transcript is only an aid to reading it.")
+    elif job is None or job.state in ("queued", "running"):
+        st.caption("Written out automatically: still being done. The recording plays now; refresh for the text.")
+    elif job.state == "failed":
+        st.caption(f"Written out automatically: it did not work ({job.reason}). The recording is unaffected.")
+    elif job.removed:
+        st.caption("Written out automatically: the text was removed.")
+    else:
+        st.caption("Written out automatically by this installation. It may contain mistakes, so listen "
+                   "before relying on it."
+                   + (" This text looks like it contains identifying details." if job.warned else ""))
+        st.text(job.text or "Nothing recognisable was said.")
+
+    c1, c2, c3 = st.columns([1.2, 1, 2])
+    with c1:
+        if media.reviewed_at is None and st.button("Mark heard", key=f"voice_heard_{media.id}"):
+            with _open_store() as store:
+                ptuploads.mark_reviewed(store, media.id)
+            st.rerun()
+    with c2:
+        if st.button("Delete", key=f"voice_delete_{media.id}",
+                     help="Removes the recording and anything written out from it. A marker stays in the conversation."):
+            with _open_store() as store:
+                ptvoice.delete(store, store.media_dir, pid, media.id, by="therapist")
+            st.rerun()
+    with c3:
+        if job is not None and job.state == "done" and not job.removed and job.text:
+            if st.button("Remove the text", key=f"voice_text_remove_{media.id}",
+                         help="For a transcript that contains identifying details. The recording stays."):
+                with _open_store() as store:
+                    store.transcription_remove_text(job.id)
+                st.rerun()
+
+
 def _inbox_send(pid, confirm):
     """Button callback: send the reply, then empty the box so it cannot be sent twice."""
     reply = st.session_state.get("inbox_reply", "")
@@ -1980,11 +2040,14 @@ def page_inbox():
                 st.caption(f"{who} · {when}" + (" · sent after a privacy warning" if m.warned else ""))
                 if m.removed:
                     st.markdown("*This message was removed.*")
+                elif m.media_id:
+                    _inbox_voice_note(pid, m.media_id)
                 else:
                     st.text(m.body)                                       # plain text: never rendered as markup
             with c2:
-                if not m.removed and st.button("Remove", key=f"inbox_remove_{m.id}",
-                                               help="For a message that contains identifying details. A marker stays."):
+                if not m.removed and not m.media_id and st.button(
+                        "Remove", key=f"inbox_remove_{m.id}",
+                        help="For a message that contains identifying details. A marker stays."):
                     with _open_store() as store:
                         ptmessages.remove(store, m.id)
                     st.rerun()

@@ -36,7 +36,7 @@ from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
-from src.portal import access, admin, diary, frames, live, messages, questionnaires, uploads, viewmodels  # noqa: E402
+from src.portal import access, admin, diary, frames, live, messages, questionnaires, uploads, viewmodels, voice  # noqa: E402
 from src.ptlog import origin  # noqa: E402
 from src.ptlog.models import PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
@@ -409,8 +409,18 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 if pid is None:
                     return _json({"error": "Please sign in."}, 401)
                 try:
-                    m = uploads.finish(store, media_dir, pid, request.path_params["upload_id"],
-                                       caption=body.get("caption") or "", confirm=body.get("confirm") is True)
+                    upload_id = request.path_params["upload_id"]
+                    open_upload = store.upload_get(upload_id)
+                    if open_upload and open_upload.get("kind") == voice.KIND:
+                        # A voice note arrives as a message; everything else finishes as a clip.
+                        m = voice.finish(store, media_dir, pid, upload_id, confirm=body.get("confirm") is True)
+                    else:
+                        m = uploads.finish(store, media_dir, pid, upload_id,
+                                           caption=body.get("caption") or "", confirm=body.get("confirm") is True)
+                except messages.MessagingOff as off:
+                    return _json({"error": str(off)}, 403)
+                except messages.TooManyMessages as many:
+                    return _json({"error": str(many)}, 429)
                 except messages.NeedsConfirmation as warn:
                     return _json({"error": str(warn), "reasons": warn.reasons}, 409)
                 except MediaRejected as rejected:
@@ -455,7 +465,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             return _json({"error": "Not found."}, 404)
         return FileResponse(str(path), media_type=_mime(m), headers={
             "Cache-Control": "private, no-store", "Content-Security-Policy": "sandbox",
-            "Content-Disposition": f'inline; filename="clip.{m.ext}"', "Accept-Ranges": "bytes"})
+            "Content-Disposition": f'inline; filename="{m.kind}.{m.ext}"', "Accept-Ranges": "bytes"})
 
     def media_delete(request: Request):
         if (request.headers.get("origin") or "").rstrip("/") not in origins:
@@ -464,7 +474,12 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             pid = signed_in(request, store)
             if pid is None:
                 return _json({"error": "Please sign in."}, 401)
-            if not uploads.delete_media(store, media_dir, pid, request.path_params["media_id"], by="patient"):
+            media_id = request.path_params["media_id"]
+            existing = uploads.get_media(store, pid, media_id)
+            gone = (voice.delete(store, media_dir, pid, media_id, by="patient")
+                    if existing is not None and existing.kind == voice.KIND
+                    else uploads.delete_media(store, media_dir, pid, media_id, by="patient"))
+            if not gone:
                 return _json({"error": "Not found."}, 404)
             return _json({})
 
@@ -630,6 +645,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/diary", inner_page("diary")),
         Route("/log", inner_page("log")),
         Route("/questionnaire", inner_page("questionnaire")),
+        Route("/voice", inner_page("voice")),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),

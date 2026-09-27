@@ -50,7 +50,7 @@ class TestModels:
     def test_enums_definitions_exceptions(self):
         assert models.ASSIGNMENT_STATUSES == ("scheduled", "active", "completed", "superseded")
         assert models.QUEUE_KINDS == ("pending_review", "attention_flag", "practice_gap", "low_adherence",
-                                      "unread_messages", "new_uploads", "overdue_questionnaire")
+                                      "unread_messages", "new_uploads", "new_voice_notes", "overdue_questionnaire")
         assert METRIC_DEFINITIONS["adherence_pct"]["unit"] == "percent" and METRIC_DEFINITIONS["sessions_per_week"]["unit"] == "count"
         assert issubclass(ProgramValidationError, PTLogError) and issubclass(AssignmentValidationError, PTLogError)
         import dataclasses
@@ -310,7 +310,8 @@ class TestQueue:
         low = q.items["low_adherence"]
         assert len(low) == 1 and low[0].patient_id == "P-019" and "40%" in low[0].description and "60%" in low[0].description and low[0].target == "adherence:P-019"
         assert q.totals == {"pending_review": 3, "attention_flag": 1, "practice_gap": 1, "low_adherence": 1,
-                            "unread_messages": 0, "new_uploads": 0, "overdue_questionnaire": 0} and q.count == 6
+                            "unread_messages": 0, "new_uploads": 0, "new_voice_notes": 0,
+                            "overdue_questionnaire": 0} and q.count == 6
 
     def test_items_resolve(self, fixed_store, caseload):
         store, clock = fixed_store
@@ -451,3 +452,49 @@ class TestNewUploadsInTracker:
         from src.portal import uploads
         uploads.mark_reviewed(store, "00000000-0000-4000-8000-000000000000")
         assert "1 clip " in tracker.queue(store, now=D0).items["new_uploads"][0].description
+
+
+class TestVoiceNotesOnTheRoster:
+    """Feature 014 T010 — a spoken note waiting to be heard is its own kind of work."""
+
+    def _add(self, store, pid, n, kind="voice"):
+        from src.ptlog.models import Media
+        for i in range(n):
+            store.media_add(Media(id=f"00000000-0000-4000-8000-0000000{kind[0]}{i:04d}", patient_id=pid, kind=kind,
+                                  ext="m4a" if kind == "voice" else "mp4", container="mov",
+                                  codec="aac" if kind == "voice" else "h264", bytes=100, duration=9.0, sha256="x"))
+
+    def test_counted_apart_from_clips(self, fixed_store, caseload):
+        from src.portal import uploads
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        self._add(store, "P-018", 2, kind="voice")
+        self._add(store, "P-018", 1, kind="clip")
+        rows = {r.patient_id: r for r in tracker.roster(store, now=D0)}
+        assert rows["P-018"].unreviewed_voice_notes == 2 and rows["P-018"].unreviewed_uploads == 1
+        assert rows["P-018"].needs_attention is True and rows["P-017"].unreviewed_voice_notes == 0
+        q = tracker.queue(store, now=D0)
+        (item,) = q.items["new_voice_notes"]
+        assert item.patient_id == "P-018" and item.target == "inbox:P-018"
+        assert "2 voice notes" in item.description and "clip" not in item.description
+        assert len(q.items["new_uploads"]) == 1 and "1 clip" in q.items["new_uploads"][0].description
+
+    def test_hearing_one_clears_it(self, fixed_store, caseload):
+        from src.portal import uploads
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        self._add(store, "P-018", 2, kind="voice")
+        first = store.media_list("P-018", "voice")[0].id
+        uploads.mark_reviewed(store, first)
+        q = tracker.queue(store, now=D0)
+        assert "1 voice note" in q.items["new_voice_notes"][0].description
+        uploads.mark_reviewed(store, store.media_list("P-018", "voice")[1].id)
+        assert tracker.queue(store, now=D0).items["new_voice_notes"] == []
+        assert {r.patient_id: r.unreviewed_voice_notes for r in tracker.roster(store, now=D0)}["P-018"] == 0
+
+    def test_a_deleted_note_is_not_waiting_to_be_heard(self, fixed_store, caseload):
+        store, clock = fixed_store
+        seed_queue(store, clock, caseload)
+        self._add(store, "P-018", 1, kind="voice")
+        store.media_update(store.media_list("P-018", "voice")[0].id, deleted_at=D0.isoformat(), deleted_by="patient")
+        assert tracker.queue(store, now=D0).items["new_voice_notes"] == []

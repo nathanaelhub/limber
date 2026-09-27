@@ -37,6 +37,7 @@ class PatientSnapshot:
     unread_messages: int = 0                  # from the patient, not yet opened by the therapist
     unreviewed_uploads: int = 0               # clips awaiting the therapist's review (feature 011)
     overdue_questionnaires: List[tuple] = field(default_factory=list)      # (instrument name, days overdue) (feature 013)
+    unreviewed_voice_notes: int = 0           # spoken notes waiting to be heard (feature 014)
 
 
 def _unreviewed_by_patient(store: SessionStore) -> dict:
@@ -103,6 +104,8 @@ def snapshot(store: SessionStore, patient: Patient, now: Optional[datetime] = No
         unreviewed_uploads=(sum(1 for m in store.media_list(patient.id, "clip", live_only=True) if m.reviewed_at is None)
                             if unreviewed_uploads is None else unreviewed_uploads),
         overdue_questionnaires=_overdue_questionnaires(store, patient, today),
+        unreviewed_voice_notes=sum(1 for m in store.media_list(patient.id, "voice", live_only=True)
+                                   if m.reviewed_at is None),
     )
 
 
@@ -120,7 +123,8 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
     program_name = snap.assignment.program_name if snap.assignment else "none"
     program_status = snap.adherence.status if snap.assignment else "none"
     needs = (bool(open_flags) or bool(snap.pending) or (pct is not None and pct < threshold) or gap
-             or snap.unread_messages > 0 or snap.unreviewed_uploads > 0 or bool(snap.overdue_questionnaires))
+             or snap.unread_messages > 0 or snap.unreviewed_uploads > 0 or bool(snap.overdue_questionnaires)
+             or snap.unreviewed_voice_notes > 0)
     return RosterRow(
         patient_id=snap.patient.id, label=snap.patient.label, is_builtin=snap.patient.is_builtin,
         program_id=snap.assignment.program_id if snap.assignment else None,
@@ -133,6 +137,7 @@ def row_from_snapshot(snap: PatientSnapshot, now: datetime, threshold: Optional[
         last_next_step=snap.latest_review.next_step if snap.latest_review else None,
         needs_attention=needs, unread_messages=snap.unread_messages, unreviewed_uploads=snap.unreviewed_uploads,
         overdue_questionnaires=len(snap.overdue_questionnaires),
+        unreviewed_voice_notes=snap.unreviewed_voice_notes,
     )
 
 
@@ -232,6 +237,11 @@ def queue(store: SessionStore, now: Optional[datetime] = None) -> QueueResult:
             keyed["overdue_questionnaire"].append((-days, QueueItem(
                 "overdue_questionnaire", pid, f"questionnaires:{pid}", None, days,
                 f"{name} is {days} days overdue for {pid}")))
+        if snap.unreviewed_voice_notes:
+            n = snap.unreviewed_voice_notes
+            keyed["new_voice_notes"].append((-n, QueueItem(
+                "new_voice_notes", pid, f"inbox:{pid}", None, 0,
+                f"{n} voice note{'s' if n != 1 else ''} to hear from {pid}")))
         if snap.unread_messages:
             n = snap.unread_messages
             keyed["unread_messages"].append((-n, QueueItem(
