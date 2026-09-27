@@ -72,7 +72,10 @@ class TestWhatIsDue:
         assert send(client[0], FULL).status_code == 201
         body = client[0].get("/api/today").json()
         assert body["questionnaires"]["due"] == 0
-        assert body["questionnaires"]["next_due_on"] == (NOW.date() + timedelta(days=14)).isoformat()
+        # Fortnightly from when it was actually answered: the service stamps that with its own clock,
+        # so the expectation is read back from the record rather than assumed to be today.
+        answered = date.fromisoformat(store.entries("P-017", "questionnaire")[0].recorded_at[:10])
+        assert body["questionnaires"]["next_due_on"] == (answered + timedelta(days=14)).isoformat()
 
     def test_a_patient_with_nothing_assigned_sees_nothing_due(self, client, seeded_other=None):
         client[0].post("/api/logout", json={}, headers={"Origin": ORIGIN})

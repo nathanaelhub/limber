@@ -34,6 +34,7 @@ from .models import (
     Assignment,
     AssignmentValidationError,
     InstrumentAssignment,
+    Transcription,
     Discharge,
     NEXT_STEPS,
     UNASSIGNED_ID,
@@ -62,7 +63,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -542,6 +543,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_live_assignment
 CREATE INDEX IF NOT EXISTS idx_assignments_patient ON instrument_assignments(patient_id, id);
 """
 
+# v13 (feature 014): what the host wrote out from a voice note. The link from a recording to the
+# message it arrived as already exists (`media.message_id`, added in feature 011), so nothing is
+# altered here: one new table, one row per recording.
+SCHEMA_V13_SQL = """
+CREATE TABLE IF NOT EXISTS transcriptions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_id    TEXT NOT NULL UNIQUE REFERENCES media(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    state       TEXT NOT NULL CHECK (state IN ('queued', 'running', 'done', 'failed')),
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    model       TEXT,
+    text        TEXT,
+    warned      INTEGER NOT NULL DEFAULT 0 CHECK (warned IN (0, 1)),
+    removed_at  TEXT,
+    reason      TEXT,
+    seconds     REAL,
+    queued_at   TEXT NOT NULL,
+    started_at  TEXT,
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_transcriptions_state ON transcriptions(state, id);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -555,6 +578,7 @@ MIGRATIONS: List[tuple] = [
     (10, SCHEMA_V10_SQL),
     (11, SCHEMA_V11_SQL),
     (12, SCHEMA_V12_SQL),
+    (13, SCHEMA_V13_SQL),
 ]
 
 
@@ -1770,9 +1794,11 @@ class SessionStore:
     @staticmethod
     def _message(row) -> Message:
         removed = row["removed_at"] is not None
+        keys = row.keys()
         return Message(id=row["id"], patient_id=row["patient_id"], sender=row["sender"],
                        body="" if removed else row["body"], sent_at=row["sent_at"], read_at=row["read_at"],
-                       removed=removed, warned=bool(row["warned"]))
+                       removed=removed, warned=bool(row["warned"]),
+                       media_id=(row["media_id"] if "media_id" in keys and not removed else None))
 
     def message_event(self, patient_id: str, event: str, sender: Optional[str] = None, message_id: Optional[int] = None) -> None:
         """History of what happened in a conversation. Never the text."""
@@ -1798,23 +1824,43 @@ class SessionStore:
         self.message_event(patient_id, "enabled" if enabled else "disabled")
         self.conn.commit()
 
-    def message_add(self, patient_id: str, sender: str, body: str, warned: bool) -> Message:
+    def message_add(self, patient_id: str, sender: str, body: str, warned: bool,
+                    media_id: Optional[str] = None) -> Message:
+        """A message, optionally carrying a recording the patient sent (feature 014).
+
+        The recording points at the message rather than the other way round, because `media.message_id`
+        has existed since feature 011 and one link is better than two."""
         cur = self.conn.execute(
             "INSERT INTO messages (patient_id, sender, body, sent_at, warned) VALUES (?, ?, ?, ?, ?)",
             (patient_id, sender, body, self._now(), 1 if warned else 0))
+        if media_id is not None:
+            self.conn.execute("UPDATE media SET message_id = ? WHERE id = ? AND patient_id = ?",
+                              (cur.lastrowid, media_id, patient_id))
         self.message_event(patient_id, "sent", sender, cur.lastrowid)
         if warned:
             self.message_event(patient_id, "sent_despite_warning", sender, cur.lastrowid)
         self.conn.execute("UPDATE conversations SET updated_at = ? WHERE patient_id = ?", (self._now(), patient_id))
         self.conn.commit()
-        return self._message(self.conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone())
+        return self._message_row(int(cur.lastrowid))
+
+    def _message_row(self, message_id: int) -> Message:
+        return self._message(self.conn.execute(
+            "SELECT m.*, (SELECT id FROM media WHERE message_id = m.id AND deleted_at IS NULL OR "
+            "(message_id = m.id AND deleted_at IS NOT NULL)) AS media_id "
+            "FROM messages m WHERE m.id = ?", (message_id,)).fetchone())
+
+    def message_for_media(self, media_id: str) -> Optional[Message]:
+        row = self.conn.execute("SELECT message_id FROM media WHERE id = ?", (media_id,)).fetchone()
+        return self._message_row(int(row["message_id"])) if row and row["message_id"] else None
 
     def message_count_since(self, patient_id: str, sender: str, since: datetime) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM messages WHERE patient_id = ? AND sender = ? AND sent_at > ?",
                                  (patient_id, sender, since.isoformat())).fetchone()[0]
 
     def message_thread(self, patient_id: str) -> List[Message]:
-        rows = self.conn.execute("SELECT * FROM messages WHERE patient_id = ? ORDER BY id", (patient_id,)).fetchall()
+        rows = self.conn.execute(
+            "SELECT m.*, (SELECT id FROM media WHERE message_id = m.id LIMIT 1) AS media_id "
+            "FROM messages m WHERE m.patient_id = ? ORDER BY m.id", (patient_id,)).fetchall()
         return [self._message(r) for r in rows]
 
     def messages_mark_read(self, patient_id: str, from_sender: str) -> int:
@@ -1839,6 +1885,9 @@ class SessionStore:
         if row is None or row["removed_at"] is not None:
             return False
         self.conn.execute("UPDATE messages SET body = '', removed_at = ? WHERE id = ?", (self._now(), message_id))
+        # A removed message must not still play: the recording is detached here and deleted, file and
+        # all, through the media pipeline.
+        self.conn.execute("UPDATE media SET message_id = NULL WHERE message_id = ?", (message_id,))
         self.message_event(row["patient_id"], "removed", "therapist", message_id)
         self.conn.commit()
         return True
@@ -1958,6 +2007,77 @@ class SessionStore:
         sets = ", ".join(f"{k} = ?" for k in fields)
         self.conn.execute(f"UPDATE media SET {sets} WHERE id = ?", (*fields.values(), media_id))
         self.conn.commit()
+
+    # writing out a voice note (feature 014): a queue in the record, worked one job at a time
+
+    def transcription_queue(self, media_id: str) -> Transcription:
+        """Queue a recording to be written out, or return the job it already has."""
+        existing = self.transcription_for(media_id)
+        if existing is not None:
+            return existing
+        if self.media_get(media_id) is None:
+            raise PTLogError(f"No recording '{media_id}' to write out")
+        self.conn.execute("INSERT INTO transcriptions (media_id, state, queued_at) VALUES (?, 'queued', ?)",
+                          (media_id, self._now()))
+        self.conn.commit()
+        return self.transcription_for(media_id)
+
+    def transcriptions_waiting(self, limit: int = 20) -> List[Transcription]:
+        rows = self.conn.execute("SELECT * FROM transcriptions WHERE state = 'queued' ORDER BY id LIMIT ?",
+                                 (int(limit),)).fetchall()
+        return [self._transcription(r) for r in rows]
+
+    def transcription_start(self, job_id: int, model: str) -> Transcription:
+        self.conn.execute("UPDATE transcriptions SET state = 'running', attempts = attempts + 1, model = ?, "
+                          "started_at = ?, reason = NULL WHERE id = ?", (model, self._now(), int(job_id)))
+        self.conn.commit()
+        return self._transcription_row(job_id)
+
+    def transcription_finish(self, job_id: int, text: str, warned: bool, seconds: float) -> Transcription:
+        self.conn.execute("UPDATE transcriptions SET state = 'done', text = ?, warned = ?, seconds = ?, "
+                          "finished_at = ? WHERE id = ?",
+                          (text, 1 if warned else 0, float(seconds), self._now(), int(job_id)))
+        self.conn.commit()
+        return self._transcription_row(job_id)
+
+    def transcription_fail(self, job_id: int, reason: str) -> Transcription:
+        self.conn.execute("UPDATE transcriptions SET state = 'failed', reason = ?, finished_at = ? WHERE id = ?",
+                          (reason, self._now(), int(job_id)))
+        self.conn.commit()
+        return self._transcription_row(job_id)
+
+    def transcription_for(self, media_id: str) -> Optional[Transcription]:
+        row = self.conn.execute("SELECT * FROM transcriptions WHERE media_id = ?", (media_id,)).fetchone()
+        return self._transcription(row) if row else None
+
+    def transcription_remove_text(self, job_id: int) -> bool:
+        """The therapist takes the text out; the row stays as a marker, and the audio is untouched."""
+        row = self.conn.execute("SELECT removed_at FROM transcriptions WHERE id = ?", (int(job_id),)).fetchone()
+        if row is None or row["removed_at"] is not None:
+            return False
+        self.conn.execute("UPDATE transcriptions SET text = '', removed_at = ? WHERE id = ?",
+                          (self._now(), int(job_id)))
+        self.conn.commit()
+        return True
+
+    def transcription_drop(self, media_id: str) -> bool:
+        """Remove the transcript of a recording that has been deleted: what was said must not outlive
+        the recording of it. The media row itself stays as the marker in the conversation."""
+        cur = self.conn.execute("DELETE FROM transcriptions WHERE media_id = ?", (media_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def _transcription_row(self, job_id: int) -> Transcription:
+        return self._transcription(self.conn.execute(
+            "SELECT * FROM transcriptions WHERE id = ?", (int(job_id),)).fetchone())
+
+    @staticmethod
+    def _transcription(row) -> Transcription:
+        return Transcription(id=int(row["id"]), media_id=row["media_id"], state=row["state"],
+                             attempts=int(row["attempts"]), model=row["model"], text=row["text"],
+                             warned=bool(row["warned"]), removed=row["removed_at"] is not None,
+                             reason=row["reason"], seconds=row["seconds"], queued_at=row["queued_at"],
+                             started_at=row["started_at"], finished_at=row["finished_at"])
 
     def media_count_since(self, patient_id: str, kind: str, since: datetime) -> tuple:
         row = self.conn.execute("SELECT COUNT(*), COALESCE(SUM(bytes), 0) FROM media WHERE patient_id = ? AND kind = ? AND created_at > ?",

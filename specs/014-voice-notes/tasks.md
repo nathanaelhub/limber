@@ -19,11 +19,11 @@ different files from the task beside it. One commit per green checkpoint.
       video stream is refused `has_video`; a file with no audio is refused `no_audio`; over-long and
       over-large are refused; a damaged file is refused; the isolated probe still survives a crash
 - [x] T003 Implement the `voice` limits and reasons in `src/media/probe.py`
-- [ ] T004 [P] Failing `tests/test_ptlog_store_v13.py`: schema v13 adds `messages.media_id` and
-      `transcriptions`; a v12 record upgrades with every table's count intact; a message may carry a media
+- [x] T004 [P] Failing `tests/test_ptlog_store_v13.py`: schema v13 adds `transcriptions` (the message
+      link needed no column: `media.message_id` has existed since feature 011); a v12 record upgrades with every table's count intact; a message may carry a media
       id; deleting a patient removes messages, media, and transcriptions; deleting a media row leaves the
       message with a marker
-- [ ] T005 Implement the v13 migration and the store methods
+- [x] T005 Implement the v13 migration and the store methods
 
 ## Phase 3: User Story 1 — the patient sends a spoken note (P1) 🎯 MVP
 

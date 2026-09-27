@@ -570,6 +570,7 @@ class Message:
     read_at: Optional[str] = None    # when the other side first saw it
     removed: bool = False
     warned: bool = False             # sent after the writer was warned that it looks identifying
+    media_id: Optional[str] = None   # the voice note this message carries, if any (feature 014)
 
 
 @dataclass
@@ -681,6 +682,27 @@ class Assignment:
     start_date: str                 # YYYY-MM-DD
     end_date: Optional[str]         # YYYY-MM-DD or None
     created_at: str
+
+
+@dataclass
+class Transcription:
+    """What the host wrote out from one voice note (feature 014).
+
+    The audio is the record; this is a reading aid. `state` moves queued → running → done or failed,
+    and a `reason` word (never a sentence from the file) says why a failure happened."""
+    id: int
+    media_id: str
+    state: str                       # queued | running | done | failed
+    attempts: int = 0
+    model: Optional[str] = None
+    text: Optional[str] = None
+    warned: bool = False             # the privacy check tripped on the text
+    removed: bool = False            # the therapist removed the text; the row stays as a marker
+    reason: Optional[str] = None     # failure reason word
+    seconds: Optional[float] = None  # how long the writing out took
+    queued_at: str = ""
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
 
 
 @dataclass
