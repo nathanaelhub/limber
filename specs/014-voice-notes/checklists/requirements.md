@@ -81,3 +81,38 @@
 Installing `faster-whisper` and downloading model files onto the owner's machine and the host is the
 owner's decision, not the implementer's, so the plan stops here and asks. Slice A is merged and usable
 either way, and the installation behaves identically with no model present.
+
+## Implementation notes — Slice B (the transcript)
+
+Built on 2026-09-28/29 to the owner's decision: **in full, against a fake transcriber, installing
+nothing**. No dependency was added to the venv, no model files were downloaded, and the suite still holds
+no model weights and makes no network call.
+
+- **The worker is a subprocess, not a thread.** A time limit inside a thread is not enforceable: a model
+  that hangs would hang the service. The same shape as feature 011's media probe — run it as its own
+  process, give it a limit, treat anything it says as data — gives a limit that actually holds.
+- **What could honestly be tested of the real path**, with no library and no weights present: the command
+  it would run (this repository's own module, no shell, no network), that it refuses plainly when nothing
+  is installed, that a timeout is reported as a timeout, that a dead worker is a failure rather than a
+  crash, and that its JSON answer is passed through. Everything about the queue is tested fully, with
+  fakes standing in for the model.
+- **One defect this found**: the worker's "nothing is installed" exit (code 3) was reported to the
+  therapist as `unreadable` — blaming the patient's recording for the host's missing setup. It now reports
+  `not_installed`. That distinction only became visible by running the real worker on a real file with no
+  model present, which is why that check was worth doing even though it could not produce a transcript.
+- **Blank pins are deliberate.** `scripts/fetch_speech_model.py` ships with empty hashes and refuses to
+  install against them. A pinned hash that nobody in this project has verified would look like provenance
+  while providing none; the owner fills them in from a download they checked.
+- **Optional had to become a real idea.** `preflight.Check` gained an `optional` flag, because a missing
+  speech model must be reported without stopping a deployment, and the CLI prints it as `note`.
+
+## What is still not true of this feature
+
+- **No transcript has ever been produced by this code from real audio.** Every transcript in every test
+  was written by a fake. How the text reads for an accented, quiet, or pained voice is unknown, and the
+  runbook says so.
+- **No real phone has recorded a voice note.** The browser run used Chrome with a fake microphone and an
+  emulated iPhone; iOS Safari's own recording behaviour is the open question, and the file-picker fallback
+  exists because of it.
+- **The memory figure (1-2 GB while writing out) is from the library's own documentation**, not measured
+  on the reference host by us.

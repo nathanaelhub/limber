@@ -80,11 +80,11 @@ different files from the task beside it. One commit per green checkpoint.
       health report the speech model as optional
 - [x] T021 [US3] Implement the therapist view, the CLI (`media transcribe`, `media transcripts`),
       preflight, and health
-- [ ] T022 [US3] **Do not install anything** (owner's decision of 2026-09-28). Instead: prove the real
+- [x] T022 [US3] **Do not install anything** (owner's decision of 2026-09-28). Instead: prove the real
       path is wired without running it — the subprocess transcriber's command line, the refusal when the
       library or model is absent, and a runbook section saying exactly what the owner runs to turn it on.
       Record plainly that no transcript has ever been produced by this code from real audio.
-- [ ] T023 Docs (Update 16 completed), `docs/DEPLOYMENT.md` memory and model notes; full suite; commit and
+- [x] T023 Docs (Update 16 completed), `docs/DEPLOYMENT.md` memory and model notes; full suite; commit and
       merge
 
 ## Dependencies
@@ -99,3 +99,15 @@ different files from the task beside it. One commit per green checkpoint.
 
 Slice A: a patient records a spoken note and the therapist hears it in the inbox. The transcript is an
 improvement on top, and the installation must run identically without it.
+
+
+## Outcome
+
+Both slices are on `main`. Slice A (a voice note that arrives, plays, and is reviewed) is complete and
+browser-verified with a fake microphone. Slice B (writing it out) is complete in code and tested against a
+fake transcriber, and **installed nowhere**: the owner turns it on with `scripts/fetch_speech_model.py`
+and `pip install faster-whisper` when they choose, following `docs/DEPLOYMENT.md`. Until then every
+surface says plainly that writing out is not available, and nothing else changes.
+
+Feature 015 (spoken answers during an exercise) was dropped on 2026-09-29; the reasoning is in
+`specs/015-spoken-answers/spec.md`.

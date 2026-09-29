@@ -2,6 +2,37 @@
 
 ---
 
+## Update 17 — 2026-09-29 — Writing Voice Notes Out, Built but Not Installed
+
+Feature spec: `specs/014-voice-notes/` (User Story 3). No schema change; `transcriptions` arrived with
+Update 16.
+
+- **The owner's decision (2026-09-28)**: build the whole transcript half against a **fake** transcriber
+  and install nothing. So no dependency was added, no model files were downloaded, and the suite still
+  contains no model weights and makes no network call.
+- **What exists now**: a queue in the record, worked one job at a time by a separate process with a
+  ten-minute limit (the same shape as the media probe, so a model that hangs or dies cannot take the
+  service down); every ending written down as a reason word (`timeout`, `unreadable`, `not_installed`,
+  `missing`, `error`); two attempts at most; a transcript that is privacy-checked, marked as written out
+  automatically and possibly wrong, shown to the therapist only, removable by them, and deleted with its
+  recording.
+- **`scripts/fetch_speech_model.py`** installs a model only against hashes: it refuses the whole install
+  if one file does not match, and refuses a file whose pin is blank — which includes the pins shipped in
+  the script, because a hash nobody has verified would only look like provenance. The owner fills them in
+  from a download they checked themselves.
+- **Optional, and visible as optional**: `deploy preflight` gained optional checks, so a missing speech
+  model is reported (`note  speech_model: …`) without refusing to start; `/api/health` answers
+  `"voice_transcripts": false`; the therapist sees one plain line; and `media transcribe` says what is
+  missing rather than failing.
+- **One thing this check found**: the worker's "nothing is installed" exit was being reported to the
+  therapist as an unreadable recording — blaming the patient's audio for the host's missing setup. It now
+  says `not_installed`.
+- **Not verified, and stated plainly in the runbook**: no transcript has ever been produced by this code
+  from real audio. Whoever installs the model will be the first, and how good the text is on accented or
+  pained speech is unknown.
+
+---
+
 ## Update 16 — 2026-09-27 — Voice Notes (the Recording; the Transcript Is Separate)
 
 Feature spec: `specs/014-voice-notes/`. Schema moved to version 13 (`transcriptions`). This is the

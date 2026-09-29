@@ -77,6 +77,7 @@ TIMEOUT_SECONDS = 600.0          # ten minutes for a three-minute recording, on 
 MODEL_NAME_ENV = "LIMBER_SPEECH_MODEL_NAME"
 DEFAULT_MODEL_NAME = "small"
 REASONS = ("timeout", "unreadable", "not_installed", "missing", "error")
+NOT_INSTALLED_EXIT = 3           # the worker's exit code for "no library or no model here"
 
 
 class NotInstalled(Exception):
@@ -128,6 +129,9 @@ def subprocess_transcriber(timeout: float = TIMEOUT_SECONDS, directory: Opt[Path
             done = subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
         except subprocess.TimeoutExpired:
             raise TranscriberTimeout(f"longer than {timeout:g} seconds") from None
+        if done.returncode == NOT_INSTALLED_EXIT:
+            # The host is missing the library or the model; that is not the recording's fault.
+            raise NotInstalled((done.stderr or "").strip()[:200] or "writing out is not available")
         if done.returncode != 0:
             raise Unreadable((done.stderr or "").strip()[:200] or "the worker failed")
         try:
@@ -213,7 +217,7 @@ def _main(argv: list) -> int:
         print(json.dumps({"text": transcribe_file(Path(argv[1]))}))
     except NotInstalled as missing:
         print(str(missing), file=sys.stderr)
-        return 3
+        return NOT_INSTALLED_EXIT
     except Exception as err:               # noqa: BLE001
         print(f"{type(err).__name__}: {err}"[:200], file=sys.stderr)
         return 1

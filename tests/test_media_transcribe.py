@@ -198,6 +198,17 @@ class TestTheRealTranscriberWithoutInstalling:
         runner = transcribe.subprocess_transcriber(timeout=5)
         assert runner(note) == "said this"
 
+    def test_the_worker_saying_nothing_is_installed_is_reported_as_that(self, env, monkeypatch):
+        """Exit code 3 is the worker's way of saying the library or model is missing. Reporting that as
+        "unreadable" would blame the patient's recording for the host's missing setup."""
+        store, media_dir, note = env
+        monkeypatch.setattr(transcribe, "available", lambda *a, **k: True)
+        send(store, media_dir, note)
+        monkeypatch.setattr(transcribe, "worker_command",
+                            lambda: ["/bin/sh", "-c", 'echo "no library" >&2; exit 3'])
+        job = transcribe.run_one(store, media_dir)
+        assert job.state == "failed" and job.reason == "not_installed"
+
     def test_a_worker_that_dies_is_a_failure_not_a_crash(self, env, monkeypatch):
         store, media_dir, note = env
         monkeypatch.setattr(transcribe, "worker_command", lambda: ["/bin/sh", "-c", "exit 9"])

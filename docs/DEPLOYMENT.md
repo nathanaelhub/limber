@@ -75,6 +75,46 @@ Host cron, as the user that runs Docker:
   without its key is useless, and a key stored only beside the backups protects nothing.
 - Copy `/data/backups/` off the host regularly (for example with the provider's snapshot or `rsync`).
 
+## Voice notes and writing them out (feature 014)
+
+Voice notes need nothing extra: they arrive, play in the inbox, and are kept, backed up, and deleted
+exactly as clips are, under `/data/media/<patient id>/`. Add them to the same size estimate, though they
+are small — a three-minute note is well under a megabyte.
+
+**Writing them out automatically is optional and is not installed.** With nothing installed, the
+therapist sees one line saying so, `deploy preflight` reports `note  speech_model: Not set up …` without
+refusing to start, and `/api/health` answers `"voice_transcripts": false`. Nothing else changes.
+
+To turn it on, on the host:
+
+1. Install the speech library in the same environment as the service: `pip install faster-whisper`
+   (CPU, int8 — no graphics card). Budget **1-2 GB of memory while a note is being written out**, on top
+   of Streamlit and torch. On the 4 GB reference host, do not also run a backup at the same time.
+2. Download the model yourself from a source you trust (for example
+   `https://huggingface.co/Systran/faster-whisper-small`), check the files, and record their SHA-256
+   hashes.
+3. Install them with the hashes you checked:
+
+   ```bash
+   python scripts/fetch_speech_model.py --from /tmp/downloaded --into /data/models/speech \
+       --pins /tmp/pins.json        # {"model.bin": "<sha256>", ...}
+   export LIMBER_SPEECH_MODEL=/data/models/speech      # and LIMBER_SPEECH_MODEL_NAME=small
+   ```
+
+   The script refuses the whole install if any hash does not match, and refuses a file with no pinned
+   hash at all — including the blank pins shipped in the script, because a hash nobody verified would
+   only look like provenance.
+4. Work the queue from the nightly cron, after the backup: `python interfaces/cli.py media transcribe`.
+   `media transcripts` lists what has been written out by state, and never prints the words.
+
+What is written out never leaves the host: the worker is a separate process on this machine reading local
+model files, with a ten-minute limit per recording, and a model that hangs or dies cannot take the
+service with it. The transcript is shown to the therapist only, marked as automatic, privacy-checked, and
+removable; it is deleted with its recording.
+
+**Nothing in this project has ever produced a transcript from real audio.** The pipeline is built and
+tested against a fake transcriber; the first real one will be whoever installs the model above.
+
 ## Uploaded clips (feature 011)
 
 Clips live on the volume under `/data/media/<patient id>/`. The nightly backup also copies each clip
