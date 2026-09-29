@@ -62,3 +62,163 @@ def why_not(directory: Optional[Path] = None) -> str:
     if not model_installed(directory):
         return f"no speech model was found in {model_dir()}"
     return ""
+
+
+# ----------------------------------------------------------------------------- doing the work
+
+import json
+import subprocess
+import sys
+import time
+from typing import Callable, Dict, Optional as Opt
+
+MAX_ATTEMPTS = 2
+TIMEOUT_SECONDS = 600.0          # ten minutes for a three-minute recording, on a small host
+MODEL_NAME_ENV = "LIMBER_SPEECH_MODEL_NAME"
+DEFAULT_MODEL_NAME = "small"
+REASONS = ("timeout", "unreadable", "not_installed", "missing", "error")
+
+
+class NotInstalled(Exception):
+    """No speech library or no model files: writing out is simply not available here."""
+
+
+class TranscriberTimeout(Exception):
+    """The recording took longer than the limit; the audio is untouched."""
+
+
+class Unreadable(Exception):
+    """The worker could not get text out of this file."""
+
+
+def worker_command() -> list:
+    """The command the host runs to write out one recording: this repository's own module, no shell."""
+    return [sys.executable, "-m", "src.media.transcribe"]
+
+
+def model_name() -> str:
+    return os.environ.get(MODEL_NAME_ENV) or DEFAULT_MODEL_NAME
+
+
+def load(directory: Opt[Path] = None):
+    """The local model, or NotInstalled. Imported here and nowhere else, so nothing else depends on it."""
+    if not library_installed():
+        raise NotInstalled("The speech library is not installed, so writing out is not available.")
+    if not model_installed(directory):
+        raise NotInstalled(f"No speech model was found in {model_dir()}, so writing out is not available.")
+    from faster_whisper import WhisperModel          # noqa: PLC0415 — deliberately lazy
+    return WhisperModel(str(directory or model_dir()), device="cpu", compute_type="int8")
+
+
+def transcribe_file(path: Path, directory: Opt[Path] = None) -> str:
+    """Write out one file in this process. Only the subprocess worker calls this."""
+    model = load(directory)
+    segments, _info = model.transcribe(str(path), vad_filter=True)
+    return " ".join(segment.text.strip() for segment in segments).strip()
+
+
+def subprocess_transcriber(timeout: float = TIMEOUT_SECONDS, directory: Opt[Path] = None) -> Callable:
+    """The real transcriber: a separate process with a time limit, as the media probe does it.
+
+    A model that hangs or dies cannot take the service with it, and the limit is enforceable, which it
+    would not be inside a thread."""
+    def runner(path: Path) -> str:
+        args = worker_command() + [str(path)]
+        try:
+            done = subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
+        except subprocess.TimeoutExpired:
+            raise TranscriberTimeout(f"longer than {timeout:g} seconds") from None
+        if done.returncode != 0:
+            raise Unreadable((done.stderr or "").strip()[:200] or "the worker failed")
+        try:
+            return str(json.loads(done.stdout or "{}").get("text") or "")
+        except ValueError:
+            raise Unreadable("the worker did not answer with a transcript") from None
+    runner.model_name = model_name()
+    return runner
+
+
+def queue_if_available(store, media_id: str, directory: Opt[Path] = None):
+    """Queue a recording to be written out, if this installation can do it at all (FR-009, FR-010)."""
+    if not available(directory):
+        return None
+    return store.transcription_queue(media_id)
+
+
+def retry(store, job_id: int) -> bool:
+    """Put a failed job back in the queue, up to MAX_ATTEMPTS in all."""
+    job = store.transcription(job_id)
+    if job.state != "failed" or job.attempts >= MAX_ATTEMPTS:
+        return False
+    store.transcription_requeue(job_id)
+    return True
+
+
+def run_one(store, media_dir: Path, transcriber: Opt[Callable] = None,
+            directory: Opt[Path] = None) -> Opt[object]:
+    """Take the oldest queued recording and write it out. Returns the finished job, or None if the
+    queue is empty. Every ending — success, refusal, failure — is written to the record."""
+    from src.portal import messages as privacy
+    from src.portal import uploads as media_files
+
+    waiting = store.transcriptions_waiting(limit=1)
+    if not waiting:
+        return None
+    job = waiting[0]
+    runner = transcriber or subprocess_transcriber(directory=directory)
+    name = getattr(runner, "model_name", None) or model_name()
+    store.transcription_start(job.id, model=name)
+
+    media = store.media_get(job.media_id)
+    if media is None or media.deleted_at is not None:
+        return store.transcription_fail(job.id, reason="missing")
+    path = media_files.media_path(media_dir, media)
+    if not path.is_file():
+        return store.transcription_fail(job.id, reason="missing")
+
+    started = time.monotonic()
+    try:
+        text = (runner(path) or "").strip()
+    except TranscriberTimeout:
+        return store.transcription_fail(job.id, reason="timeout")
+    except Unreadable:
+        return store.transcription_fail(job.id, reason="unreadable")
+    except NotInstalled:
+        return store.transcription_fail(job.id, reason="not_installed")
+    except Exception:                      # noqa: BLE001 — a model is third-party code; nothing may escape
+        return store.transcription_fail(job.id, reason="error")
+    warned = bool(privacy.check_text(text)) if text else False
+    return store.transcription_finish(job.id, text=text, warned=warned,
+                                      seconds=round(time.monotonic() - started, 2))
+
+
+def run_queue(store, media_dir: Path, transcriber: Opt[Callable] = None, limit: int = 50,
+              directory: Opt[Path] = None) -> Dict[str, int]:
+    """Work the queue until it is empty (or `limit` jobs have been done). One at a time, always."""
+    counts = {"done": 0, "failed": 0}
+    for _ in range(max(0, int(limit))):
+        job = run_one(store, media_dir, transcriber=transcriber, directory=directory)
+        if job is None:
+            break
+        counts["done" if job.state == "done" else "failed"] += 1
+    return counts
+
+
+def _main(argv: list) -> int:
+    """The subprocess worker: one file in, one JSON transcript out. Nothing else."""
+    if len(argv) < 2:
+        print(json.dumps({"error": "usage: python -m src.media.transcribe <file>"}), file=sys.stderr)
+        return 2
+    try:
+        print(json.dumps({"text": transcribe_file(Path(argv[1]))}))
+    except NotInstalled as missing:
+        print(str(missing), file=sys.stderr)
+        return 3
+    except Exception as err:               # noqa: BLE001
+        print(f"{type(err).__name__}: {err}"[:200], file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main(sys.argv))

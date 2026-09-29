@@ -59,6 +59,10 @@ def finish(store: SessionStore, media_dir: Path, patient_id: str, upload_id: str
         return media                                  # a clip finished through the ordinary route
     message = store.message_add(patient_id, "patient", "", warned=False, media_id=media.id)
     store.message_event(patient_id, "sent", "patient", message.id)
+    # Queue it to be written out, if this installation can do that at all. The note is playable either
+    # way: the transcript is an aid, never a condition of the note arriving.
+    from src.media import transcribe
+    transcribe.queue_if_available(store, media.id)
     return store.media_get(media.id)
 
 

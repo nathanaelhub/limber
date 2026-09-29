@@ -2060,12 +2060,22 @@ class SessionStore:
         self.conn.commit()
         return True
 
+    def transcription_requeue(self, job_id: int) -> None:
+        """Put a failed job back in the queue; its attempt count is kept, so it cannot spin for ever."""
+        self.conn.execute("UPDATE transcriptions SET state = 'queued', reason = NULL, finished_at = NULL "
+                          "WHERE id = ? AND state = 'failed'", (int(job_id),))
+        self.conn.commit()
+
     def transcription_drop(self, media_id: str) -> bool:
         """Remove the transcript of a recording that has been deleted: what was said must not outlive
         the recording of it. The media row itself stays as the marker in the conversation."""
         cur = self.conn.execute("DELETE FROM transcriptions WHERE media_id = ?", (media_id,))
         self.conn.commit()
         return cur.rowcount > 0
+
+    def transcription(self, job_id: int) -> Transcription:
+        """One job by its id."""
+        return self._transcription_row(job_id)
 
     def _transcription_row(self, job_id: int) -> Transcription:
         return self._transcription(self.conn.execute(

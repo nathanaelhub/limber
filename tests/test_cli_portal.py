@@ -99,3 +99,14 @@ def test_media_commands(cli_env, tmp_path):
     assert r.returncode == 0 and "files_without_row: 1" in r.stdout
     r = run_cli(cli_env, "media", "retention")
     assert r.returncode == 0 and "deleted: 0" in r.stdout and "kept: 1" in r.stdout
+
+
+def test_transcribe_on_an_installation_without_a_model(cli_env, tmp_path):
+    """Feature 014: the commands exist and say plainly that writing out is not set up, rather than
+    failing or pretending. No model and no speech library are installed anywhere in this repository."""
+    run_cli(cli_env, "patients", "add", "P-017")
+    ran = run_cli(cli_env, "media", "transcribe")
+    assert ran.returncode == 0, out(ran)
+    assert "not available" in out(ran).lower() or "not set up" in out(ran).lower()
+    listed = run_cli(cli_env, "media", "transcripts")
+    assert listed.returncode == 0 and ("no voice notes" in out(listed).lower() or "state" in out(listed).lower())

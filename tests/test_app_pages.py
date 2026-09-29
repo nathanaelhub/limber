@@ -888,3 +888,46 @@ def test_the_reply_box_still_works_beside_a_voice_note(seeded_env, tmp_path):
     with SessionStore(seeded_env).open() as store:
         bodies = [m.body for m in store.message_thread("P-017")]
         assert "Thank you, I have listened to that." in bodies
+
+
+def test_inbox_shows_a_transcript_and_can_remove_its_text(seeded_env, tmp_path, monkeypatch):
+    """Feature 014 T020 — with writing out available, the therapist reads it, marked as automatic."""
+    from src.media import transcribe
+    media = _seed_voice_note(seeded_env, tmp_path)
+    monkeypatch.setattr(transcribe, "available", lambda *a, **k: True)
+    with SessionStore(seeded_env).open() as store:
+        job = store.transcription_queue(media.id)
+        store.transcription_start(job.id, model="fake-small")
+        store.transcription_finish(job.id, text="the knee catches going down stairs", warned=False, seconds=3.2)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    at.session_state["inbox_open"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption) + list(at.text))
+    assert "the knee catches going down stairs" in text
+    assert "written out automatically" in text.lower() and "may contain mistakes" in text.lower()
+    at.button(key=f"voice_text_remove_{media.id}").click().run()
+    with SessionStore(seeded_env).open() as store:
+        job = store.transcription_for(media.id)
+        assert job.removed is True and job.text == ""
+    after = " ".join(x.value for x in list(at.markdown) + list(at.caption) + list(at.text))
+    assert "the knee catches" not in after and "text was removed" in after.lower()
+
+
+def test_inbox_shows_why_writing_out_failed(seeded_env, tmp_path, monkeypatch):
+    from src.media import transcribe
+    media = _seed_voice_note(seeded_env, tmp_path)
+    monkeypatch.setattr(transcribe, "available", lambda *a, **k: True)
+    with SessionStore(seeded_env).open() as store:
+        job = store.transcription_queue(media.id)
+        store.transcription_start(job.id, model="fake-small")
+        store.transcription_fail(job.id, reason="timeout")
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "inbox"
+    at.session_state["inbox_open"] = "P-017"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    text = " ".join(x.value for x in list(at.markdown) + list(at.caption))
+    assert "did not work" in text.lower() and "timeout" in text
+    assert at.get("audio"), "the recording is still there to listen to"

@@ -22,6 +22,7 @@ class Check:
     name: str
     ok: bool
     detail: str
+    optional: bool = False       # reported, but does not stop a deployment (feature 014)
 
 
 def _key_present(db_path: Path) -> bool:
@@ -78,6 +79,15 @@ def run(db_path: Path, assets_dir: Path, public_origin: Optional[str], therapist
     checks.append(Check("public_origin", origin_ok, public_origin if origin_ok else
                         "The public address must be given and must be https (browsers only allow the camera on https, "
                         "and codes and passwords must not travel in the clear). Example: https://limber.example.org"))
+    # Writing out voice notes is optional: an installation without it works, and says so (feature 014).
+    from src.media import transcribe
+    speech_ok = transcribe.available()
+    checks.append(Check("speech_model", speech_ok,
+                        f"{transcribe.model_dir()} ({transcribe.model_name()})" if speech_ok else
+                        f"Not set up ({transcribe.why_not()}), so voice notes still arrive and play but are "
+                        f"not written out. To turn it on: install the speech library and run "
+                        f"`python scripts/fetch_speech_model.py --from <downloaded> --into {transcribe.model_dir()}`.",
+                        optional=True))
     therapist = urlparse(therapist_url or "")
     therapist_ok = origin_ok and therapist.scheme == "https" and therapist.netloc == origin.netloc and therapist.path not in ("", "/")
     checks.append(Check("therapist_url", therapist_ok, therapist_url if therapist_ok else

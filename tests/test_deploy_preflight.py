@@ -33,15 +33,22 @@ def ready(tmp_path, monkeypatch):
 
 
 def problems(db, assets, **overrides):
-    return [c.name for c in preflight.run(db, assets_dir=assets, **{**GOOD, **overrides}) if not c.ok]
+    """The checks that would stop a deployment. An optional one (feature 014's speech model) is reported
+    by preflight but is not a problem."""
+    return [c.name for c in preflight.run(db, assets_dir=assets, **{**GOOD, **overrides})
+            if not c.ok and not c.optional]
 
 
 def test_a_ready_installation_passes(ready):
     db, assets = ready
     checks = preflight.run(db, assets_dir=assets, **GOOD)
-    assert all(c.ok for c in checks), [c for c in checks if not c.ok]
-    assert {c.name for c in checks} == {"therapist_password", "server_key", "record_writable", "pose_assets",
-                                        "public_origin", "therapist_url"}
+    required = [c for c in checks if not c.optional]
+    assert all(c.ok for c in required), [c for c in required if not c.ok]
+    assert {c.name for c in required} == {"therapist_password", "server_key", "record_writable", "pose_assets",
+                                         "public_origin", "therapist_url"}
+    # Writing out voice notes (feature 014) is reported but never required: no model is installed here.
+    (speech,) = [c for c in checks if c.optional]
+    assert speech.name == "speech_model" and speech.ok is False and "still arrive and play" in speech.detail
 
 
 def test_each_failure_is_named_and_explained(ready, tmp_path):

@@ -503,8 +503,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             return _json({"ok": False, "record": "unavailable"}, 503)
         with open_store() as store:
             therapist = admin.password_is_set(store)
+        from src.media import transcribe
         return _json({"ok": True, "record": "ok", "pose_assets": pose_assets_present(static_dir),
-                      "therapist_sign_in": therapist})
+                      "therapist_sign_in": therapist,
+                      # Optional: voice notes arrive and play whether or not this is set up (feature 014).
+                      "voice_transcripts": transcribe.available()})
 
     async def admin_login(request: Request):
         """The therapist door: check the password and hand over to the therapist app with a single-use

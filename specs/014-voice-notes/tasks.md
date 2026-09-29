@@ -58,29 +58,32 @@ different files from the task beside it. One commit per green checkpoint.
 
 ## Phase 6: The stop
 
-- [ ] T015 **Ask the owner** whether to install `faster-whisper` (about 100-500 MB of model files, 1-2 GB
-      of memory while running, on their machine and on the host), stating that Slice A already works and
-      that the installation runs without it. Do not install anything before the answer.
+- [x] T015 **Asked the owner** (2026-09-28). Answer: build Slice B in full against a **fake** transcriber
+      and **install nothing** — no dependency added to the venv, no model files downloaded. The owner runs
+      `scripts/fetch_speech_model.py` and installs the library when they want writing out live; until then
+      the installation says it is not available. T022 therefore does not install or run a real model.
 
-## Phase 7: User Story 3 — the transcript, on the host (P2, only on a yes)
+## Phase 7: User Story 3 — the transcript, on the host (P2; built, not installed)
 
-- [ ] T016 [P] [US3] Failing tests in `tests/test_media_transcribe.py` with a **fake** transcriber: the
+- [x] T016 [P] [US3] Failing tests in `tests/test_media_transcribe.py` with a **fake** transcriber: the
       queue takes one job at a time; a job records queued → running → done with its duration and model; a
       failure records `failed` with a reason word; a job over the time limit is marked `timeout`; the
       transcript goes through the privacy check and carries a marker; an empty result says "nothing
       recognisable"; with no model installed nothing is queued and nothing fails
-- [ ] T017 [US3] Implement `src/media/transcribe.py` (lazy import, model absent means unavailable) and the
+- [x] T017 [US3] Implement `src/media/transcribe.py` (lazy import, model absent means unavailable) and the
       queue and worker in the store
-- [ ] T018 [P] [US3] Failing tests: `scripts/fetch_speech_model.py` refuses a hash mismatch, writes under
+- [x] T018 [P] [US3] Failing tests: `scripts/fetch_speech_model.py` refuses a hash mismatch, writes under
       `models/`, and reports what it wrote (tested against a local file, no network)
-- [ ] T019 [US3] Implement the fetch script with pinned hashes
-- [ ] T020 [P] [US3] Failing tests: the therapist sees the transcript marked automatic, can remove its
+- [x] T019 [US3] Implement the fetch script with pinned hashes
+- [x] T020 [P] [US3] Failing tests: the therapist sees the transcript marked automatic, can remove its
       text, and sees a failure reason; the patient never sees a transcript (no-leak walk); preflight and
       health report the speech model as optional
-- [ ] T021 [US3] Implement the therapist view, the CLI (`media transcribe`, `media transcripts`),
+- [x] T021 [US3] Implement the therapist view, the CLI (`media transcribe`, `media transcripts`),
       preflight, and health
-- [ ] T022 [US3] Install the dependency, fetch the model, and run it once end to end on a real recording;
-      record what the transcript actually looked like, honestly
+- [ ] T022 [US3] **Do not install anything** (owner's decision of 2026-09-28). Instead: prove the real
+      path is wired without running it — the subprocess transcriber's command line, the refusal when the
+      library or model is absent, and a runbook section saying exactly what the owner runs to turn it on.
+      Record plainly that no transcript has ever been produced by this code from real audio.
 - [ ] T023 Docs (Update 16 completed), `docs/DEPLOYMENT.md` memory and model notes; full suite; commit and
       merge
 

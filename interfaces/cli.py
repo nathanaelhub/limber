@@ -715,8 +715,32 @@ def cmd_media(args):
                 cleaned = uploads.clean_expired(store, store.media_dir)
                 report = uploads.reconcile(store, store.media_dir)
                 print("; ".join(f"{k}: {v}" for k, v in report.items()) + f"; expired_uploads: {cleaned}")
+            elif args.media_cmd == "transcribe":
+                from src.media import transcribe
+                if not transcribe.available():
+                    print(f"Writing out voice notes is not available ({transcribe.why_not()}).")
+                    print("Voice notes still arrive and play. See docs/DEPLOYMENT.md to turn it on.")
+                    return 0
+                report = transcribe.run_queue(store, store.media_dir)
+                print("; ".join(f"{k}: {v}" for k, v in report.items()))
+            elif args.media_cmd == "transcripts":
+                from src.media import transcribe
+                print_header("Voice notes written out")
+                notes = [m for m in store.media_list(args.patient) if m.kind == "voice"] if args.patient \
+                    else [m for m in store.media_list() if m.kind == "voice"]
+                if not notes:
+                    print("No voice notes.")
+                if not transcribe.available():
+                    print(f"(writing out is not available here: {transcribe.why_not()})")
+                for m in notes:
+                    job = store.transcription_for(m.id)
+                    state = "not queued" if job is None else job.state
+                    extra = f" ({job.reason})" if job is not None and job.reason else ""
+                    words = "" if job is None or not job.text else f"  {len(job.text.split())} words"
+                    print(f"{m.id}  {m.patient_id:<10}{m.created_at[:16].replace('T', ' ')}  "
+                          f"{m.duration:5.1f} s  state: {state}{extra}{words}")
             else:
-                print_error("Usage: media {list,retention,reconcile}")
+                print_error("Usage: media {list,retention,reconcile,transcribe,transcripts}")
                 return 1
         return 0
     except (PTLogError, OSError) as e:
@@ -735,8 +759,10 @@ def cmd_deploy(args):
             assets = _Path(args.assets_dir) if args.assets_dir else _Path(__file__).resolve().parent / "portal_static" / "vendor"
             checks = preflight.run(db, assets, args.public_origin, args.therapist_url)
             for c in checks:
-                print(f"{'ok  ' if c.ok else 'FAIL'}  {c.name}: {c.detail}")
-            failed = [c for c in checks if not c.ok]
+                # An optional check is reported, never a reason to refuse to start (feature 014).
+                mark = "ok  " if c.ok else ("note" if c.optional else "FAIL")
+                print(f"{mark}  {c.name}: {c.detail}")
+            failed = [c for c in checks if not c.ok and not c.optional]
             print("Limber is ready to start." if not failed else f"{len(failed)} check(s) failed; Limber must not start like this.")
             return 0 if not failed else 1
         if sub == "init":
@@ -1406,6 +1432,9 @@ Examples:
     ml.add_argument("--patient", default=None)
     media_sub.add_parser("retention", help="Delete files past their retention period (rows stay as markers)")
     media_sub.add_parser("reconcile", help="Remove expired uploads and files without rows; mark rows without files")
+    media_sub.add_parser("transcribe", help="Write out any voice notes waiting (needs a speech model; optional)")
+    transcripts = media_sub.add_parser("transcripts", help="What has been written out, by state (never the words)")
+    transcripts.add_argument("--patient", help="Only this patient")
 
     dep_parser = subparsers.add_parser("deploy", help="Hosting: start-up checks, first-boot setup, encrypted backups")
     dep_sub = dep_parser.add_subparsers(dest="deploy_cmd")
