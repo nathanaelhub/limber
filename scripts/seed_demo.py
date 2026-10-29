@@ -290,7 +290,36 @@ def main() -> int:
     for suffix in ("", "-wal", "-shm"):
         Path(str(db) + suffix).unlink(missing_ok=True)
     build(db, args.seed)
+    write_demo_logins(db)
     return 0
+
+
+DEMO_PASSWORD = "limber-demo-2026"
+DEMO_PATIENTS = (("P-017", "knee, steady progress"), ("P-021", "hip, pain rising"), ("P-023", "shoulder, diary off"))
+
+
+def write_demo_logins(db_path: Path) -> None:
+    """Test sign-ins for the demo record: the therapist password and a fresh access code per demo
+    patient, printed and saved to data/demo-logins.txt (gitignored with the rest of data/).
+    Demo record only: codes are issued against the demo database's own server key."""
+    from src.portal import access, admin
+    with SessionStore(db_path).open() as s:
+        admin.set_password(s, DEMO_PASSWORD)
+        key = access.load_key(access.default_key_path(db_path))
+        codes = [(pid, about, access.issue_code(s, key, pid, days=30)[0]) for pid, about in DEMO_PATIENTS]
+    lines = [
+        "Limber demo sign-ins (simulated data only; reissued every time the demo is rebuilt)",
+        "",
+        "Start it:  PTASSIST_DB=data/demo.db .venv/bin/python interfaces/cli.py portal serve",
+        "           PTASSIST_DB=data/demo.db .venv/bin/streamlit run interfaces/app.py --server.port 8501",
+        "Open:      http://127.0.0.1:8600",
+        "",
+        f"Therapist:  'I'm a therapist' door, password  {DEMO_PASSWORD}",
+    ] + [f"Patient {pid} ({about}):  access code  {code}" for pid, about, code in codes]
+    out = db_path.parent / "demo-logins.txt"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+    print(f"\n(saved to {out})")
 
 
 if __name__ == "__main__":
