@@ -107,6 +107,6 @@ def initialise(db_path: Path, password_file: Optional[Path] = None) -> List[str]
         done.append("server key created")
     with SessionStore(db_path).open() as store:
         if not admin.password_is_set(store) and password_file is not None:
-            admin.set_password(store, Path(password_file).read_text().rstrip("\n"))
+            admin.set_password(store, Path(password_file).read_text(encoding="utf-8").rstrip("\n"))
             done.append("therapist password set")
     return done

@@ -91,7 +91,7 @@ EXERCISE_KEY_MAP = {
 
 # Page configuration
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
-LIMBER_MARK_SVG = (ASSETS_DIR / "limber-mark.svg").read_text()
+LIMBER_MARK_SVG = (ASSETS_DIR / "limber-mark.svg").read_text(encoding="utf-8")
 
 st.set_page_config(
     page_title="Limber · Therapist",

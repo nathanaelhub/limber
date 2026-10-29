@@ -130,6 +130,9 @@ The script refuses to write into the real record.
 (set `PTASSIST_DB=/path/to/file.db` to use another location). Exports default to `exports/`.
 Both folders are ignored by git. Patients are identified only by a pseudonymous ID; names,
 dates of birth, and record numbers are rejected.
+**Performance tip:** on older machines run `webcam` with
+`--skip-frames 2 --imgsz 320` — YOLO infers every other frame at a
+smaller size, which roughly doubles FPS for a small accuracy cost.
 
 **Webcam Controls:**
 - `q` - Quit
@@ -152,6 +155,15 @@ dates of birth, and record numbers are rejected.
 | Trunk Flexion | `trunk_flexion` | Seated forward bend |
 
 **Pre-built Programs:** `knee_rehab`, `shoulder_mobility`, `hip_strengthening`, `general_conditioning`
+
+## Running the Tests
+
+```bash
+pytest tests/ -v
+```
+
+Covers angle math, the rep-counting state machine, form assessment, and
+log serialization (`tests/fixtures/` has sample keypoint data).
 
 ## Project Structure
 

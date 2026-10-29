@@ -152,7 +152,7 @@ def forget() -> None:
 
 def _read(file: Path) -> Instrument:
     try:
-        data = yaml.safe_load(file.read_text())
+        data = yaml.safe_load(file.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as err:
         raise _Bad(f"the file could not be read as YAML: {err}") from None
     if not isinstance(data, dict):

@@ -41,7 +41,7 @@ def load_catalog(config_path: Optional[Path] = None) -> Catalog:
         return _CACHE[key]
     catalog = Catalog()
     try:
-        data = yaml.safe_load(path.read_text()) or {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         data = {}
     for ex_key, ex in (data.get("exercises") or {}).items():

@@ -289,7 +289,7 @@ def cmd_list_exercises(args):
                 "hip_abduction": {"display_name": "Hip Abduction", "keypoints": [12, 11, 13]},
             }
         else:
-            with open(config_path, 'r') as f:
+            with open(config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
                 exercises = config.get('exercises', {})
 

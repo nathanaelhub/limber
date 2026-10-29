@@ -101,7 +101,9 @@ class TestAnswering:
         assert len(store.entries("P-017", "questionnaire")) == 1
 
     def test_the_answered_time_may_be_back_dated_like_any_entry(self, client, store):
-        when = (NOW - timedelta(days=2)).isoformat()
+        # The service checks the seven-day window against its own (real) clock, so the
+        # back-dated time is relative to now, not to the fixed date the store uses.
+        when = (datetime.now() - timedelta(days=2)).replace(microsecond=0).isoformat()
         assert post(client[0], "/api/entries", {"kind": "questionnaire", "client_id": "q9", "recorded_at": when,
                                                "data": {"instrument": DEMO, "answers": FULL}}).status_code == 201
         assert store.entries("P-017", "questionnaire")[0].recorded_at == when

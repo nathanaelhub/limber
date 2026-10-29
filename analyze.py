@@ -734,7 +734,7 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, ExerciseConfig]:
         print("Using default configurations...")
         return get_default_configs()
 
-    with open(config_file, 'r') as f:
+    with open(config_file, 'r', encoding='utf-8') as f:
         config_data = yaml.safe_load(f)
 
     exercises = {}
@@ -1394,6 +1394,9 @@ Examples:
 
   # Use AIGym for pushups
   python analyze.py aigym --input workout.mp4 --type pushup
+
+  # Faster webcam on older machines: infer every 2nd frame at 320px
+  python analyze.py webcam --exercise squat --skip-frames 2 --imgsz 320
         """
     )
 
