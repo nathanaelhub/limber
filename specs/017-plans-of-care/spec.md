@@ -104,3 +104,21 @@ declines with a note. No approval workflow beyond that.
 
 - No calendar sync (iCal, Google); a later networked feature could add it.
 - No video in messages beyond what 011 already provides.
+
+## Deviations recorded while building (2026-10-30)
+
+- **HEIC**: Pillow cannot read HEIC on its own, and a photo that cannot be read cannot have its metadata
+  removed. HEIC is accepted and converted to JPEG only when the optional `pillow-heif` plug-in is installed
+  on the host. Without it, HEIC is refused with a plain message that says how to send a compatible photo.
+  No new required dependency was added (Principle V). iPhone Safari usually converts HEIC to JPEG on upload
+  anyway.
+- **PDFs** are checked by type and size and stored as sent. They are not rewritten, because rewriting a PDF
+  safely needs a PDF library. This matches the Constitution Check, which only asks that photos be re-encoded.
+- **Where writes land**: a write that names no plan goes to the patient's newest active plan, or to the
+  newest completed one if no plan is active. If every plan is archived, the write is refused with 409.
+- **Attachments** have their own table (not `media`), because `media.kind` is a CHECK constraint that would
+  need a table rebuild. The files still follow the 011 layout under the pseudonymous ID, in an
+  `attachments/` subfolder.
+- **`plan_id`** columns added to existing tables have no foreign key, because SQLite cannot add one without a
+  rebuild. Plans are removed with the patient.
+- **Default clinic time zone** is America/Chicago (the demo clinic). It is a setting.

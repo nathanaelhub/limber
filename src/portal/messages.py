@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from datetime import timedelta
-from typing import List, Optional
+from typing import List, Optional, Sequence, Tuple
 
 from src.ptlog import privacy
 from src.ptlog.models import ConversationSummary, Message, PortalError
@@ -69,10 +69,15 @@ def set_enabled(store: SessionStore, patient_id: str, enabled: bool) -> None:
     store.conversation_set_enabled(patient_id, enabled)
 
 
-def send(store: SessionStore, patient_id: str, sender: str, text, confirm: bool = False) -> Message:
+def send(store: SessionStore, patient_id: str, sender: str, text, confirm: bool = False,
+         plan_id: Optional[int] = None, files: Sequence[Tuple[str, bytes]] = (), media_dir=None) -> Message:
+    """Send into one plan (the current one when none is named), optionally with photos or a PDF
+    (feature 017). With attachments the text may be empty."""
     if sender not in SIDES:
         raise PortalError("A message is sent by the patient or the therapist")
-    if not isinstance(text, str) or not text.strip():
+    if text is None and files:
+        text = ""
+    if not isinstance(text, str) or (not text.strip() and not files):
         raise PortalError("Write a message first.")
     body = text.strip()
     if len(body) > MAX_LENGTH:
@@ -87,7 +92,13 @@ def send(store: SessionStore, patient_id: str, sender: str, text, confirm: bool 
     reasons = check_text(body)
     if reasons and not confirm:
         raise NeedsConfirmation(reasons)
-    return store.message_add(patient_id, sender, body, warned=bool(reasons))
+    if not files:
+        return store.message_add(patient_id, sender, body, warned=bool(reasons), plan_id=plan_id)
+    from src.portal import attachments
+    ready = attachments.prepare(files)                    # refused before anything is stored
+    message = store.message_add(patient_id, sender, body, warned=bool(reasons), plan_id=plan_id, commit=False)
+    message.attachments = attachments.attach(store, media_dir, message, ready)
+    return message
 
 
 def check_rate(store: SessionStore, patient_id: str) -> None:
@@ -96,14 +107,17 @@ def check_rate(store: SessionStore, patient_id: str) -> None:
         raise TooManyMessages()
 
 
-def thread(store: SessionStore, patient_id: str, viewer: str, mark_read: bool = True) -> List[Message]:
-    """The conversation, oldest first. Reading marks the other side's messages as read."""
+def thread(store: SessionStore, patient_id: str, viewer: str, mark_read: bool = True,
+           plan_id: Optional[int] = None) -> List[Message]:
+    """The conversation, oldest first: one plan's, or all of them. Reading marks the other side's
+    messages in it as read."""
     if viewer not in SIDES:
         raise PortalError("viewer must be the patient or the therapist")
     store._require_patient(patient_id)
     if mark_read:
-        store.messages_mark_read(patient_id, from_sender="patient" if viewer == "therapist" else "therapist")
-    return store.message_thread(patient_id)
+        store.messages_mark_read(patient_id, from_sender="patient" if viewer == "therapist" else "therapist",
+                                 plan_id=plan_id)
+    return store.message_thread(patient_id, plan_id)
 
 
 def unread_count(store: SessionStore, patient_id: str, viewer: str) -> int:

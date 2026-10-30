@@ -129,9 +129,15 @@ def messages_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     return {"enabled": enabled, "unread": messages.unread_count(store, patient_id, viewer="patient") if enabled else 0}
 
 
+def attachment_json(a) -> Dict[str, Any]:
+    return {"id": a.id, "kind": a.kind, "type": a.mime, "bytes": a.bytes, "width": a.width, "height": a.height,
+            "deleted": a.deleted_at is not None}
+
+
 def message_json(m) -> Dict[str, Any]:
     return {"id": m.id, "from": "you" if m.sender == "patient" else "therapist", "text": m.body,
-            "sent_at": m.sent_at[:16], "removed": m.removed, "media_id": m.media_id}
+            "sent_at": m.sent_at[:16], "removed": m.removed, "media_id": m.media_id, "plan_id": m.plan_id,
+            "attachments": [attachment_json(a) for a in getattr(m, "attachments", [])]}
 
 
 def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
@@ -141,6 +147,18 @@ def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     enabled = messages.is_enabled(store, patient_id)
     thread = messages.thread(store, patient_id, viewer="patient") if enabled else []
     return {"patient_id": patient_id, "enabled": enabled, "notice": messages.NOT_FOR_EMERGENCIES,
+            "messages": [message_json(m) for m in thread]}
+
+
+def plan_messages_view(store: SessionStore, patient_id: str, plan_id) -> Dict[str, Any]:
+    """One plan's conversation (feature 017); opening it marks the therapist's messages in it read."""
+    from src.portal import messages, plans
+    _require(store, patient_id)
+    plan = plans.own_plan(store, patient_id, plan_id)
+    enabled = messages.is_enabled(store, patient_id)
+    thread = messages.thread(store, patient_id, viewer="patient", plan_id=plan.id) if enabled else []
+    return {"patient_id": patient_id, "enabled": enabled, "notice": messages.NOT_FOR_EMERGENCIES,
+            "plan": plans.plan_json(plan), "can_send": enabled and not plan.read_only,
             "messages": [message_json(m) for m in thread]}
 
 
