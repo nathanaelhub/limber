@@ -121,3 +121,13 @@ select { width: 100%; padding: .8rem 1rem; font: inherit; color: var(--ink); bac
 .pain-chart { width: 100%; max-width: 26rem; height: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; }
 #preview { width: 100%; max-height: 50vh; margin: .8rem 0; background: var(--ink); border-radius: 14px; }
 .exercises .link-button { margin: 0 .6rem; }
+
+/* accessibility settings (feature 016): set on <html> by the server, previewed live on the invite page */
+label.check { display: flex; align-items: center; gap: .7rem; min-height: 44px; font-weight: 600; }
+label.check input { width: 1.4rem; height: 1.4rem; margin: 0; flex: none; accent-color: var(--teal); }
+fieldset.notice { border: 0; padding-left: 0; padding-right: 0; }
+html.a11y-large body { font-size: 21px; }
+html.a11y-large .small { font-size: 1rem; }
+html.a11y-contrast { --ink: #000000; --muted: #2E2E2E; --line: #4A4A4A; --teal: #064A45; --teal-dark: #03302C; --warn: #8A1C0A; --bg: #FFFFFF; }
+html.a11y-contrast input, html.a11y-contrast select, html.a11y-contrast textarea { border-width: 2px; }
+html.a11y-calm *, html.a11y-calm *::before, html.a11y-calm *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

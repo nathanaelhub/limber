@@ -298,13 +298,26 @@ DEMO_PASSWORD = "limber-demo-2026"
 DEMO_PATIENTS = (("P-017", "knee, steady progress"), ("P-021", "hip, pain rising"), ("P-023", "shoulder, diary off"))
 
 
+DEMO_SECOND_CASELOAD = ("P-018", "P-022", "P-024")   # rivera's patients; everyone else is the lead therapist's
+
+
 def write_demo_logins(db_path: Path) -> None:
-    """Test sign-ins for the demo record: the therapist password and a fresh access code per demo
-    patient, printed and saved to data/demo-logins.txt (gitignored with the rest of data/).
+    """Test sign-ins for the demo record, printed and saved to data/demo-logins.txt (gitignored with the rest of
+    data/): the installation therapist (also an admin), a second therapist with their own caseload, an admin who
+    is not a therapist, a patient with a username, and a fresh access code per demo patient (feature 016).
     Demo record only: codes are issued against the demo database's own server key."""
-    from src.portal import access, admin
+    from src.portal import access, accounts, admin
     with SessionStore(db_path).open() as s:
-        admin.set_password(s, DEMO_PASSWORD)
+        lead = admin.set_password(s, DEMO_PASSWORD)
+        if s.account_by_username("rivera") is None:
+            rivera = accounts.create_account(s, username="rivera", display_name="Dr. Rivera (demo)",
+                                             password=DEMO_PASSWORD, role="therapist")
+            accounts.create_account(s, username="admin", display_name="Clinic admin (demo)", password=DEMO_PASSWORD,
+                                    role="admin")
+            for pid in [p.id for p in s.list_patients() if not p.is_builtin]:
+                accounts.assign(s, pid, rivera.id if pid in DEMO_SECOND_CASELOAD else lead.id)
+            accounts.create_account(s, username="patient017", display_name="Demo patient", password=DEMO_PASSWORD,
+                                    role="patient", patient_id="P-017")
         key = access.load_key(access.default_key_path(db_path))
         codes = [(pid, about, access.issue_code(s, key, pid, days=30)[0]) for pid, about in DEMO_PATIENTS]
     lines = [
@@ -314,8 +327,15 @@ def write_demo_logins(db_path: Path) -> None:
         "           PTASSIST_DB=data/demo.db .venv/bin/streamlit run interfaces/app.py --server.port 8501",
         "Open:      http://127.0.0.1:8600",
         "",
-        f"Therapist:  'I'm a therapist' door, password  {DEMO_PASSWORD}",
-    ] + [f"Patient {pid} ({about}):  access code  {code}" for pid, about, code in codes]
+        f"Every password below is  {DEMO_PASSWORD}",
+        "Therapist door:",
+        "  therapist   admin + therapist: every demo patient except the three below, and the People page",
+        f"  rivera      therapist: only {', '.join(DEMO_SECOND_CASELOAD)}",
+        "  admin       admin only: People and My settings, no clinical pages",
+        "Patient door, 'I have a username and password':",
+        "  patient017  P-017",
+        "Patient door, access codes:",
+    ] + [f"  {code}  {pid} ({about})" for pid, about, code in codes]
     out = db_path.parent / "demo-logins.txt"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Create your account</title>
+</head>
+<body data-page="invite">
+  <main class="card">
+    <div class="lockup"><img src="/static/limber-mark.svg" alt="" width="56" height="56"><span>Limber</span></div>
+    <p id="invite-bad" class="lead" role="alert" hidden></p>
+    <form id="invite" autocomplete="on" hidden>
+      <h1>Create your account</h1>
+      <p class="lead" id="invite-role"></p>
+      <label for="display_name">Your name, as you'd like it shown</label>
+      <input id="display_name" class="plain" autocomplete="name" maxlength="60" required>
+      <label for="username">Choose a username</label>
+      <input id="username" class="plain" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" required>
+      <p class="small">3 to 32 letters, digits, dots, dashes, or underscores.</p>
+      <label for="new-password">Choose a password</label>
+      <input id="new-password" class="plain" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+      <p class="small">At least 12 characters. A short sentence works well.</p>
+      <label for="password-again">Type it again</label>
+      <input id="password-again" class="plain" type="password" autocomplete="new-password" maxlength="256" required>
+      <fieldset class="notice">
+        <legend>Make it easier to use (you can change these later)</legend>
+        <label class="check"><input type="checkbox" id="larger_text"> Larger text</label>
+        <label class="check"><input type="checkbox" id="high_contrast"> Higher contrast</label>
+        <label class="check"><input type="checkbox" id="reduced_motion"> Less motion</label>
+      </fieldset>
+      <button type="submit">Create my account</button>
+      <p id="invite-error" class="error" role="alert" hidden></p>
+    </form>
+  </main>
+  <script src="/static/portal.js"></script>
+</body>
+</html>

@@ -30,10 +30,23 @@
              placeholder="XXXX-XXXX-XXXX" maxlength="20" required>
       <button type="submit">Open my plan</button>
       <p id="error" class="error" role="alert" hidden></p>
+      <p class="small"><button id="use-account" class="link" type="button">I have a username and password</button></p>
+    </form>
+
+    <form id="signin-account" autocomplete="on" role="tabpanel" hidden>
+      <label for="patient-username">Username</label>
+      <input id="patient-username" class="plain" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" required>
+      <label for="patient-password">Password</label>
+      <input id="patient-password" class="plain" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+      <button type="submit">Open my plan</button>
+      <p id="account-error" class="error" role="alert" hidden></p>
+      <p class="small"><button id="use-code" class="link" type="button">I have an access code instead</button></p>
     </form>
 
     <form id="admin-signin" autocomplete="off" role="tabpanel" hidden>
-      <label for="password">Therapist password</label>
+      <label for="staff-username">Username</label>
+      <input id="staff-username" class="plain" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32">
+      <label for="password">Password</label>
       <input id="password" class="plain" name="password" type="password" autocomplete="current-password" maxlength="256" required>
       <button type="submit">Open the therapist app</button>
       <p id="admin-error" class="error" role="alert" hidden></p>

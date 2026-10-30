@@ -849,6 +849,38 @@ def cmd_portal(args):
         argv += ["--therapist-url", args.therapist_url]
         return patient_portal.main(argv)
 
+    if sub == "accounts":
+        from src.portal import accounts
+        try:
+            with SessionStore(default_db_path()).open() as store:
+                if args.accounts_cmd == "create-admin":
+                    if args.stdin:
+                        password = sys.stdin.readline().rstrip("\n")
+                    else:
+                        import getpass
+                        password = getpass.getpass("Password (12 or more characters): ")
+                        if getpass.getpass("Repeat it: ") != password:
+                            print_error("The two entries differ; nothing was changed.")
+                            return 1
+                    made = accounts.create_account(store, username=args.username, display_name=args.name,
+                                                   password=password, role="therapist" if args.therapist else "admin",
+                                                   is_admin=True)
+                    print(f"Admin account '{made.username}' created. Invite everyone else from People in the therapist app.")
+                elif args.accounts_cmd == "list":
+                    for a in store.account_list():
+                        role = "admin + therapist" if a.is_admin and a.is_therapist else a.role
+                        extra = [a.patient_id] if a.patient_id else []
+                        print(" | ".join([a.username, role, a.status] + extra))
+                    if not store.account_list():
+                        print("No accounts yet. Create the first with: portal accounts create-admin")
+                else:
+                    print_error("Usage: portal accounts {create-admin,list}")
+                    return 1
+            return 0
+        except PTLogError as e:
+            print_error(str(e))
+            return 1
+
     if sub == "admin":
         from src.portal import admin
         try:
@@ -1499,6 +1531,14 @@ Examples:
     pstatus = padmin_sub.add_parser("status", help="Whether a password is set, and the therapist access history")
     pstatus.add_argument("--limit", type=int, default=20)
     padmin_sub.add_parser("clear", help="Remove the therapist password (private machines only)")
+    paccounts = portal_sub.add_parser("accounts", help="Accounts (feature 016): make the first admin, list everyone")
+    paccounts_sub = paccounts.add_subparsers(dest="accounts_cmd")
+    pcreate = paccounts_sub.add_parser("create-admin", help="Create an admin account (password asked for, never an argument)")
+    pcreate.add_argument("--username", required=True)
+    pcreate.add_argument("--name", required=True, help="How the person is shown in the app")
+    pcreate.add_argument("--therapist", action="store_true", help="Also a therapist with their own caseload")
+    pcreate.add_argument("--stdin", action="store_true", help="Read the password from standard input")
+    paccounts_sub.add_parser("list", help="Every account: username, role, status")
 
     args = parser.parse_args()
 

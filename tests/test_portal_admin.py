@@ -31,7 +31,7 @@ def store(tmp_db, fake_clock):
 class TestPassword:
     def test_schema_and_status(self, store):
         tables = {r[0] for r in store.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        assert SCHEMA_VERSION >= 7 and {"portal_admin", "admin_signins", "admin_audit"} <= tables
+        assert SCHEMA_VERSION >= 7 and {"accounts", "admin_signins", "admin_audit"} <= tables
         assert [v for v, _ in MIGRATIONS][-1] == SCHEMA_VERSION
         assert admin.password_is_set(store) is False
 
@@ -39,11 +39,11 @@ class TestPassword:
         admin.set_password(store, PASSWORD)
         assert admin.password_is_set(store) and admin.verify_password(store, PASSWORD)
         assert not admin.verify_password(store, PASSWORD + "x") and not admin.verify_password(store, "")
-        dump = "\n".join(str(tuple(r)) for r in store.conn.execute("SELECT * FROM portal_admin"))
+        dump = "\n".join(str(tuple(r)) for r in store.conn.execute("SELECT * FROM accounts"))
         assert PASSWORD not in dump
         first = dump
         admin.set_password(store, PASSWORD)                          # a fresh salt every time
-        assert "\n".join(str(tuple(r)) for r in store.conn.execute("SELECT * FROM portal_admin")) != first
+        assert "\n".join(str(tuple(r)) for r in store.conn.execute("SELECT * FROM accounts")) != first
         assert admin.clear_password(store) is True and admin.password_is_set(store) is False
 
     @pytest.mark.parametrize("bad", ["short", "", None, "a" * 11, " " * 20, "x" * 300])
@@ -96,7 +96,7 @@ class TestPassesAndSignIns:
     def test_no_password_set(self, store, fake_clock):
         with pytest.raises(admin.NotConfigured):
             admin.sign_in(store, PASSWORD, "c", access.LoginLimiter(clock=fake_clock), clock=fake_clock)
-        assert admin.signed_in(store, "anything", clock=fake_clock) is False
+        assert admin.signed_in(store, "anything", clock=fake_clock) is None
 
 
 @pytest.fixture

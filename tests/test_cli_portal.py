@@ -110,3 +110,17 @@ def test_transcribe_on_an_installation_without_a_model(cli_env, tmp_path):
     assert "not available" in out(ran).lower() or "not set up" in out(ran).lower()
     listed = run_cli(cli_env, "media", "transcripts")
     assert listed.returncode == 0 and ("no voice notes" in out(listed).lower() or "state" in out(listed).lower())
+
+
+def test_accounts_first_admin_and_list(cli_env):
+    r = subprocess.run([sys.executable, str(CLI), "portal", "accounts", "create-admin", "--username", "boss",
+                        "--name", "Clinic Admin", "--therapist", "--stdin"], env=cli_env, capture_output=True,
+                       text=True, input="correct horse battery\n", timeout=60)
+    assert r.returncode == 0, out(r)
+    r = run_cli(cli_env, "portal", "accounts", "list")
+    assert r.returncode == 0 and "boss | admin + therapist | active" in r.stdout
+    assert "Clinic Admin" not in r.stdout                        # display names stay off the console
+    r = subprocess.run([sys.executable, str(CLI), "portal", "accounts", "create-admin", "--username", "boss",
+                        "--name", "Again", "--stdin"], env=cli_env, capture_output=True, text=True,
+                       input="correct horse battery\n", timeout=60)
+    assert r.returncode == 1 and "taken" in out(r)

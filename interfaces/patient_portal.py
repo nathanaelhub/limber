@@ -36,7 +36,7 @@ from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
-from src.portal import access, admin, diary, frames, live, messages, questionnaires, uploads, viewmodels, voice  # noqa: E402
+from src.portal import access, accounts, admin, diary, frames, live, messages, questionnaires, uploads, viewmodels, voice  # noqa: E402
 from src.ptlog import origin  # noqa: E402
 from src.ptlog.models import PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
@@ -132,14 +132,22 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         try:
             body = await request.json()
             code = body.get("code") if isinstance(body, dict) else None
+            username = body.get("username") if isinstance(body, dict) else None
+            password = body.get("password") if isinstance(body, dict) else None
             device = isinstance(body, dict) and body.get("device") is True
         except ValueError:
             return _json({"error": "Send JSON."}, 400)
         client = client_of(request)
         with open_store() as store:
             try:
-                token = access.sign_in(store, key, code if isinstance(code, str) else None, client, limiter,
-                                       clock=clock, device=device)
+                if username is not None:                      # a patient account (feature 016)
+                    device = False
+                    token = accounts.patient_sign_in(store, username if isinstance(username, str) else None,
+                                                     password if isinstance(password, str) else None, client,
+                                                     limiter, clock=clock)
+                else:
+                    token = access.sign_in(store, key, code if isinstance(code, str) else None, client, limiter,
+                                           clock=clock, device=device)
                 patient_id = access.current_patient(store, token, clock=clock)
             except access.LockedOut as locked:
                 return _json({"error": str(locked), "retry_after_seconds": locked.retry_after}, 429,
@@ -518,12 +526,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         try:
             body = await request.json()
             password = body.get("password") if isinstance(body, dict) else None
+            username = body.get("username") if isinstance(body, dict) else None
         except ValueError:
             return _json({"error": "Send JSON."}, 400)
         with open_store() as store:
             try:
-                admin.check_password(store, password if isinstance(password, str) else None, client_of(request), limiter)
-                a_pass = admin.issue_pass(store, clock=clock)
+                who = admin.check_password(store, password if isinstance(password, str) else None, client_of(request),
+                                           limiter, username=username if isinstance(username, str) else None)
+                a_pass = admin.issue_pass(store, who.id, clock=clock)
             except admin.NotConfigured as missing:
                 return _json({"error": str(missing)}, 409)
             except access.LockedOut as locked:
@@ -532,6 +542,70 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             except access.AccessDenied as denied:
                 return _json({"error": str(denied)}, 401)
         return _json({"redirect": f"{therapist_url.rstrip('/')}/?pass={a_pass}"})
+
+    # ------------------------------------------------------------------ invitations and settings (feature 016)
+
+    def invite_status(request: Request):
+        with open_store() as store:
+            try:
+                inv = accounts.check_invite(store, request.path_params["token"], clock=clock)
+            except accounts.InviteInvalid as bad:
+                return _json({"error": str(bad)}, 410)
+        return _json({"role": inv.role, "admin": inv.make_admin, "expires_at": inv.expires_at})
+
+    async def invite_accept(request: Request):
+        """Create the invited account. A patient is signed in here; staff go on to the therapist app."""
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+        text = lambda k: body.get(k) if isinstance(body.get(k), str) else None        # noqa: E731
+        client = client_of(request)
+        with open_store() as store:
+            try:
+                account = accounts.accept_invite(
+                    store, request.path_params["token"], display_name=text("display_name"), username=text("username"),
+                    password=text("password"), password_again=text("password_again"),
+                    prefs=body.get("prefs") if isinstance(body.get("prefs"), dict) else None, clock=clock)
+                if account.role == "patient":
+                    token = accounts.patient_sign_in(store, account.username, text("password"), client, limiter,
+                                                     clock=clock)
+                else:
+                    a_pass = admin.issue_pass(store, account.id, clock=clock)
+            except accounts.InviteInvalid as bad:
+                return _json({"error": str(bad)}, 410)
+            except PTLogError as err:
+                return _json({"error": str(err)}, 400)
+        if account.role != "patient":
+            return _json({"redirect": f"{therapist_url.rstrip('/')}/?pass={a_pass}"})
+        response = _json({"redirect": "/today", "patient_id": account.patient_id})
+        response.set_cookie(COOKIE, token, max_age=int(access.ABSOLUTE_LIMIT.total_seconds()), path="/",
+                            httponly=True, samesite="strict", secure=secure_cookie)
+        return response
+
+    async def preferences(request: Request):
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            if request.method == "GET":
+                return _json(accounts.get_patient_prefs(store, patient_id))
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json(accounts.set_patient_prefs(store, patient_id, body if isinstance(body, dict) else {}))
 
     # ------------------------------------------------------------------ guided session
 
@@ -631,15 +705,28 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
 
     # ------------------------------------------------------------------ pages
 
+    def html_page(name: str, prefs: Optional[dict] = None) -> Response:
+        """A page with the reader's accessibility classes already on <html>, so nothing restyles after load."""
+        text = (static_dir / f"{name}.html").read_text(encoding="utf-8")
+        classes = accounts.css_classes(prefs)
+        if classes:
+            text = text.replace('<html lang="en">', f'<html lang="en" class="{classes}">', 1)
+        return Response(text, media_type="text/html", headers={"Cache-Control": "no-store"})
+
     def index(_request: Request):
-        return FileResponse(static_dir / "index.html", headers={"Cache-Control": "no-store"})
+        return html_page("index")
+
+    def invite_page(_request: Request):
+        return html_page("invite")
 
     def inner_page(name: str):
         def page(request: Request):
             with open_store() as store:
-                if signed_in(request, store) is None:
+                patient_id = signed_in(request, store)
+                if patient_id is None:
                     return RedirectResponse("/", status_code=303)
-            return FileResponse(static_dir / f"{name}.html", headers={"Cache-Control": "no-store"})
+                prefs = accounts.get_patient_prefs(store, patient_id)
+            return html_page(name, prefs)
         return page
 
     routes = [
@@ -654,6 +741,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/log", inner_page("log")),
         Route("/questionnaire", inner_page("questionnaire")),
         Route("/voice", inner_page("voice")),
+        Route("/settings", inner_page("settings")),
+        Route("/invite/{token}", invite_page),
+        Route("/api/invites/{token}", invite_status, methods=["GET"]),
+        Route("/api/invites/{token}", invite_accept, methods=["POST"]),
+        Route("/api/me/preferences", preferences, methods=["GET", "POST"]),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),

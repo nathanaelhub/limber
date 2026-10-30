@@ -64,6 +64,7 @@ def test_v8_record_upgrades_to_v9_without_losing_a_row(tmp_db, make_session, fak
         assert len(s.load_session(1).sets[0].reps) == 5 and s.get_review(1).next_step == "continue"
     after = _counts(tmp_db)
     for table, n in before.items():
+        table = "accounts" if table == "portal_admin" else table      # v14 moved it into accounts (feature 016)
         assert after[table] >= n, table
     assert after["portal_audit"] == before["portal_audit"] + 1 and after["reps"] == 5 and after["reviews"] == 1
     assert "entries" in after

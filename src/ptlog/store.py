@@ -27,6 +27,8 @@ from .models import (
     AuditEntry,
     PortalError,
     PortalSignIn,
+    Account,
+    Invitation,
     ThresholdChange,
     ThresholdValidationError,
     ADHERENCE_THRESHOLD_DEFAULT,
@@ -63,7 +65,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -565,6 +567,69 @@ CREATE TABLE IF NOT EXISTS transcriptions (
 CREATE INDEX IF NOT EXISTS idx_transcriptions_state ON transcriptions(state, id);
 """
 
+# v14 (feature 016): one account per person, with a role; invitations an admin hands out; which therapist
+# each patient belongs to; and the history of who changed whom. The shared therapist password of v7 becomes
+# the first account, an admin who is also a therapist, and every existing patient joins its caseload.
+SCHEMA_V14_SQL = """
+CREATE TABLE IF NOT EXISTS accounts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    username       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    display_name   TEXT NOT NULL,
+    role           TEXT NOT NULL CHECK (role IN ('admin', 'therapist', 'patient')),
+    is_admin       INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1)),
+    patient_id     TEXT UNIQUE REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    salt           TEXT,
+    password_hash  TEXT,
+    status         TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+    prefs          TEXT NOT NULL DEFAULT '{}',
+    created_at     TEXT NOT NULL,
+    CHECK ((role = 'patient') = (patient_id IS NOT NULL)),
+    CHECK (role <> 'admin' OR is_admin = 1),
+    CHECK (role <> 'patient' OR is_admin = 0)
+);
+CREATE TABLE IF NOT EXISTS caseloads (
+    patient_id    TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    therapist_id  INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_caseloads_therapist ON caseloads(therapist_id);
+CREATE TABLE IF NOT EXISTS invitations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash    TEXT NOT NULL UNIQUE,
+    role          TEXT NOT NULL CHECK (role IN ('admin', 'therapist', 'patient')),
+    make_admin    INTEGER NOT NULL DEFAULT 0 CHECK (make_admin IN (0, 1)),
+    therapist_id  INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
+    patient_id    TEXT REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    created_by    INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+    created_at    TEXT NOT NULL,
+    expires_at    TEXT NOT NULL,
+    used_at       TEXT,
+    used_by       INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+    revoked_at    TEXT
+);
+CREATE TABLE IF NOT EXISTS account_audit (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    at       TEXT NOT NULL,
+    event    TEXT NOT NULL CHECK (event IN ('account_created', 'invite_created', 'invite_used', 'invite_revoked',
+             'account_disabled', 'account_enabled', 'patient_reassigned', 'prefs_changed')),
+    actor    INTEGER,
+    subject  TEXT
+);
+INSERT INTO accounts (username, display_name, role, is_admin, salt, password_hash, status, prefs, created_at)
+    SELECT 'therapist', 'Therapist', 'therapist', 1, salt, password_hash, 'active', '{}', updated_at FROM portal_admin;
+INSERT INTO caseloads (patient_id, therapist_id)
+    SELECT p.id, a.id FROM patients p JOIN accounts a ON a.username = 'therapist' WHERE p.is_builtin = 0;
+DROP TABLE admin_signins;
+CREATE TABLE admin_signins (
+    token_hash  TEXT PRIMARY KEY,
+    kind        TEXT NOT NULL CHECK (kind IN ('pass', 'signin')),
+    account_id  INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL
+);
+DROP TABLE portal_admin;
+ALTER TABLE patient_settings ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}';
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -579,6 +644,7 @@ MIGRATIONS: List[tuple] = [
     (11, SCHEMA_V11_SQL),
     (12, SCHEMA_V12_SQL),
     (13, SCHEMA_V13_SQL),
+    (14, SCHEMA_V14_SQL),
 ]
 
 
@@ -601,6 +667,9 @@ class SessionStore:
         # False only for the live web session, whose callbacks run on worker threads (the caller locks).
         self.check_same_thread = check_same_thread
         self.conn: Optional[sqlite3.Connection] = None
+        # Feature 016: when set, the patients this store may show. Reads of anyone else behave as if the patient
+        # did not exist, so a therapist cannot reach another therapist's patient by any path through the record.
+        self.visible: Optional[set] = None
 
     # ---------------------------------------------------------------- lifecycle
 
@@ -631,6 +700,14 @@ class SessionStore:
 
     def _now(self) -> str:
         return self.clock().isoformat()
+
+    def restrict(self, patient_ids) -> "SessionStore":
+        """Limit every read to these patients (and the built-in one); None lifts the limit."""
+        self.visible = None if patient_ids is None else set(patient_ids) | {UNASSIGNED_ID}
+        return self
+
+    def _vis(self, patient_id: Optional[str]) -> bool:
+        return self.visible is None or patient_id in self.visible
 
     # ---------------------------------------------------------------- schema
 
@@ -702,7 +779,7 @@ class SessionStore:
             """,
             (patient_id,),
         ).fetchone()
-        return self._row_to_patient(row) if row else None
+        return self._row_to_patient(row) if row and self._vis(row["id"]) else None
 
     def list_patients(self) -> List[Patient]:
         rows = self.conn.execute(
@@ -713,7 +790,7 @@ class SessionStore:
             ORDER BY p.is_builtin DESC, p.id COLLATE NOCASE ASC
             """
         ).fetchall()
-        return [self._row_to_patient(r) for r in rows]
+        return [self._row_to_patient(r) for r in rows if self._vis(r["id"])]
 
     # ---------------------------------------------------------------- sessions (write)
 
@@ -912,7 +989,7 @@ class SessionStore:
     def load_session(self, session_id: int) -> Session:
         """Load the full object graph for one session."""
         row = self.conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
-        if row is None:
+        if row is None or not self._vis(row["patient_id"]):
             raise SessionNotFoundError(f"Session {session_id} not found")
         session = Session(
             id=row["id"], patient_id=row["patient_id"], schema_version=row["schema_version"],
@@ -1047,6 +1124,7 @@ class SessionStore:
             rows = self.conn.execute(
                 "SELECT * FROM sessions WHERE patient_id = ? ORDER BY start_time DESC, id DESC", (patient_id,)
             ).fetchall()
+        rows = [r for r in rows if self._vis(r["patient_id"])]
         if not rows:
             return []
         ids = [r["id"] for r in rows]
@@ -1746,35 +1824,166 @@ class SessionStore:
         return [AuditEntry(id=r["id"], at=r["at"], patient_id=r["patient_id"], event=r["event"],
                            client=r["client"], detail=r["detail"]) for r in rows]
 
-    # therapist sign-in (feature 007, US6); the rules live in src/portal/admin.py
+    # accounts, invitations, and caseloads (feature 016); the rules live in src/portal/accounts.py
 
-    def admin_get(self) -> Optional[tuple]:
-        row = self.conn.execute("SELECT salt, password_hash, updated_at FROM portal_admin WHERE id = 1").fetchone()
-        return (row["salt"], row["password_hash"], row["updated_at"]) if row else None
+    @staticmethod
+    def _account(row) -> Account:
+        return Account(id=row["id"], username=row["username"], display_name=row["display_name"], role=row["role"],
+                       is_admin=bool(row["is_admin"]), patient_id=row["patient_id"], status=row["status"],
+                       has_password=row["password_hash"] is not None, created_at=row["created_at"])
 
-    def admin_set(self, salt: str, password_hash: str) -> None:
-        """Store the therapist password's salted hash; every therapist sign-in and pass ends."""
-        self.conn.execute("DELETE FROM portal_admin")
-        self.conn.execute("INSERT INTO portal_admin (id, salt, password_hash, updated_at) VALUES (1, ?, ?, ?)",
-                          (salt, password_hash, self._now()))
-        self.conn.execute("DELETE FROM admin_signins")
+    def account_create(self, username: str, display_name: str, role: str, is_admin: bool,
+                       patient_id: Optional[str], salt: Optional[str], password_hash: Optional[str]) -> Account:
+        cur = self.conn.execute(
+            "INSERT INTO accounts (username, display_name, role, is_admin, patient_id, salt, password_hash, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (username, display_name, role, int(is_admin), patient_id, salt, password_hash, self._now()))
+        self.conn.commit()
+        return self.account_get(cur.lastrowid)
+
+    def account_get(self, account_id: int) -> Optional[Account]:
+        row = self.conn.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        return self._account(row) if row else None
+
+    def account_by_username(self, username: str) -> Optional[Account]:
+        row = self.conn.execute("SELECT * FROM accounts WHERE username = ?", (username,)).fetchone()
+        return self._account(row) if row else None
+
+    def account_by_patient(self, patient_id: str) -> Optional[Account]:
+        row = self.conn.execute("SELECT * FROM accounts WHERE patient_id = ?", (patient_id,)).fetchone()
+        return self._account(row) if row else None
+
+    def account_delete(self, account_id: int) -> None:
+        self.conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
         self.conn.commit()
 
-    def admin_clear(self) -> bool:
-        cur = self.conn.execute("DELETE FROM portal_admin")
-        self.conn.execute("DELETE FROM admin_signins")
+    def patient_exists(self, patient_id: str) -> bool:
+        """Whether the record holds this patient, whatever this store is restricted to (admin use)."""
+        return self.conn.execute("SELECT 1 FROM patients WHERE id = ?", (patient_id,)).fetchone() is not None
+
+    def account_list(self) -> List[Account]:
+        return [self._account(r) for r in self.conn.execute("SELECT * FROM accounts ORDER BY id")]
+
+    def account_secret(self, account_id: int) -> Optional[tuple]:
+        """(salt, password_hash), or None when no password is set."""
+        row = self.conn.execute("SELECT salt, password_hash FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        return (row["salt"], row["password_hash"]) if row and row["password_hash"] else None
+
+    def account_set_password(self, account_id: int, salt: Optional[str], password_hash: Optional[str]) -> None:
+        """Set or clear an account's password; every sign-in of that account ends."""
+        self.conn.execute("UPDATE accounts SET salt = ?, password_hash = ? WHERE id = ?", (salt, password_hash, account_id))
+        self._end_sign_ins(account_id)
+        self.conn.commit()
+
+    def account_set_status(self, account_id: int, status: str) -> None:
+        self.conn.execute("UPDATE accounts SET status = ? WHERE id = ?", (status, account_id))
+        if status != "active":
+            self._end_sign_ins(account_id)
+        self.conn.commit()
+
+    def _end_sign_ins(self, account_id: int) -> None:
+        self.conn.execute("DELETE FROM admin_signins WHERE account_id = ?", (account_id,))
+        self.conn.execute("DELETE FROM portal_sessions WHERE token_hash IN (SELECT s.token_hash FROM portal_sessions s "
+                          "JOIN accounts a ON a.patient_id = s.patient_id WHERE a.id = ?)", (account_id,))
+
+    def account_prefs(self, account_id: int) -> dict:
+        row = self.conn.execute("SELECT prefs FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        return json.loads(row["prefs"]) if row else {}
+
+    def account_set_prefs(self, account_id: int, prefs: dict) -> None:
+        self.conn.execute("UPDATE accounts SET prefs = ? WHERE id = ?", (json.dumps(prefs, sort_keys=True), account_id))
+        self.conn.commit()
+
+    def staff_password_exists(self) -> bool:
+        return self.conn.execute("SELECT 1 FROM accounts WHERE role <> 'patient' AND status = 'active' "
+                                 "AND password_hash IS NOT NULL LIMIT 1").fetchone() is not None
+
+    def installation_account(self) -> Optional[Account]:
+        """The first admin who is also a therapist: what the v7 shared password became."""
+        row = self.conn.execute("SELECT * FROM accounts WHERE role = 'therapist' AND is_admin = 1 "
+                                "ORDER BY id LIMIT 1").fetchone()
+        return self._account(row) if row else None
+
+    def caseload_set(self, patient_id: str, therapist_id: int) -> None:
+        self.conn.execute("INSERT INTO caseloads (patient_id, therapist_id) VALUES (?, ?) "
+                          "ON CONFLICT(patient_id) DO UPDATE SET therapist_id = excluded.therapist_id",
+                          (patient_id, therapist_id))
+        self.conn.commit()
+
+    def caseload_of(self, patient_id: str) -> Optional[int]:
+        row = self.conn.execute("SELECT therapist_id FROM caseloads WHERE patient_id = ?", (patient_id,)).fetchone()
+        return row[0] if row else None
+
+    def caseload_patients(self, therapist_id: int) -> List[str]:
+        return [r[0] for r in self.conn.execute("SELECT patient_id FROM caseloads WHERE therapist_id = ?", (therapist_id,))]
+
+    def unassigned_patients(self) -> List[str]:
+        return [r[0] for r in self.conn.execute(
+            "SELECT id FROM patients WHERE is_builtin = 0 AND id NOT IN (SELECT patient_id FROM caseloads)")]
+
+    @staticmethod
+    def _invitation(row, now: str) -> Invitation:
+        state = ("used" if row["used_at"] else "revoked" if row["revoked_at"]
+                 else "expired" if _ts_key(row["expires_at"]) <= _ts_key(now) else "invited")
+        return Invitation(id=row["id"], role=row["role"], make_admin=bool(row["make_admin"]),
+                          therapist_id=row["therapist_id"], patient_id=row["patient_id"], created_by=row["created_by"],
+                          created_at=row["created_at"], expires_at=row["expires_at"], state=state)
+
+    def invite_add(self, token_hash: str, role: str, make_admin: bool, therapist_id: Optional[int],
+                   patient_id: Optional[str], created_by: int, expires_at: datetime) -> Invitation:
+        cur = self.conn.execute(
+            "INSERT INTO invitations (token_hash, role, make_admin, therapist_id, patient_id, created_by, created_at, "
+            "expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (token_hash, role, int(make_admin), therapist_id, patient_id, created_by, self._now(), expires_at.isoformat()))
+        self.conn.commit()
+        return self.invite_get(cur.lastrowid)
+
+    def invite_get(self, invite_id: int) -> Optional[Invitation]:
+        row = self.conn.execute("SELECT * FROM invitations WHERE id = ?", (invite_id,)).fetchone()
+        return self._invitation(row, self._now()) if row else None
+
+    def invite_by_token(self, token_hash: str, now: str) -> Optional[Invitation]:
+        row = self.conn.execute("SELECT * FROM invitations WHERE token_hash = ?", (token_hash,)).fetchone()
+        return self._invitation(row, now) if row else None
+
+    def invite_list(self) -> List[Invitation]:
+        now = self._now()
+        return [self._invitation(r, now) for r in self.conn.execute("SELECT * FROM invitations ORDER BY id")]
+
+    def invite_mark_used(self, invite_id: int, account_id: int) -> bool:
+        cur = self.conn.execute("UPDATE invitations SET used_at = ?, used_by = ? WHERE id = ? AND used_at IS NULL "
+                                "AND revoked_at IS NULL", (self._now(), account_id, invite_id))
         self.conn.commit()
         return cur.rowcount > 0
 
-    def admin_token_add(self, token_hash: str, kind: str, expires_at: datetime) -> None:
+    def invite_revoke(self, invite_id: int) -> bool:
+        cur = self.conn.execute("UPDATE invitations SET revoked_at = ? WHERE id = ? AND used_at IS NULL "
+                                "AND revoked_at IS NULL", (self._now(), invite_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def account_audit_add(self, event: str, actor: Optional[int], subject: Optional[str] = None) -> None:
+        self.conn.execute("INSERT INTO account_audit (at, event, actor, subject) VALUES (?, ?, ?, ?)",
+                          (self._now(), event, actor, subject))
+        self.conn.commit()
+
+    def account_audit_list(self, limit: int = 200) -> List[dict]:
+        rows = self.conn.execute(f"SELECT * FROM account_audit ORDER BY id DESC LIMIT {int(limit)}").fetchall()
+        return [{"at": r["at"], "event": r["event"], "actor": r["actor"], "subject": r["subject"]} for r in rows]
+
+    # therapist sign-in tokens (feature 007, US6; per account since feature 016)
+
+    def admin_token_add(self, token_hash: str, kind: str, expires_at: datetime, account_id: int) -> None:
         self.conn.execute("DELETE FROM admin_signins WHERE expires_at <= ?", (self._now(),))
-        self.conn.execute("INSERT INTO admin_signins (token_hash, kind, created_at, expires_at) VALUES (?, ?, ?, ?)",
-                          (token_hash, kind, self._now(), expires_at.isoformat()))
+        self.conn.execute("INSERT INTO admin_signins (token_hash, kind, account_id, created_at, expires_at) "
+                          "VALUES (?, ?, ?, ?, ?)", (token_hash, kind, account_id, self._now(), expires_at.isoformat()))
         self.conn.commit()
 
     def admin_token_get(self, token_hash: str) -> Optional[tuple]:
-        row = self.conn.execute("SELECT kind, expires_at FROM admin_signins WHERE token_hash = ?", (token_hash,)).fetchone()
-        return (row["kind"], row["expires_at"]) if row else None
+        """(kind, expires_at, account_id)."""
+        row = self.conn.execute("SELECT kind, expires_at, account_id FROM admin_signins WHERE token_hash = ?",
+                                (token_hash,)).fetchone()
+        return (row["kind"], row["expires_at"], row["account_id"]) if row else None
 
     def admin_token_delete(self, token_hash: str) -> bool:
         cur = self.conn.execute("DELETE FROM admin_signins WHERE token_hash = ?", (token_hash,))
@@ -1878,7 +2087,8 @@ class SessionStore:
         args: tuple = (from_sender,)
         if patient_id is not None:
             sql, args = sql + " AND patient_id = ?", (from_sender, patient_id)
-        return {r["patient_id"]: int(r["n"]) for r in self.conn.execute(sql + " GROUP BY patient_id", args)}
+        return {r["patient_id"]: int(r["n"]) for r in self.conn.execute(sql + " GROUP BY patient_id", args)
+                if self._vis(r["patient_id"])}
 
     def message_remove(self, message_id: int) -> bool:
         row = self.conn.execute("SELECT patient_id, removed_at FROM messages WHERE id = ?", (message_id,)).fetchone()
@@ -1902,7 +2112,7 @@ class SessionStore:
             LEFT JOIN conversations c ON c.patient_id = p.id
             LEFT JOIN messages m ON m.id = (SELECT MAX(id) FROM messages WHERE patient_id = p.id)
             WHERE p.is_builtin = 0""").fetchall()
-        return [dict(r) for r in rows]
+        return [dict(r) for r in rows if self._vis(r["patient_id"])]
 
     # patient-reported entries (feature 010); the rules live in src/ptlog/entries.py
 
@@ -1963,7 +2173,8 @@ class SessionStore:
         """Every patient's entries of one kind, oldest first, from one query (roster and queue)."""
         result: Dict[str, List[Entry]] = {}
         for r in self.conn.execute("SELECT * FROM entries WHERE kind = ? ORDER BY patient_id, recorded_at, id", (kind,)):
-            result.setdefault(r["patient_id"], []).append(self._entry(r))
+            if self._vis(r["patient_id"]):
+                result.setdefault(r["patient_id"], []).append(self._entry(r))
         return result
 
     # media (feature 011); the rules live in src/portal/uploads.py
@@ -1987,7 +2198,7 @@ class SessionStore:
 
     def media_get(self, media_id: str) -> Optional[Media]:
         row = self.conn.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
-        return self._media(row) if row else None
+        return self._media(row) if row and self._vis(row["patient_id"]) else None
 
     def media_list(self, patient_id: Optional[str] = None, kind: Optional[str] = None, live_only: bool = False) -> List[Media]:
         sql, args = "SELECT * FROM media WHERE 1=1", []
@@ -1997,7 +2208,8 @@ class SessionStore:
             sql += " AND kind = ?"; args.append(kind)
         if live_only:
             sql += " AND deleted_at IS NULL"
-        return [self._media(r) for r in self.conn.execute(sql + " ORDER BY created_at DESC, id DESC", args)]
+        return [self._media(r) for r in self.conn.execute(sql + " ORDER BY created_at DESC, id DESC", args)
+                if self._vis(r["patient_id"])]
 
     def media_update(self, media_id: str, **fields) -> None:
         allowed = {"reviewed_at", "deleted_at", "deleted_by", "caption", "warned", "backed_up_at", "message_id"}
@@ -2208,21 +2420,29 @@ class SessionStore:
         return self.load_session(session_id)
 
     def _settings(self, patient_id: str) -> dict:
-        row = self.conn.execute("SELECT diary_enabled, medications FROM patient_settings WHERE patient_id = ?",
+        row = self.conn.execute("SELECT diary_enabled, medications, prefs FROM patient_settings WHERE patient_id = ?",
                                 (patient_id,)).fetchone()
-        return {"diary_enabled": bool(row["diary_enabled"]), "medications": json.loads(row["medications"])} if row \
-            else {"diary_enabled": True, "medications": []}
+        return {"diary_enabled": bool(row["diary_enabled"]), "medications": json.loads(row["medications"]),
+                "prefs": json.loads(row["prefs"])} if row else {"diary_enabled": True, "medications": [], "prefs": {}}
 
     def _save_settings(self, patient_id: str, **fields) -> None:
         self._require_patient(patient_id)
         current = self._settings(patient_id)
         current.update(fields)
         self.conn.execute(
-            "INSERT INTO patient_settings (patient_id, diary_enabled, medications, updated_at) VALUES (?, ?, ?, ?) "
+            "INSERT INTO patient_settings (patient_id, diary_enabled, medications, prefs, updated_at) VALUES (?, ?, ?, ?, ?) "
             "ON CONFLICT(patient_id) DO UPDATE SET diary_enabled = excluded.diary_enabled, "
-            "medications = excluded.medications, updated_at = excluded.updated_at",
-            (patient_id, 1 if current["diary_enabled"] else 0, json.dumps(current["medications"]), self._now()))
+            "medications = excluded.medications, prefs = excluded.prefs, updated_at = excluded.updated_at",
+            (patient_id, 1 if current["diary_enabled"] else 0, json.dumps(current["medications"]),
+             json.dumps(current["prefs"], sort_keys=True), self._now()))
         self.conn.commit()
+
+    def patient_prefs(self, patient_id: str) -> dict:
+        """A patient's accessibility settings (feature 016), with or without a password account."""
+        return dict(self._settings(patient_id)["prefs"])
+
+    def set_patient_prefs(self, patient_id: str, prefs: dict) -> None:
+        self._save_settings(patient_id, prefs=dict(prefs))
 
     def diary_enabled(self, patient_id: str) -> bool:
         return self._settings(patient_id)["diary_enabled"]

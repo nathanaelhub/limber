@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Settings</title>
+</head>
+<body data-page="settings">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" hidden>Messages<span id="nav-unread" class="badge" hidden></span></a><a href="/settings" aria-current="page">Settings</a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <main class="card wide">
+    <h1>Settings</h1>
+    <p class="lead">Make Limber easier to read and use. These follow you to every device you sign in on.</p>
+    <form id="prefs">
+      <label class="check"><input type="checkbox" id="larger_text"> Larger text</label>
+      <label class="check"><input type="checkbox" id="high_contrast"> Higher contrast</label>
+      <label class="check"><input type="checkbox" id="reduced_motion"> Less motion</label>
+      <button type="submit">Save</button>
+      <p id="saved" class="small" role="status" hidden>Saved.</p>
+      <p id="prefs-error" class="error" role="alert" hidden></p>
+    </form>
+  </main>
+  <script src="/static/portal.js"></script>
+</body>
+</html>

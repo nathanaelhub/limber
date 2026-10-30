@@ -536,6 +536,38 @@ class AccessStatus:
 
 
 @dataclass
+class Account:
+    """One person who signs in (feature 016). The password is never here, only whether one is set."""
+    id: int
+    username: str
+    display_name: str
+    role: str                        # admin | therapist | patient
+    is_admin: bool
+    patient_id: Optional[str]
+    status: str                      # active | disabled
+    has_password: bool
+    created_at: str
+
+    @property
+    def is_therapist(self) -> bool:
+        return self.role == "therapist"
+
+
+@dataclass
+class Invitation:
+    """A single-use link an admin handed out. state: invited | used | revoked | expired."""
+    id: int
+    role: str
+    make_admin: bool
+    therapist_id: Optional[int]
+    patient_id: Optional[str]
+    created_by: Optional[int]
+    created_at: str
+    expires_at: str
+    state: str
+
+
+@dataclass
 class PortalSignIn:
     """One open sign-in of a patient on one device."""
     patient_id: str

@@ -28,6 +28,7 @@ import time
 import json
 from pathlib import Path
 from datetime import date, datetime
+import os
 import sys
 import av
 import pandas as pd
@@ -57,13 +58,32 @@ from src.ptlog import tracker as pttracker
 from src.ptlog import programs as ptprograms
 from src.ptlog import thresholds as ptthresholds
 from src.portal import access as ptaccess
+from src.portal import accounts as ptaccounts
 from src.portal import admin as ptadmin
 from src.portal import messages as ptmessages
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
 def _open_store():
-    return SessionStore(default_db_path()).open()
+    """The record, limited to the signed-in therapist's caseload (feature 016). With no staff password set
+    (a private machine) there is no account and nothing is limited, as before."""
+    store = SessionStore(default_db_path()).open()
+    account_id = st.session_state.get("account_id")
+    if account_id is not None:
+        ptaccounts.restrict(store, store.account_get(account_id))
+    return store
+
+
+def _account():
+    """The signed-in person, or None on an installation without staff sign-in."""
+    account_id = st.session_state.get("account_id")
+    if account_id is None:
+        return None
+    with SessionStore(default_db_path()).open() as store:
+        return store.account_get(account_id)
+
+
+PORTAL_URL = os.environ.get("PTASSIST_PORTAL_URL", "http://127.0.0.1:8600").rstrip("/")
 
 
 def list_observation_logs(patient_id=None):
@@ -319,6 +339,15 @@ def render_sidebar():
             'inbox': '✉️ Inbox',
             'learn': '📚 How It Works'
         }
+        me = _account()
+        if me is not None and not me.is_therapist:       # an admin who is not a therapist sees no clinical pages
+            pages = {}
+        if me is not None and me.is_admin:
+            pages['people'] = '🧑‍🤝‍🧑 People'
+        if me is not None:
+            pages['settings'] = '⚙️ My settings'
+        if st.session_state.get("current_page") not in pages:
+            st.session_state.current_page = next(iter(pages), 'home')
         with _open_store() as store:
             waiting = ptmessages.total_unread(store)
         if waiting:                                   # who is waiting for a reply, visible from every page
@@ -331,25 +360,29 @@ def render_sidebar():
 
         st.markdown("---")
 
-        # Patient (pseudonymous IDs from the canonical record)
-        st.markdown("### Patient")
-        with _open_store() as store:
-            patients = store.list_patients()
-        ids = [p.id for p in patients]
-        labels = {p.id: (f"{p.id} · {p.label}" if p.label else p.id) for p in patients}
-        current = st.session_state.get("patient_id") or "unassigned"
-        st.session_state.patient_id = st.selectbox(
-            "Patient", ids, index=ids.index(current) if current in ids else 0,
-            format_func=lambda i: labels.get(i, i), key="patient_select")
+        # Patient (pseudonymous IDs from the canonical record, only the signed-in therapist's own)
+        if me is None or me.is_therapist:
+            st.markdown("### Patient")
+            with _open_store() as store:
+                patients = store.list_patients()
+            ids = [p.id for p in patients]
+            labels = {p.id: (f"{p.id} · {p.label}" if p.label else p.id) for p in patients}
+            current = st.session_state.get("patient_id") or "unassigned"
+            st.session_state.patient_id = st.selectbox(
+                "Patient", ids, index=ids.index(current) if current in ids else 0,
+                format_func=lambda i: labels.get(i, i), key="patient_select")
 
         st.markdown("### Settings")
         st.toggle("Show Technical Details", key="show_technical")
 
         st.markdown("---")
         if st.session_state.get("admin_token"):
+            if me is not None:
+                st.caption(f"Signed in as {me.display_name} ({me.username})")
             if st.button("Sign out", key="therapist_signout", use_container_width=True):
                 with _open_store() as store:
                     ptadmin.sign_out(store, st.session_state.pop("admin_token", None), "therapist-app")
+                st.session_state.pop("account_id", None)
                 st.rerun()
         st.caption("Limber v1.0 · therapist app")
         st.caption("Powered by YOLO11 Pose Estimation")
@@ -1045,7 +1078,7 @@ def page_patients():
         if st.form_submit_button("Register"):
             try:
                 with _open_store() as store:
-                    store.add_patient(new_id, label=new_label or None, notes=new_notes or None)
+                    ptaccounts.add_patient(store, _account(), new_id, label=new_label or None, notes=new_notes or None)
                 st.success(f"Registered patient {new_id}")
                 st.rerun()
             except PTLogError as exc:
@@ -2460,6 +2493,131 @@ def calculate_form_score(rep_data):
 
 
 # =============================================================================
+# PAGES: PEOPLE (admins) AND MY SETTINGS (feature 016)
+# =============================================================================
+
+PREF_CSS = {
+    "larger_text": "html, body, .stApp, .stMarkdown p, label, input, textarea { font-size: 20px !important; }",
+    "high_contrast": ".stApp { background: #FFFFFF !important; } .stApp, .stApp p, .stApp label, h1, h2, h3 "
+                     "{ color: #000000 !important; } .stCaption, small { color: #2E2E2E !important; }",
+    "reduced_motion": "*, *::before, *::after { animation: none !important; transition: none !important; }",
+}
+PREF_LABELS = {"larger_text": "Larger text", "high_contrast": "Higher contrast", "reduced_motion": "Less motion"}
+
+
+def _apply_prefs(prefs):
+    rules = " ".join(PREF_CSS[k] for k in ptaccounts.PREFS if prefs.get(k))
+    if rules:
+        st.markdown(f"<style>{rules}</style>", unsafe_allow_html=True)
+
+
+def page_my_settings():
+    st.markdown("## ⚙️ My settings")
+    me = _account()
+    with SessionStore(default_db_path()).open() as store:
+        current = ptaccounts.get_prefs(store, me.id)
+    with st.form("my_settings"):
+        chosen = {k: st.checkbox(PREF_LABELS[k], value=current[k]) for k in ptaccounts.PREFS}
+        if st.form_submit_button("Save"):
+            with SessionStore(default_db_path()).open() as store:
+                ptaccounts.set_prefs(store, me.id, chosen)
+            st.rerun()
+    st.caption("These follow you to every device you sign in on.")
+
+
+def page_people():
+    """Admins: everyone with an account, invitations, and which therapist each patient belongs to."""
+    st.markdown("## 🧑‍🤝‍🧑 People")
+    me = _account()
+    with SessionStore(default_db_path()).open() as store:
+        try:
+            rows = ptaccounts.people(store, me)
+        except PTLogError as exc:
+            st.error(str(exc))
+            return
+        therapists = [a for a in store.account_list() if a.is_therapist and a.status == "active"]
+    table = [{"Name": r["display_name"] or "—", "Username": r["username"] or "—", "Role": r["role"],
+              "Patient ID": r["patient_id"] or "", "Therapist": r["therapist"] or "",
+              "Status": r["status"], "Since / expires": ptviews.date_minute(r["since"])} for r in rows]
+    st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+
+    st.markdown("### Invite someone")
+    role = st.radio("Role", ["therapist", "patient", "admin"], horizontal=True, key="invite_role")
+    with st.form("invite_form"):
+        therapist_id, patient_id, make_admin = None, None, False
+        if role == "patient":
+            if not therapists:
+                st.info("Invite a therapist first: every patient belongs to one.")
+            therapist_id = st.selectbox("Therapist", [t.id for t in therapists],
+                                        format_func=lambda i: next(t.username for t in therapists if t.id == i))
+            patient_id = st.text_input("Pseudonymous patient ID", placeholder="P-031",
+                                       help="An existing patient or a new one. Never a name.")
+        elif role == "therapist":
+            make_admin = st.checkbox("Also an admin")
+        if st.form_submit_button("Create invite link", type="primary"):
+            try:
+                with SessionStore(default_db_path()).open() as store:
+                    token, invite = ptaccounts.create_invite(store, me, role, therapist_id=therapist_id,
+                                                             patient_id=patient_id or None, make_admin=make_admin)
+                st.session_state.invite_link = f"{PORTAL_URL}/invite/{token}"
+                st.session_state.invite_expires = invite.expires_at
+            except PTLogError as exc:
+                st.error(str(exc))
+            else:
+                st.rerun()                               # the new invite shows in the table above
+    if st.session_state.get("invite_link"):
+        st.success("Copy this link now and give it to the person. It is shown only once, works once, and expires "
+                   f"{ptviews.date_minute(st.session_state.invite_expires)}. Limber does not send it anywhere.")
+        st.code(st.session_state.invite_link, language=None)
+        if st.button("Done, hide the link"):
+            st.session_state.pop("invite_link", None)
+            st.rerun()
+
+    pending = [r for r in rows if r["status"] == "invited"]
+    if pending:
+        st.markdown("### Revoke an unused invite")
+        choice = st.selectbox("Invite", [r["invite_id"] for r in pending],
+                              format_func=lambda i: next(f"{r['role']} {r['patient_id'] or ''} · expires "
+                                                         f"{ptviews.date_minute(r['since'])}" for r in pending
+                                                         if r["invite_id"] == i))
+        if st.button("Revoke invite"):
+            with SessionStore(default_db_path()).open() as store:
+                ptaccounts.revoke_invite(store, me, choice)
+            st.rerun()
+
+    accounts_rows = [r for r in rows if r["id"] is not None and r["id"] != me.id]
+    if accounts_rows:
+        st.markdown("### Disable or re-enable an account")
+        target = st.selectbox("Account", [r["id"] for r in accounts_rows],
+                              format_func=lambda i: next(f"{r['username']} ({r['role']}, {r['status']})"
+                                                         for r in accounts_rows if r["id"] == i))
+        status = next(r["status"] for r in accounts_rows if r["id"] == target)
+        if st.button("Re-enable" if status == "disabled" else "Disable"):
+            try:
+                with SessionStore(default_db_path()).open() as store:
+                    ptaccounts.set_status(store, me, target, "active" if status == "disabled" else "disabled")
+                st.rerun()
+            except PTLogError as exc:
+                st.error(str(exc))
+
+    with SessionStore(default_db_path()).open() as store:
+        patient_ids = [p.id for p in store.list_patients() if not p.is_builtin]
+    if patient_ids and therapists:
+        st.markdown("### Move a patient to another therapist")
+        st.caption("The new therapist sees the patient's whole history; the old one no longer sees any of it.")
+        c1, c2 = st.columns(2)
+        with c1:
+            pid = st.selectbox("Patient", patient_ids, key="reassign_patient")
+        with c2:
+            tid = st.selectbox("To therapist", [t.id for t in therapists], key="reassign_to",
+                               format_func=lambda i: next(t.username for t in therapists if t.id == i))
+        if st.button("Move patient"):
+            with SessionStore(default_db_path()).open() as store:
+                ptaccounts.reassign(store, me, pid, tid)
+            st.success(f"{pid} now belongs to {next(t.username for t in therapists if t.id == tid)}.")
+
+
+# =============================================================================
 # MAIN APP
 # =============================================================================
 
@@ -2477,26 +2635,35 @@ def therapist_gate() -> bool:
     the Limber front page or the password itself."""
     with _open_store() as store:
         if not ptadmin.password_is_set(store):
+            st.session_state.pop("account_id", None)
             return True
-        if ptadmin.signed_in(store, st.session_state.get("admin_token")):
+        who = ptadmin.signed_in(store, st.session_state.get("admin_token"))
+        if who is not None:
+            st.session_state.account_id = who.id
             return True
+        st.session_state.pop("account_id", None)
         a_pass = st.query_params.get("pass")
         if a_pass:
             token = ptadmin.redeem_pass(store, a_pass)
             st.query_params.clear()                      # the pass must not stay in the address bar
             if token:
                 st.session_state.admin_token = token
+                st.session_state.account_id = ptadmin.signed_in(store, token).id
                 return True
 
     left, middle, right = st.columns([1, 1.2, 1])
     with middle:
         st.markdown(f'''<div class="limber-lockup">{LIMBER_MARK_SVG}<span>Limber</span></div>
             <div class="limber-tag">Therapist sign-in</div>''', unsafe_allow_html=True)
-        password = st.text_input("Therapist password", type="password", key="therapist_password")
+        username = st.text_input("Username", key="therapist_username")
+        password = st.text_input("Password", type="password", key="therapist_password")
         if st.button("Sign in", key="therapist_signin", type="primary", use_container_width=True):
             try:
                 with _open_store() as store:
-                    st.session_state.admin_token = ptadmin.sign_in(store, password, "therapist-app", _therapist_limiter())
+                    token = ptadmin.sign_in(store, password, "therapist-app", _therapist_limiter(),
+                                            username=username.strip() or None)
+                    st.session_state.admin_token = token
+                    st.session_state.account_id = ptadmin.signed_in(store, token).id
                 st.session_state.pop("therapist_password", None)
                 st.rerun()
             except PTLogError as exc:
@@ -2510,6 +2677,10 @@ def main():
     init_session_state()
     if not therapist_gate():
         return
+    me = _account()
+    if me is not None:
+        with SessionStore(default_db_path()).open() as store:
+            _apply_prefs(ptaccounts.get_prefs(store, me.id))
     render_sidebar()
 
     # Route to current page
@@ -2535,6 +2706,10 @@ def main():
         page_inbox()
     elif page == 'learn':
         page_how_it_works()
+    elif page == 'people':
+        page_people()
+    elif page == 'settings':
+        page_my_settings()
     else:
         page_home()
 

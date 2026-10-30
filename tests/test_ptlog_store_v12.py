@@ -70,6 +70,7 @@ def test_the_upgrade_keeps_every_row(tmp_db):
     after = _counts(tmp_db)
     assert after["instrument_assignments"] == 0
     for table, n in before.items():
+        table = "accounts" if table == "portal_admin" else table      # v14 moved it into accounts (feature 016)
         expected = n + (SCHEMA_VERSION - PREVIOUS) if table == "schema_version" else n   # one row per migration
         assert after[table] == expected, f"{table}: {n} rows before, {after[table]} after"
 

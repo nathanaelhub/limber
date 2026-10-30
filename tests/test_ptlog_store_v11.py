@@ -95,6 +95,9 @@ def test_the_rebuild_keeps_every_row(tmp_db):
         if table == "schema_version":
             assert after[table] == n + (SCHEMA_VERSION - PREVIOUS)   # one row per migration applied
             continue
+        if table == "portal_admin":                                  # v14 moved it into accounts (feature 016)
+            assert table not in after and after["accounts"] == n
+            continue
         assert after[table] == n, f"{table}: {n} rows before, {after[table]} after"
 
 

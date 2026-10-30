@@ -931,3 +931,82 @@ def test_inbox_shows_why_writing_out_failed(seeded_env, tmp_path, monkeypatch):
     text = " ".join(x.value for x in list(at.markdown) + list(at.caption))
     assert "did not work" in text.lower() and "timeout" in text
     assert at.get("audio"), "the recording is still there to listen to"
+
+
+# ----------------------------------------------------------------------------- feature 016: accounts in the app
+
+def _people(db):
+    """An admin, two therapists, and a patient in each caseload."""
+    from src.portal import accounts
+    with SessionStore(db).open() as store:
+        boss = accounts.create_account(store, username="boss", display_name="Admin", password=THERAPIST_PASSWORD,
+                                       role="admin")
+        anna = accounts.create_account(store, username="anna", display_name="Anna", password=THERAPIST_PASSWORD,
+                                       role="therapist")
+        ben = accounts.create_account(store, username="ben", display_name="Ben", password=THERAPIST_PASSWORD,
+                                      role="therapist")
+        accounts.assign(store, "P-017", anna.id)
+        accounts.add_patient(store, ben, "P-023", label="Shoulder")
+    return boss, anna, ben
+
+
+def _sign_in_as(db, username):
+    from src.portal import admin
+    with SessionStore(db).open() as store:
+        a_pass = admin.issue_pass(store, store.account_by_username(username).id)
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.query_params["pass"] = a_pass
+    return at
+
+
+def test_a_therapist_sees_only_their_own_caseload(seeded_env):
+    _people(seeded_env)
+    at = _sign_in_as(seeded_env, "ben").run()
+    assert not at.exception, [e.value for e in at.exception]
+    options = " ".join(at.selectbox(key="patient_select").options)
+    assert "P-023" in options and "P-017" not in options
+    for page in ("sessions", "tracker", "inbox", "patients"):
+        at.session_state["current_page"] = page
+        at.run()
+        assert not at.exception, (page, [e.value for e in at.exception])
+        assert "P-017" not in _visible_text(at) and "Post-op knee" not in _visible_text(at), page
+
+
+def test_username_and_password_on_the_app_sign_in(seeded_env):
+    _people(seeded_env)
+    at = AppTest.from_file(str(APP), default_timeout=180).run()
+    at.text_input(key="therapist_username").set_value("anna").run()
+    at.text_input(key="therapist_password").set_value(THERAPIST_PASSWORD).run()
+    at.button(key="therapist_signin").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert "P-017" in " ".join(at.selectbox(key="patient_select").options)
+    assert any("Signed in as Anna" in c.value for c in at.caption)
+
+
+def test_an_admin_manages_people_but_sees_no_clinical_pages(seeded_env):
+    _people(seeded_env)
+    at = _sign_in_as(seeded_env, "boss").run()
+    assert not at.exception, [e.value for e in at.exception]
+    labels = [b.label for b in at.button]
+    assert any("People" in b for b in labels) and not any("Tracker" in b or "Review" in b for b in labels)
+    assert not any(s.key == "patient_select" for s in at.selectbox)
+    text = _visible_text(at)
+    assert "anna" in text and "ben" in text
+    at.button(key="FormSubmitter:invite_form-Create invite link").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("/invite/" in c.value for c in at.code)
+    assert "invited" in _visible_text(at)
+
+
+def test_my_settings_saves_and_applies(seeded_env):
+    _people(seeded_env)
+    at = _sign_in_as(seeded_env, "anna").run()
+    at.session_state["current_page"] = "settings"
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    at.checkbox[0].check().run()
+    at.button(key="FormSubmitter:my_settings-Save").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    from src.portal import accounts
+    with SessionStore(seeded_env).open() as store:
+        assert accounts.get_prefs(store, store.account_by_username("anna").id)["larger_text"] is True

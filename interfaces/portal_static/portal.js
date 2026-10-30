@@ -108,9 +108,34 @@
       event.preventDefault();
       var error = document.getElementById("admin-error");
       error.hidden = true;
-      api("/api/admin/login", { method: "POST", body: JSON.stringify({ password: document.getElementById("password").value }) })
+      var staff = document.getElementById("staff-username").value.trim();
+      var body = { password: document.getElementById("password").value };
+      if (staff) { body.username = staff; }                    // blank: a one-therapist installation's password
+      api("/api/admin/login", { method: "POST", body: JSON.stringify(body) })
         .then(function (res) {
           if (res.status === 200 && res.data.redirect) { window.location.href = res.data.redirect; return; }
+          error.textContent = res.data.error || "Sign-in is not available right now.";
+          error.hidden = false;
+        })
+        .catch(function () { error.textContent = "The service cannot be reached right now."; error.hidden = false; });
+    });
+    // a patient with a username and password (feature 016) instead of an access code
+    var accountForm = document.getElementById("signin-account");
+    var useAccount = function (on) {
+      panels.patient.hidden = on; accountForm.hidden = !on;
+      document.getElementById(on ? "patient-username" : "code").focus();
+    };
+    document.getElementById("use-account").addEventListener("click", function () { useAccount(true); });
+    document.getElementById("use-code").addEventListener("click", function () { useAccount(false); });
+    doors.therapist.addEventListener("click", function () { accountForm.hidden = true; });
+    accountForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var error = document.getElementById("account-error");
+      error.hidden = true;
+      api("/api/login", { method: "POST", body: JSON.stringify({ username: document.getElementById("patient-username").value,
+                                                                password: document.getElementById("patient-password").value }) })
+        .then(function (res) {
+          if (res.status === 200) { window.location.href = "/today"; return; }
           error.textContent = res.data.error || "Sign-in is not available right now.";
           error.hidden = false;
         })
@@ -128,6 +153,66 @@
           error.hidden = false;
         })
         .catch(function () { error.textContent = "The service cannot be reached right now."; error.hidden = false; });
+    });
+  }
+
+  // ---- accessibility settings (feature 016): the server puts them on <html>; these pages change them ----
+  var PREFS = { larger_text: "a11y-large", high_contrast: "a11y-contrast", reduced_motion: "a11y-calm" };
+  function readPrefs() {
+    var out = {};
+    Object.keys(PREFS).forEach(function (k) { out[k] = document.getElementById(k).checked; });
+    return out;
+  }
+  function applyPrefs(prefs) {
+    Object.keys(PREFS).forEach(function (k) { document.documentElement.classList.toggle(PREFS[k], prefs[k] === true); });
+  }
+  function previewPrefs() {
+    Object.keys(PREFS).forEach(function (k) {
+      document.getElementById(k).addEventListener("change", function () { applyPrefs(readPrefs()); });
+    });
+  }
+
+  if (page === "settings") {
+    api("/api/me/preferences").then(function (res) {
+      if (res.status === 401) { window.location.href = "/"; return; }
+      Object.keys(PREFS).forEach(function (k) { document.getElementById(k).checked = res.data[k] === true; });
+    });
+    previewPrefs();
+    document.getElementById("prefs").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var saved = document.getElementById("saved"), error = document.getElementById("prefs-error");
+      saved.hidden = true; error.hidden = true;
+      api("/api/me/preferences", { method: "POST", body: JSON.stringify(readPrefs()) }).then(function (res) {
+        if (res.status === 200) { applyPrefs(res.data); saved.hidden = false; return; }
+        error.textContent = res.data.error || "Could not save that."; error.hidden = false;
+      }).catch(function () { error.textContent = "The service cannot be reached right now."; error.hidden = false; });
+    });
+  }
+
+  if (page === "invite") {
+    var token = window.location.pathname.split("/").pop();
+    var form = document.getElementById("invite"), bad = document.getElementById("invite-bad");
+    var ROLE_LINES = { patient: "Your therapist invited you to Limber.", therapist: "You're invited to Limber as a therapist.",
+                       admin: "You're invited to Limber as an admin." };
+    api("/api/invites/" + encodeURIComponent(token)).then(function (res) {
+      if (res.status !== 200) { bad.textContent = res.data.error || "This invite link cannot be used."; bad.hidden = false; return; }
+      text("invite-role", ROLE_LINES[res.data.role] + (res.data.admin ? " You'll also be an admin." : ""));
+      form.hidden = false;
+      document.getElementById("display_name").focus();
+    });
+    previewPrefs();
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var error = document.getElementById("invite-error");
+      error.hidden = true;
+      api("/api/invites/" + encodeURIComponent(token), { method: "POST", body: JSON.stringify({
+        display_name: document.getElementById("display_name").value, username: document.getElementById("username").value,
+        password: document.getElementById("new-password").value, password_again: document.getElementById("password-again").value,
+        prefs: readPrefs() }) }).then(function (res) {
+        if (res.status === 200 && res.data.redirect) { window.location.href = res.data.redirect; return; }
+        if (res.status === 410) { form.hidden = true; bad.textContent = res.data.error; bad.hidden = false; return; }
+        error.textContent = res.data.error || "Could not create the account."; error.hidden = false;
+      }).catch(function () { error.textContent = "The service cannot be reached right now."; error.hidden = false; });
     });
   }
 

@@ -233,7 +233,12 @@ def current_patient(store: SessionStore, token: Optional[str],
     expired = _ts_key(signin.expires_at) <= _ts_key(now.isoformat())
     if token.startswith("d."):
         idle = timedelta(0)                                              # a device sign-in has no idle limit
-    if (idle > IDLE_LIMIT or expired or store.portal_status(signin.patient_id).state != "active"
+    if token.startswith("a."):                                           # a password account (feature 016)
+        account = store.account_by_patient(signin.patient_id)
+        allowed = account is not None and account.status == "active"
+    else:
+        allowed = store.portal_status(signin.patient_id).state == "active"
+    if (idle > IDLE_LIMIT or expired or not allowed
             or store.get_discharge(signin.patient_id) is not None):
         store.portal_signin_delete(digest)
         return None
