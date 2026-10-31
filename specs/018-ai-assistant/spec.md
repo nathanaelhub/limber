@@ -79,6 +79,10 @@ a draft.
 1. **Given** a draft, **Then** nothing reaches the patient until the therapist presses Send.
 2. **Given** the patient's last message mentions chest pain, numbness, a fall, or similar red flags,
    **Then** the draft is withheld and the therapist sees "This message may need a direct response" instead.
+3. **Given** a withheld message the therapist dealt with by phone, **When** they press **Mark as handled by
+   phone**, **Then** it leaves the inbox's "may need a direct response" list, its unread count clears, and
+   the record keeps who marked it and when. Nothing is sent to the patient. (Added 2026-10-30 from the
+   Claude Design review, `design/limber-export/screens/TherapistInbox.html`, state 5b.)
 
 ### User Story 3 - The Patient Asks the Exercise Coach (Priority: P2)
 
@@ -126,6 +130,9 @@ the nearest emergency room) and nothing else.
   tokens, outcome. Not the content.
 - **FR-008**: New dependency: the `anthropic` Python SDK. Justified under Principle V: it is the official
   client, and writing HTTP calls by hand would mean re-implementing its retries and error types.
+
+- **FR-009**: A withheld message can be marked **handled by phone**: it clears from the inbox flag and the
+  unread count, sends nothing, and is recorded with the therapist and time (US2 scenario 3).
 
 ## Success Criteria
 

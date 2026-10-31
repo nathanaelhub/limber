@@ -224,8 +224,8 @@
     if (count) { count.hidden = !badge.unread; count.textContent = String(badge.unread); }
   }
 
-  if (page === "session" || page === "progress" || page === "messages" || page === "clip" ||
-      page === "diary" || page === "log" || page === "questionnaire" || page === "voice") {
+  if (page === "session" || page === "progress" || page === "messages" || page === "clip" || page === "visits" ||
+      page === "diary" || page === "log" || page === "questionnaire" || page === "voice" || page === "settings") {
     api("/api/today").then(function (res) {
       if (res.status === 401) { window.location.href = "/"; return; }
       text("patient-id", res.data.patient_id);
@@ -233,9 +233,48 @@
     });
   }
 
+  // Today's plan cards and next visit (feature 017)
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
+                     "October", "November", "December"];
+  var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  function renderPlans(d) {
+    var cards = document.getElementById("plan-cards"), top = document.getElementById("today-top");
+    if (!cards) { return; }
+    while (cards.firstChild) { cards.removeChild(cards.firstChild); }
+    var done = (d.exercises || []).filter(function (e) { return e.done_today; }).length, total = (d.exercises || []).length;
+    (d.plans || []).forEach(function (p) {
+      var li = document.createElement("li"); li.className = "card plan-card";
+      var h = document.createElement("h2"); h.textContent = p.title; li.appendChild(h);
+      var line = document.createElement("p"); line.className = "small";
+      if (!p.has_program) { line.textContent = "Your therapist hasn't added exercises yet."; }
+      else if (!total) { line.textContent = "No exercises today."; }
+      else if (done === total) { line.textContent = "Done for today: " + total + " of " + total + (total === 1 ? " exercise." : " exercises."); }
+      else { line.textContent = done + " of " + total + (total === 1 ? " exercise" : " exercises") + " done today."; }
+      li.appendChild(line);
+      if (p.unread && d.messages && d.messages.enabled) {
+        var a = document.createElement("a"); a.className = "plan-link"; a.href = "/messages?plan=" + p.id;
+        a.textContent = p.unread === 1 ? "1 new message" : p.unread + " new messages";
+        li.appendChild(a);
+      }
+      cards.appendChild(li);
+    });
+    var v = d.next_visit, card = document.getElementById("next-visit");
+    if (v) {
+      var when = new Date(v.date + "T12:00:00");
+      text("visit-month", MONTH_NAMES[when.getMonth()].slice(0, 3).toUpperCase());
+      text("visit-day", String(when.getDate()));
+      text("visit-when", DAY_NAMES[when.getDay()].slice(0, 3) + " " + when.getDate() + " " + MONTH_NAMES[when.getMonth()].slice(0, 3) + ", " +
+           (v.time.charAt(0) === "0" ? v.time.slice(1) : v.time) + " · " + v.minutes + " min");
+      text("visit-note", v.note || "");
+    }
+    card.hidden = !v;
+    top.hidden = !(d.plans && d.plans.length) && !v;
+  }
+
   function renderToday(d) {
       text("patient-id", d.patient_id);
       messagesLink(d.messages);
+      renderPlans(d);
       if (d.checkin && d.checkin.today) { var cd = text("checkin-done", "Check-ins today: " + d.checkin.today); cd.hidden = false; }
       if (d.diary) { document.getElementById("diary-link").hidden = !d.diary.enabled; }
       if (d.voice) { document.getElementById("voice-link").hidden = !d.voice.enabled; }

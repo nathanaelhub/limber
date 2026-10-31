@@ -17,27 +17,65 @@
 <body data-page="messages">
   <header class="bar">
     <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
-    <nav><a href="/today">Today</a><a href="/progress">Progress</a><a id="nav-messages" href="/messages" aria-current="page">Messages<span id="nav-unread" class="badge" hidden></span></a><a href="/settings">Settings</a></nav>
+    <nav class="tabs" aria-label="Main"><a href="/today"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Today</span></a><a href="/progress"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg><span>Progress</span></a><a id="nav-messages" href="/messages" aria-current="page"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg><span>Messages</span><span id="nav-unread" class="badge" hidden></span></a><a href="/visits"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Visits</span></a><a href="/settings"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></a></nav>
     <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
   </header>
-  <main class="card wide">
+  <main class="card wide conversation">
     <h1>Messages</h1>
-    <p class="lead">Your conversation with your therapist</p>
-    <p class="emergency" role="note">Not for emergencies. Your therapist reads messages during working hours. If this is urgent, call your clinic or emergency services.</p>
+    <p class="lead">Your conversation with your therapist, one for each plan of care</p>
+    <div id="plan-switcher" class="chips" role="group" aria-label="Plans of care" hidden></div>
     <p id="messages-off" class="lead" hidden>Messages are not turned on for you. Ask your therapist at your next visit.</p>
+    <p id="load-error" class="error" role="alert" hidden></p>
     <ol id="thread" class="thread" aria-live="polite"></ol>
+    <section id="past-plan" class="ended" hidden>
+      <h2><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg><span id="past-title">This plan has ended</span></h2>
+      <p>You can read these messages, but you can't reply here. To ask something new, use an active plan.</p>
+      <button id="go-active" type="button" hidden></button>
+    </section>
     <form id="compose" hidden>
-      <label for="text">Write to your therapist</label>
-      <textarea id="text" rows="3" maxlength="2000" required></textarea>
-      <p id="warn" class="warn" role="alert" hidden></p>
-      <div class="actions">
-        <button id="send" type="submit">Send</button>
-        <button id="send-anyway" type="button" class="secondary" hidden>Send anyway</button>
+      <div id="tray" class="tray" hidden>
+        <div class="tray-head"><span id="tray-count" class="b"></span><span id="tray-more" class="small"></span></div>
+        <ul id="tray-items" class="tray-items"></ul>
+        <p id="tray-rule" class="small" hidden>One PDF per message. To add photos instead, remove the PDF.</p>
+      </div>
+      <div class="c-row">
+        <button id="add" class="ib" type="button" aria-haspopup="dialog" aria-controls="add-sheet" aria-label="Add photos or a PDF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        <label class="sr" for="text">Write to your therapist</label>
+        <textarea id="text" class="field" rows="2" maxlength="2000" placeholder="Write a message"></textarea>
+        <button id="send" class="ib p" type="submit" aria-label="Send"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4 18-7z"/></svg></button>
+      </div>
+      <div id="warn" class="warnbox" role="alert" hidden>
+        <p class="b"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg><span id="warn-text"></span></p>
+        <p class="small">Messages are safer without personal details. Your clinic already has your contact details.</p>
+        <div class="actions">
+          <button id="edit-message" type="button" class="secondary">Edit message</button>
+          <button id="send-anyway" type="button">Send anyway</button>
+        </div>
       </div>
       <p id="compose-error" class="error" role="alert" hidden></p>
-      <p class="small">Please do not include your name, phone number, or other personal details.</p>
+      <p class="note emergency" role="note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>Not for emergencies. Your therapist reads messages during working hours. If you need help now, call 911.</p>
     </form>
+    <p id="notice-alone" class="note emergency" role="note" hidden>Not for emergencies. If you need help now, call 911.</p>
   </main>
+  <div id="add-sheet" class="sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="add-title" hidden>
+    <div class="scrim" id="add-scrim"></div>
+    <div class="sheet">
+      <span class="grab" aria-hidden="true"></span>
+      <h2 id="add-title">Add to your message</h2>
+      <p class="small">Up to 4 photos, or 1 PDF.</p>
+      <label id="take-photo-row" class="pick" for="take-photo" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</label>
+      <input id="take-photo" class="sr" type="file" accept="image/*" capture="environment">
+      <label class="pick" for="pick-photos"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Choose photos</label>
+      <input id="pick-photos" class="sr" type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple>
+      <label class="pick" for="pick-pdf"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>Choose a PDF</label>
+      <input id="pick-pdf" class="sr" type="file" accept="application/pdf">
+      <button id="add-cancel" type="button" class="link">Cancel</button>
+    </div>
+  </div>
+  <div id="viewer" class="sheet-wrap" role="dialog" aria-modal="true" aria-label="Photo" hidden>
+    <div class="scrim" id="viewer-scrim"></div>
+    <figure class="viewer"><img id="viewer-img" alt=""><button id="viewer-close" type="button">Close</button></figure>
+  </div>
   <script src="/static/portal.js"></script>
   <script src="/static/messages.js"></script>
 </body>

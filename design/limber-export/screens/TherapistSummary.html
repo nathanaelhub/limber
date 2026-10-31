@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly summary panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<div class="board" style="width: 2696px; height: 1400px;">
+
+  <!-- 6a Result -->
+  <div class="frame">
+    <div class="cap">6a · Patient page with the summary <span>st.tabs, st.metric, st.container(border=True), st.page_link</span></div>
+    <div class="st" style="height: 1280px;">
+      <aside class="st-side">
+        <div class="col" style="gap: 2px;"><h3 style="font-size: 22px;">Limber</h3><span class="st-cap">Clinic workspace</span></div>
+        <nav class="st-nav" aria-label="Sections">
+          <a href="TherapistInbox.html">Inbox <span class="cnt">3</span></a>
+          <a href="#" aria-current="page">Patients</a>
+          <a href="#">Schedule</a>
+          <a href="#">Settings</a>
+        </nav>
+      </aside>
+      <main class="st-main">
+        <div class="col" style="gap: 4px;"><h1>P-021</h1><span class="st-cap">Right knee, post-op · Started 3 weeks ago · Also: Left shoulder</span></div>
+        <nav class="st-tabs" aria-label="Patient sections"><a href="#" aria-current="page">Overview</a><a href="#">Exercises</a><a href="TherapistInbox.html">Messages</a><a href="#">Session notes</a><a href="TherapistAISettings.html">AI settings</a></nav>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+          <div class="st-box" style="gap: 2px; padding: 16px 20px;"><span class="st-cap">Days done, last 7</span><span style="font-size: 30px; font-weight: 800;">4 of 7</span></div>
+          <div class="st-box" style="gap: 2px; padding: 16px 20px;"><span class="st-cap">Pain, latest</span><span style="font-size: 30px; font-weight: 800;">6/10</span><span class="small b" style="color: #B4432B;">Up 3 from last week</span></div>
+          <div class="st-box" style="gap: 2px; padding: 16px 20px;"><span class="st-cap">Next visit</span><span style="font-size: 22px; font-weight: 800;">Tue 4 Nov, 9:00</span><span class="small">Re-check range of motion</span></div>
+        </div>
+
+        <section class="st-box" aria-labelledby="ws1">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+            <div class="col" style="gap: 2px;"><h2 id="ws1">Weekly summary</h2><span class="st-cap">27 October to 2 November · made today at 08:30 from 18 records</span></div>
+            <button class="st-btn">Summarise again</button>
+          </div>
+          <span class="ai"><span class="ai-mark">AI</span>AI-drafted — check before acting</span>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;">
+            <div class="col" style="gap: 6px;"><h3>Adherence</h3><p>Exercises done on 4 of 7 days. Missed Thursday, Saturday and Sunday. Straight leg raises were skipped most often.</p><a href="#" class="lnk small">Exercise log · 7 entries</a></div>
+            <div class="col" style="gap: 6px;"><h3>Pain trend</h3><p>Pain rose from 3/10 to 6/10. The highest score was on Thursday 30 October, the day the patient said stairs felt harder.</p><a href="#" class="lnk small">Pain log · 6 entries</a></div>
+            <div class="col" style="gap: 6px;"><h3>Questions asked</h3><p>2 coach questions about heel slide depth and quad set holds, answered from the program. 1 coach question about worse pain was sent to you. 1 message with a swelling photo.</p><span class="row" style="gap: 14px;"><a href="#" class="lnk small">Coach chats · 3</a><a href="TherapistInbox.html" class="lnk small">Message · 30 Oct</a></span></div>
+          </div>
+          <div class="col" style="gap: 10px; border-top: 1px solid #EDEAE2; padding-top: 14px;">
+            <h3>Suggested next steps</h3>
+            <ol style="margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px;">
+              <li><span>Look at the swelling photo before Tuesday's visit.</span> <a href="TherapistInbox.html" class="lnk small">From: Message · 30 Oct</a></li>
+              <li><span>Check range of motion and swelling on Tuesday before progressing the program.</span> <a href="#" class="lnk small">From: Pain log</a> · <a href="#" class="lnk small">Exercise log</a></li>
+              <li><span>Ask about the missed days and whether straight leg raises hurt.</span> <a href="#" class="lnk small">From: Exercise log</a> · <a href="#" class="lnk small">Coach chat · 1 Nov</a></li>
+            </ol>
+          </div>
+          <div class="row" style="gap: 10px; border-top: 1px solid #EDEAE2; padding-top: 14px;">
+            <button class="st-btn p">Save as session note</button><button class="st-btn">Edit</button><button class="st-btn">Discard</button>
+            <span class="st-cap" style="margin-left: 8px;">P-021 never sees this summary.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- 6b States -->
+  <div class="frame">
+    <div class="cap">6b · Summary panel states <span>idle, loading, saved, no records, unavailable</span></div>
+    <div class="st" style="height: 1280px;">
+      <main class="st-main" style="gap: 22px;">
+        <section class="st-box" aria-labelledby="s1">
+          <span class="st-cap b">IDLE</span>
+          <h2 id="s1">Weekly summary</h2>
+          <div class="row" style="gap: 12px;"><button class="st-btn p">Summarise the last 7 days</button><span class="st-cap">Uses P-021's exercise log, pain log, messages and coach chats. Nothing is sent to the patient.</span></div>
+        </section>
+        <section class="st-box" aria-labelledby="s2" aria-busy="true">
+          <span class="st-cap b">LOADING</span>
+          <h2 id="s2">Weekly summary</h2>
+          <div class="row" style="gap: 12px;"><button class="st-btn p" disabled>Summarise the last 7 days</button></div>
+          <div class="row" role="status" style="gap: 12px;"><span class="spin" aria-hidden="true"></span><span>Reading 7 days of records. This can take up to 20 seconds.</span></div>
+        </section>
+        <section class="st-box" aria-labelledby="s3">
+          <span class="st-cap b">SAVED</span>
+          <h2 id="s3">Weekly summary</h2>
+          <div class="st-alert st-info" role="status"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" style="color: #0A544E; flex: none;"><path d="M5 12l5 5 9-10"/></svg><div class="col" style="gap: 2px;"><span class="b">Saved as a session note</span><span>The note keeps the AI-drafted label until you edit and sign it.</span></div></div>
+          <div class="row" style="gap: 10px;"><a href="#" class="st-btn">Open session note</a></div>
+        </section>
+        <section class="st-box" aria-labelledby="s4">
+          <span class="st-cap b">NO RECORDS THIS WEEK</span>
+          <h2 id="s4">Weekly summary</h2>
+          <div class="st-alert st-neutral" role="status"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex: none;"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg><div class="col" style="gap: 2px;"><span class="b">No records this week</span><span>P-021 has not logged exercises, pain or messages since 27 October. There is nothing to summarise.</span></div></div>
+          <div class="row" style="gap: 10px;"><a href="TherapistInbox.html" class="st-btn">Message P-021</a></div>
+        </section>
+        <section class="st-box" aria-labelledby="s5">
+          <span class="st-cap b">ASSISTANT UNAVAILABLE</span>
+          <h2 id="s5">Weekly summary</h2>
+          <div class="st-alert st-warn" role="alert"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h0"/></svg><div class="col" style="gap: 2px;"><span class="b">The assistant isn't available right now</span><span>Your records are safe. Try again in a few minutes, or read the logs directly.</span></div></div>
+          <div class="row" style="gap: 10px;"><button class="st-btn">Try again</button><a href="#" class="st-btn">Open exercise log</a></div>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+</body>
+</html>

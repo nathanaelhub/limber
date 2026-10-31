@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exercise coach, tablet</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<div class="board" style="width: 864px; height: 1160px;">
+  <div class="frame">
+    <div class="cap">2h · Coach at 768 <span>the program it answers from sits beside the chat</span></div>
+    <div class="tablet lb">
+      <div class="top" style="padding: 26px 28px 14px; border-bottom: 1px solid #EDEAE2;">
+        <div class="row" style="gap: 6px;">
+          <a href="Today.html" class="btn btn-g" style="padding: 0 8px 0 0;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Today</a>
+          <span class="code" style="margin-left: auto;">P-021</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px;">
+          <div class="col" style="gap: 2px;"><h1>Ask about your exercises</h1><span class="small mut">Right knee, post-op</span></div>
+        </div>
+        <div class="ai-bar"><span class="ai-mark">AI</span><span>Answers come from an AI assistant using your exercise program. Your therapist can read this chat.</span></div>
+      </div>
+      <div style="flex: 1; display: flex; min-height: 0;">
+        <aside style="width: 260px; flex: none; padding: 22px 20px; border-right: 1px solid #EDEAE2; display: flex; flex-direction: column; gap: 12px;" aria-labelledby="prog">
+          <h3 id="prog">Your program</h3>
+          <p class="xs mut">The coach answers only from this list.</p>
+          <div class="card" style="padding: 14px; border-radius: 16px;"><p class="b small">Heel slides</p><p class="xs mut">3 sets of 10</p></div>
+          <div class="card" style="padding: 14px; border-radius: 16px;"><p class="b small">Quad sets</p><p class="xs mut">3 sets of 15, hold 5 seconds</p></div>
+          <div class="card" style="padding: 14px; border-radius: 16px;"><p class="b small">Straight leg raises</p><p class="xs mut">2 sets of 10</p></div>
+        </aside>
+        <section style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+          <div class="body" style="padding: 16px 24px; justify-content: flex-end;">
+            <div class="thread">
+              <span class="who me">You</span>
+              <div class="msg me" style="max-width: 76%;">How far should I bend in heel slides?</div>
+              <span class="who"><span class="ai"><span class="ai-mark">AI</span>AI assistant</span></span>
+              <div class="msg aib" style="display: flex; flex-direction: column; gap: 8px; max-width: 86%;">
+                <span><span class="b">Heel slides: 3 sets of 10.</span> Bend until you feel a gentle stretch, then slide your heel back out.</span>
+                <span>A gentle stretch is fine. If you feel sharp pain, stop and tell your therapist.</span>
+                <a href="#" class="src"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>From your program: Heel slides</a>
+              </div>
+              <span class="who me">You</span>
+              <div class="msg me" style="max-width: 76%;">Can I take an extra painkiller before I do them?</div>
+            </div>
+            <div class="refer" role="region" aria-labelledby="rf2">
+              <div class="row" style="gap: 10px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color: #0A544E;"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><h3 id="rf2">That's one for your therapist</h3></div>
+              <p class="small">Questions about pain getting worse, new symptoms, medicine or changing your program need your therapist. The coach can't answer them.</p>
+              <div class="row" style="gap: 12px;"><a href="PatientMessages.html" class="btn btn-p">Message your therapist</a><span class="xs mut grow">Your question is copied into a new message. You can change it before you send.</span></div>
+              <p class="xs mut">This is a set message from your clinic.</p>
+            </div>
+          </div>
+          <div class="composer" style="padding: 14px 24px 16px;">
+            <div class="c-row">
+              <label class="sr" for="ct1">Your question</label>
+              <textarea id="ct1" class="field" rows="1" placeholder="Ask about an exercise"></textarea>
+              <button class="btn btn-p" disabled>Ask</button>
+            </div>
+            <span class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg>Not for emergencies. If you need help now, call 911.</span>
+          </div>
+        </section>
+      </div>
+      <nav class="tabbar" aria-label="Main" style="padding: 8px 120px 20px;">
+        <a class="tab" href="Today.html" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="PatientMessages.html"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages</a>
+        <a class="tab" href="Appointments.html"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Limber system</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+</helmet>
+<div class="lb" style="width: 1840px; height: 1560px; box-sizing: border-box; padding: 64px 72px; background: #FAF8F4; display: flex; flex-direction: column; gap: 40px;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 40px;">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <span class="code">LIMBER · MESSAGING AND AI ASSISTANT</span>
+      <h1 style="font-size: 52px;">One calm system for talking to your therapist</h1>
+      <p class="mut" style="max-width: 900px;">Patient screens at 390 and 768. Therapist screens at 1280, built only from Streamlit parts. Same tokens as sign in, onboarding, Today, Progress and Settings.</p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px;">
+    <div class="card" style="display: flex; flex-direction: column; gap: 14px;">
+      <h3>Colour tokens</h3>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #0E6B64;"></div><span class="xs b">--teal</span><span class="xs mut">#0E6B64 · 6.4:1 on white</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #0A544E;"></div><span class="xs b">--teal-dark</span><span class="xs mut">#0A544E · 8.8:1 AAA</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #F2684A;"></div><span class="xs b">--coral</span><span class="xs mut">#F2684A · fills only, ink text on it</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #16302C;"></div><span class="xs b">--ink</span><span class="xs mut">#16302C · 13.3:1</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #728280;"></div><span class="xs b">--muted</span><span class="xs mut">#728280 · 3.8:1, icons only</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #B4432B;"></div><span class="xs b">--warn</span><span class="xs mut">#B4432B · 5.6:1</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #FAF8F4; border: 1px solid #D6D1C5;"></div><span class="xs b">--bg</span><span class="xs mut">#FAF8F4</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D6D1C5;"></div><span class="xs b">--card</span><span class="xs mut">#FFFFFF</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 56px; border-radius: 14px; background: #EDEAE2;"></div><span class="xs b">--line</span><span class="xs mut">#EDEAE2</span></div>
+      </div>
+      <h3 style="margin-top: 6px;">New tokens</h3>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+        <div class="col" style="gap: 6px;"><div style="height: 40px; border-radius: 12px; background: #5E6E6C;"></div><span class="xs b">--muted-text</span><span class="xs mut">#5E6E6C · 5.1:1 small text</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 40px; border-radius: 12px; background: #D6D1C5;"></div><span class="xs b">--line-strong</span><span class="xs mut">#D6D1C5 · input edges</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 40px; border-radius: 12px; background: #E3EFED;"></div><span class="xs b">--teal-tint</span><span class="xs mut">#E3EFED · selected, AI</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 40px; border-radius: 12px; background: #FDEBE5;"></div><span class="xs b">--coral-tint</span><span class="xs mut">#FDEBE5 · to do</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 40px; border-radius: 12px; background: #FBECE8;"></div><span class="xs b">--warn-tint</span><span class="xs mut">#FBECE8 · warning</span></div>
+        <div class="col" style="gap: 6px;"><div style="height: 40px; border-radius: 12px; background: rgba(22,48,44,.48);"></div><span class="xs b">--scrim</span><span class="xs mut">ink at 48%</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+      <h3>The AI label, every time</h3>
+      <p class="small mut">One mark, a boxed “AI”, plus words. Never colour alone, never an icon alone. The same mark appears on patient and therapist screens.</p>
+      <div class="col" style="gap: 6px;"><span class="xs b mut">ON EACH COACH ANSWER</span><span class="ai"><span class="ai-mark">AI</span>AI assistant</span></div>
+      <div class="col" style="gap: 6px;"><span class="xs b mut">TOP OF THE COACH CHAT</span>
+        <div class="ai-bar"><span class="ai-mark">AI</span><span>Answers come from an AI assistant using your exercise program. Your therapist can read this chat.</span></div></div>
+      <div class="col" style="gap: 6px;"><span class="xs b mut">THERAPIST REPLY BOX</span><span class="ai"><span class="ai-mark">AI</span>AI-drafted — check before sending</span></div>
+      <div class="col" style="gap: 6px;"><span class="xs b mut">THERAPIST SUMMARY</span><span class="ai"><span class="ai-mark">AI</span>AI-drafted — check before acting</span></div>
+      <div class="col" style="gap: 6px;"><span class="xs b mut">SET SAFETY MESSAGES (NOT AI)</span><span class="xs">Referral and emergency cards are fixed text written by the clinic. They carry no AI mark and say “This is a set message from your clinic.”</span></div>
+    </div>
+
+    <div class="card" style="display: flex; flex-direction: column; gap: 14px;">
+      <h3>Navigation: one new item, Visits</h3>
+      <div style="border: 1px solid #EDEAE2; border-radius: 18px; overflow: hidden; width: 390px; align-self: center;">
+        <nav class="tabbar" aria-label="Main" style="padding-bottom: 8px;">
+          <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+          <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+          <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages</a>
+          <a class="tab new" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+          <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+        </nav>
+      </div>
+      <p class="small">Visits sits before Settings. Every patient has visits, so the tab never disappears. Changing a visit is a task people come back to.</p>
+      <p class="small">The coach does not get a tab. It is off by default, so a tab would vanish for many patients. It lives on Today and at the top of Messages instead.</p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px;">
+    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+      <h3>Type</h3>
+      <p style="font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;">Heading 28 / 800</p>
+      <p style="font-size: 19px; font-weight: 800; letter-spacing: -0.02em;">Card title 19 / 800</p>
+      <p>Body 17 / 1.5. Short sentences, plain words.</p>
+      <p class="small">Small 15 / 600 for chips and buttons</p>
+      <p class="xs mut">Caption 13 in --muted-text, never --muted</p>
+      <p class="xs mut">Sora, then Outfit, then system sans.</p>
+    </div>
+    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+      <h3>The three user settings</h3>
+      <p class="small"><span class="b">Larger text.</span> Body 21, small 18, captions 16. Bubbles and cards grow taller, never truncate. Chips wrap to two rows.</p>
+      <p class="small"><span class="b">Higher contrast (AAA).</span> Muted text becomes ink, teal becomes teal-dark (8.8:1), borders become 2px ink, tints become white, badges become ink with white text.</p>
+      <p class="small"><span class="b">Less motion.</span> Thinking dots stop and the words “Checking your program” carry the meaning. Sheets appear without sliding.</p>
+    </div>
+    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+      <h3>Rules held on every screen</h3>
+      <p class="small">Patients are shown as a code such as P-021. No names, photos or emails.</p>
+      <p class="small">Tap targets 44px or larger. Most are 48.</p>
+      <p class="small">Status is always words plus shape: “2 new”, “Cancelled”, “Past”, “Done for today”.</p>
+      <p class="small">Nothing written by AI reaches a patient without the therapist, except the coach, which the therapist turns on.</p>
+    </div>
+  </div>
+
+  <div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+    <h3>Components and their states</h3>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 28px;">
+      <p class="small"><span class="b">Plan switcher.</span> Active plan, other plan with “N new”, no unread, past plan (archive icon). Wraps in Larger text.</p>
+      <p class="small"><span class="b">Message bubble.</span> Therapist, you, with photos, with PDF, sending, sent with time, failed with Try again.</p>
+      <p class="small"><span class="b">Attachment tray.</span> Empty, 1 to 4 photos, 4 of 4 (add disabled, says why), 1 PDF (photos disabled), uploading, remove on each.</p>
+      <p class="small"><span class="b">Add menu.</span> Take a photo (phones only), Choose photos, Choose a PDF.</p>
+      <p class="small"><span class="b">Compose box.</span> Empty (send disabled), typing, privacy warning, sending. Hidden for past plans.</p>
+      <p class="small"><span class="b">Privacy warning.</span> Phone number found, name found. Actions: Edit message, Send anyway.</p>
+      <p class="small"><span class="b">AI label.</span> Answer label, chat banner, AI-drafted reply, AI-drafted summary.</p>
+      <p class="small"><span class="b">Coach answer.</span> Thinking, answer with source link, referral card, emergency card.</p>
+      <p class="small"><span class="b">Referral card.</span> Default, after tap (“Your question is in a new message”).</p>
+      <p class="small"><span class="b">Emergency card.</span> One state. Replaces any AI text. Call 911 and Find an emergency room.</p>
+      <p class="small"><span class="b">Coach unavailable.</span> Turned off, daily limit reached, cannot connect. Each links to Messages.</p>
+      <p class="small"><span class="b">Plan card.</span> To do, in progress, done for today, coach entry.</p>
+      <p class="small"><span class="b">Appointment row.</span> Upcoming, next, reschedule requested, cancelled (struck through), past.</p>
+      <p class="small"><span class="b">Month view day.</span> Plain, today (ring), visit (filled), cancelled (dashed and struck), past.</p>
+      <p class="small"><span class="b">Reschedule sheet.</span> Open, sending, request sent.</p>
+      <p class="small"><span class="b">Therapist parts (Streamlit).</span> Inbox row, chat_message, draft box, withheld notice, summary panel, toggle with notice, coach log expander.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1840,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

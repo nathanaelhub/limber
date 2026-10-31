@@ -122,3 +122,20 @@ declines with a note. No approval workflow beyond that.
 - **`plan_id`** columns added to existing tables have no foreign key, because SQLite cannot add one without a
   rebuild. Plans are removed with the patient.
 - **Default clinic time zone** is America/Chicago (the demo clinic). It is a setting.
+
+### Screens (T009–T012, from the Claude Design export in `design/limber-export/`)
+
+- **Navigation** follows the design: a bottom tab bar on phones (≤640px) and the top bar on wider screens, with
+  **Visits** added as a fifth destination on every patient page (owner's decision, 2026-10-30).
+- **Today** shows one card per active plan, not a full program per plan. A patient still has one active
+  program at a time (feature 003), so the card says which plan it belongs to; any other active plan's card
+  says "Your therapist hasn't added exercises yet."
+- **Therapist screens** keep the Streamlit layout: the inbox keeps one row per patient (with a Plans column
+  showing unread per plan) and adds a "Plan of care" picker above the thread, rather than one row per plan.
+  Plans and visits are sections of the patient page, not tabs.
+- **Not built here**: the coach entry row on Messages and Today (feature 018), and "Mark as handled by phone",
+  which is now FR-009 of feature 018. The emergency-card and nearest-emergency-room link styles are in
+  `portal.css` for 018 to use.
+- **Contrast fix**: small grey text now uses `--muted-text` (#5E6E6C, 5.1:1 on the background). The old `--muted`
+  was 3.8:1 and failed WCAG AA. Unread badges are ink on coral, because white on coral failed.
+

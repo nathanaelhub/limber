@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI settings per patient</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<div class="board" style="width: 1376px; height: 1760px;">
+  <div class="frame">
+    <div class="cap">7a · AI settings for P-021 <span>st.toggle, st.container, st.dataframe, st.expander</span></div>
+    <div class="st" style="height: 1640px;">
+      <aside class="st-side">
+        <div class="col" style="gap: 2px;"><h3 style="font-size: 22px;">Limber</h3><span class="st-cap">Clinic workspace</span></div>
+        <nav class="st-nav" aria-label="Sections">
+          <a href="TherapistInbox.html">Inbox <span class="cnt">3</span></a>
+          <a href="#" aria-current="page">Patients</a>
+          <a href="#">Schedule</a>
+          <a href="#">Settings</a>
+        </nav>
+      </aside>
+      <main class="st-main">
+        <div class="col" style="gap: 4px;"><h1>P-021</h1><span class="st-cap">Right knee, post-op · Started 3 weeks ago · Also: Left shoulder</span></div>
+        <nav class="st-tabs" aria-label="Patient sections"><a href="TherapistSummary.html">Overview</a><a href="#">Exercises</a><a href="TherapistInbox.html">Messages</a><a href="#">Session notes</a><a href="#" aria-current="page">AI settings</a></nav>
+        <p class="st-cap">Both are off for every new patient. Turn them on only after you have told the patient.</p>
+
+        <section class="st-box">
+          <div class="tog">
+            <button class="sw" role="switch" aria-checked="true" aria-labelledby="tg1"></button>
+            <div class="col grow" style="gap: 4px;">
+              <div class="row" style="justify-content: space-between;"><span id="tg1" class="b">Weekly summaries and drafts</span><span class="badge bd-ok">On since 13 October</span></div>
+              <span class="st-cap">Lets you make AI summaries of the last 7 days and AI-drafted replies in the inbox. Nothing reaches P-021 unless you send it.</span>
+            </div>
+          </div>
+          <div class="col" style="gap: 6px;"><span class="st-cap b">WHAT P-021 IS SHOWN</span>
+            <div class="quote">Your therapist may use an AI assistant to summarise your week and to draft replies. Your therapist reads and checks everything before it reaches you.</div></div>
+        </section>
+
+        <section class="st-box">
+          <div class="tog">
+            <button class="sw" role="switch" aria-checked="true" aria-labelledby="tg2"></button>
+            <div class="col grow" style="gap: 4px;">
+              <div class="row" style="justify-content: space-between;"><span id="tg2" class="b">Patient exercise coach</span><span class="badge bd-ok">On since 13 October</span></div>
+              <span class="st-cap">P-021 can ask an AI assistant about their own program. It answers only from the program, sends worse pain, new symptoms, medicine and program changes to you, and shows a fixed emergency card for red flags.</span>
+            </div>
+          </div>
+          <div class="col" style="gap: 6px;"><span class="st-cap b">WHAT P-021 IS SHOWN BEFORE THEIR FIRST QUESTION</span>
+            <div class="quote">Your therapist has turned on the exercise coach. It is an AI assistant that answers questions using your exercise program only. Your therapist can read these chats. It is not for emergencies.</div></div>
+        </section>
+
+        <section class="col" style="gap: 10px;">
+          <div class="col" style="gap: 2px;"><h2>Past coach conversations</h2><span class="st-cap">Read only. Newest first.</span></div>
+          <table class="tbl" aria-label="Past coach conversations">
+            <thead><tr><th scope="col">DATE</th><th scope="col">QUESTIONS</th><th scope="col">OUTCOME</th></tr></thead>
+            <tbody>
+              <tr><td>Mon 3 Nov</td><td>1</td><td><span class="badge bd-x">Emergency card shown</span></td></tr>
+              <tr><td>Sat 1 Nov</td><td>2</td><td><span class="badge bd-todo">1 sent to you</span> <span class="badge bd-ok">1 answered</span></td></tr>
+              <tr><td>Wed 29 Oct</td><td>1</td><td><span class="badge bd-ok">Answered</span></td></tr>
+            </tbody>
+          </table>
+          <details class="st-exp" open>
+            <summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>Sat 1 Nov · 2 questions</summary>
+            <div class="in col" style="gap: 4px;">
+              <div class="st-chat"><span class="av pt" aria-hidden="true">P</span><div class="col"><span class="st-cap b">P-021 · 09:01</span><p>How far should I bend in heel slides?</p></div></div>
+              <div class="st-chat"><span class="av" style="background: #FFFFFF; border: 1.5px solid #16302C;" aria-hidden="true">AI</span><div class="col" style="gap: 2px;"><span class="ai"><span class="ai-mark">AI</span>AI assistant · 09:02</span><p>Heel slides: 3 sets of 10. Bend until you feel a gentle stretch, then slide your heel back out.</p></div></div>
+              <div class="st-chat"><span class="av pt" aria-hidden="true">P</span><div class="col"><span class="st-cap b">P-021 · 09:05</span><p>My knee pain is worse this week. Should I stop the leg raises?</p></div></div>
+              <div class="st-chat"><span class="av" style="background: #E3EFED; border: 1.5px solid #0E6B64;" aria-hidden="true">SET</span><div class="col"><span class="st-cap b">Set message · referral card</span><p>That's one for your therapist. P-021 was offered Message your therapist.</p></div></div>
+            </div>
+          </details>
+          <details class="st-exp"><summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>Mon 3 Nov · 1 question · emergency card</summary></details>
+        </section>
+
+        <section class="st-box" style="background: #F1EEE7;">
+          <span class="st-cap b">DEFAULT FOR A NEW PATIENT</span>
+          <div class="row" style="gap: 28px;">
+            <span class="row" style="gap: 10px;"><button class="sw" role="switch" aria-checked="false" aria-label="Weekly summaries and drafts"></button>Weekly summaries and drafts · Off</span>
+            <span class="row" style="gap: 10px;"><button class="sw" role="switch" aria-checked="false" aria-label="Patient exercise coach"></button>Patient exercise coach · Off</span>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+</body>
+</html>

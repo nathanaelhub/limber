@@ -137,6 +137,7 @@ def attachment_json(a) -> Dict[str, Any]:
 def message_json(m) -> Dict[str, Any]:
     return {"id": m.id, "from": "you" if m.sender == "patient" else "therapist", "text": m.body,
             "sent_at": m.sent_at[:16], "removed": m.removed, "media_id": m.media_id, "plan_id": m.plan_id,
+            "seen": m.read_at is not None,           # the other side has opened it ("Seen" on the patient's own)
             "attachments": [attachment_json(a) for a in getattr(m, "attachments", [])]}
 
 
@@ -186,6 +187,23 @@ def voice_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     return voice.options(store, patient_id)
 
 
+def plan_cards(store: SessionStore, patient_id: str, assignment, now: datetime) -> Dict[str, Any]:
+    """Today's plan cards (feature 017): one per active plan, with the therapist's unread messages in it and
+    whether the current program belongs to it, and the next upcoming visit."""
+    from src.portal import plans
+    unread = store.messages_unread_by_plan("therapist", patient_id)
+    program_plan = None
+    if assignment is not None:
+        row = store.conn.execute("SELECT plan_id FROM assignments WHERE id = ?", (assignment.id,)).fetchone()
+        program_plan = row["plan_id"] if row else None
+    cards = [{"id": p.id, "title": p.title, "unread": unread.get(p.id, 0),
+              "has_program": assignment is not None and program_plan == p.id}
+             for p in store.plans(patient_id) if p.status == "active"]
+    upcoming = [a for a in plans.appointments_view(store, patient_id) if a["state"] == "upcoming"]
+    upcoming.sort(key=lambda a: a["starts_local"])
+    return {"plans": cards, "next_visit": upcoming[0] if upcoming else None}
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     from src.portal import diary
     _require(store, patient_id)
@@ -201,6 +219,7 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
                             "questionnaires": questionnaire_badge(store, patient_id, now),
                             "voice": voice_badge(store, patient_id)}
     assignment = store.active_assignment(patient_id, today)
+    view.update(plan_cards(store, patient_id, assignment, now))
     if assignment is None:
         view["message"] = NO_PROGRAM
         return view
