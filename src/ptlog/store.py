@@ -71,7 +71,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -709,6 +709,46 @@ CREATE TABLE IF NOT EXISTS clinic_settings (
 );
 """
 
+SCHEMA_V16_SQL = """
+CREATE TABLE IF NOT EXISTS assist_switches (
+    patient_id     TEXT PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    summaries      INTEGER NOT NULL DEFAULT 0 CHECK (summaries IN (0, 1)),
+    coach          INTEGER NOT NULL DEFAULT 0 CHECK (coach IN (0, 1)),
+    summaries_at   TEXT,
+    coach_at       TEXT,
+    updated_by     INTEGER
+);
+CREATE TABLE IF NOT EXISTS assist_calls (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    at             TEXT NOT NULL,
+    patient_id     TEXT NOT NULL,
+    account_id     INTEGER,
+    purpose        TEXT NOT NULL CHECK (purpose IN ('summary', 'draft', 'coach')),
+    model          TEXT NOT NULL,
+    input_tokens   INTEGER NOT NULL DEFAULT 0,
+    output_tokens  INTEGER NOT NULL DEFAULT 0,
+    outcome        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assist_calls_account ON assist_calls(account_id, at);
+CREATE TABLE IF NOT EXISTS therapist_notes (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id   TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    plan_id      INTEGER,
+    body         TEXT NOT NULL,
+    ai_drafted   INTEGER NOT NULL DEFAULT 0 CHECK (ai_drafted IN (0, 1)),
+    edited       INTEGER NOT NULL DEFAULT 0 CHECK (edited IN (0, 1)),
+    account_id   INTEGER,
+    created_at   TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS message_handled (
+    message_id   INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+    how          TEXT NOT NULL CHECK (how IN ('phone')),
+    account_id   INTEGER,
+    at           TEXT NOT NULL
+);
+ALTER TABLE messages ADD COLUMN from_draft INTEGER NOT NULL DEFAULT 0;
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -725,6 +765,7 @@ MIGRATIONS: List[tuple] = [
     (13, SCHEMA_V13_SQL),
     (14, SCHEMA_V14_SQL),
     (15, SCHEMA_V15_SQL),
+    (16, SCHEMA_V16_SQL),
 ]
 
 
@@ -1175,6 +1216,7 @@ class SessionStore:
         export_paths += [r[0] for r in self.conn.execute(
             "SELECT path FROM review_exports WHERE patient_id = ?", (pid,))]
         media_files = self.conn.execute("SELECT COUNT(*) FROM media WHERE patient_id = ? AND deleted_at IS NULL", (pid,)).fetchone()[0]
+        self.conn.execute("DELETE FROM assist_calls WHERE patient_id = ?", (pid,))   # a log, so no foreign key
         self.conn.execute("DELETE FROM patients WHERE id = ?", (pid,))   # cascades through every child table
         self.conn.commit()
         import shutil
@@ -2309,7 +2351,8 @@ class SessionStore:
                        body="" if removed else row["body"], sent_at=row["sent_at"], read_at=row["read_at"],
                        removed=removed, warned=bool(row["warned"]),
                        media_id=(row["media_id"] if "media_id" in keys and not removed else None),
-                       plan_id=(row["plan_id"] if "plan_id" in keys else None))
+                       plan_id=(row["plan_id"] if "plan_id" in keys else None),
+                       from_draft=bool(row["from_draft"]) if "from_draft" in keys else False)
 
     def message_event(self, patient_id: str, event: str, sender: Optional[str] = None, message_id: Optional[int] = None) -> None:
         """History of what happened in a conversation. Never the text."""
@@ -2336,15 +2379,16 @@ class SessionStore:
         self.conn.commit()
 
     def message_add(self, patient_id: str, sender: str, body: str, warned: bool,
-                    media_id: Optional[str] = None, plan_id: Optional[int] = None, commit: bool = True) -> Message:
+                    media_id: Optional[str] = None, plan_id: Optional[int] = None, commit: bool = True,
+                    from_draft: bool = False) -> Message:
         """A message, optionally carrying a recording the patient sent (feature 014).
 
         The recording points at the message rather than the other way round, because `media.message_id`
         has existed since feature 011 and one link is better than two."""
         plan = self._plan_for_write(patient_id, plan_id)
         cur = self.conn.execute(
-            "INSERT INTO messages (patient_id, sender, body, sent_at, warned, plan_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (patient_id, sender, body, self._now(), 1 if warned else 0, plan))
+            "INSERT INTO messages (patient_id, sender, body, sent_at, warned, plan_id, from_draft) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (patient_id, sender, body, self._now(), 1 if warned else 0, plan, 1 if from_draft else 0))
         if media_id is not None:
             self.conn.execute("UPDATE media SET message_id = ? WHERE id = ? AND patient_id = ?",
                               (cur.lastrowid, media_id, patient_id))
@@ -2804,6 +2848,76 @@ class SessionStore:
             WHERE s.patient_id = ? ORDER BY s.start_time DESC, s.id DESC LIMIT 1
             """, (patient_id,)).fetchone()
         return Review(row["session_id"], row["reviewed_at"], row["notes"], row["next_step"]) if row else None
+
+    # the AI assistant (feature 018); the rules live in src/assist/
+
+    def assist_switches(self, patient_id: str) -> Dict[str, bool]:
+        row = self.conn.execute("SELECT summaries, coach FROM assist_switches WHERE patient_id = ?", (patient_id,)).fetchone()
+        return {"summaries": bool(row and row["summaries"]), "coach": bool(row and row["coach"])}
+
+    def assist_set_switch(self, patient_id: str, which: str, on: bool, account_id: Optional[int] = None) -> None:
+        if which not in ("summaries", "coach"):
+            raise ValueError(f"Unknown assistant switch: {which}")
+        self._require_patient(patient_id)
+        self.conn.execute("INSERT OR IGNORE INTO assist_switches (patient_id) VALUES (?)", (patient_id,))
+        self.conn.execute(f"UPDATE assist_switches SET {which} = ?, {which}_at = ?, updated_by = ? WHERE patient_id = ?",
+                          (1 if on else 0, self._now() if on else None, account_id, patient_id))
+        self.conn.commit()
+
+    def assist_switched_on_at(self, patient_id: str, which: str) -> Optional[str]:
+        if which not in ("summaries", "coach"):
+            raise ValueError(f"Unknown assistant switch: {which}")
+        row = self.conn.execute(f"SELECT {which}_at FROM assist_switches WHERE patient_id = ?", (patient_id,)).fetchone()
+        return row[0] if row else None
+
+    def assist_call_add(self, patient_id: str, account_id: Optional[int], purpose: str, model: str,
+                        input_tokens: int, output_tokens: int, outcome: str) -> None:
+        """One call to the AI processor: its size and purpose, never its content (constitution III)."""
+        self.conn.execute("INSERT INTO assist_calls (at, patient_id, account_id, purpose, model, input_tokens, "
+                          "output_tokens, outcome) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                          (self._now(), patient_id, account_id, purpose, model, int(input_tokens or 0),
+                           int(output_tokens or 0), outcome))
+        self.conn.commit()
+
+    def assist_calls_on(self, day: str, account_id: Optional[int]) -> int:
+        """Calls made on one day (YYYY-MM-DD) by one account; `None` is the account-less private machine."""
+        sql = "SELECT COUNT(*) FROM assist_calls WHERE substr(at, 1, 10) = ? AND account_id " + \
+              ("IS NULL" if account_id is None else "= ?")
+        args = (day,) if account_id is None else (day, int(account_id))
+        return self.conn.execute(sql, args).fetchone()[0]
+
+    def therapist_note_add(self, patient_id: str, body: str, ai_drafted: bool, edited: bool,
+                           account_id: Optional[int], plan_id: Optional[int] = None) -> dict:
+        self._require_patient(patient_id)
+        cur = self.conn.execute(
+            "INSERT INTO therapist_notes (patient_id, plan_id, body, ai_drafted, edited, account_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (patient_id, plan_id, body, 1 if ai_drafted else 0, 1 if edited else 0, account_id, self._now()))
+        self.conn.commit()
+        return self._note(self.conn.execute("SELECT * FROM therapist_notes WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+    @staticmethod
+    def _note(row) -> dict:
+        return {"id": row["id"], "patient_id": row["patient_id"], "plan_id": row["plan_id"], "body": row["body"],
+                "ai_drafted": bool(row["ai_drafted"]), "edited": bool(row["edited"]), "created_at": row["created_at"]}
+
+    def therapist_notes(self, patient_id: str) -> List[dict]:
+        if not self._vis(patient_id):
+            return []
+        return [self._note(r) for r in self.conn.execute(
+            "SELECT * FROM therapist_notes WHERE patient_id = ? ORDER BY id DESC", (patient_id,))]
+
+    def message_mark_handled(self, message_id: int, how: str, account_id: Optional[int]) -> None:
+        self.conn.execute("INSERT OR REPLACE INTO message_handled (message_id, how, account_id, at) VALUES (?, ?, ?, ?)",
+                          (int(message_id), how, account_id, self._now()))
+        self.conn.commit()
+
+    def messages_handled(self, message_ids: List[int]) -> set:
+        if not message_ids:
+            return set()
+        marks = ",".join("?" * len(message_ids))
+        return {r[0] for r in self.conn.execute(
+            f"SELECT message_id FROM message_handled WHERE message_id IN ({marks})", [int(i) for i in message_ids])}
 
 
 def _owner_alive(source_extras: Optional[str]) -> bool:

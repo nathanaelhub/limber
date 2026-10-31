@@ -63,6 +63,8 @@ from src.portal import admin as ptadmin
 from src.portal import messages as ptmessages
 from src.portal import plans as ptplans
 from src.portal import attachments as ptattach
+from src.assist import assistant as ptassistant
+from src.assist import config as ptassist_config
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -1117,12 +1119,202 @@ def page_patients():
             st.error(str(exc))
 
     _patient_plans_section(pid)
+    _patient_assist_section(pid)
     _patient_appointments_section(pid)
     _patient_program_section(pid)
     _patient_home_access_section(pid, current)
     _patient_logs_section(pid, current)
     _patient_questionnaire_section(pid, current)
     _patient_discharge_section(pid)
+
+# ----------------------------------------------------------------------------- the AI assistant (feature 018)
+
+_RECORD_KINDS = {"S": "Session", "E": "Log", "M": "Message", "T": "Voice note"}
+_MD_SPECIALS = "\\`*_[]<>#|~$"   # enough that no markup, link, or HTML can render; punctuation stays readable
+
+
+def _plain(text):
+    """Model text shown as plain words: every Markdown character escaped, so nothing renders as markup."""
+    return "".join("\\" + c if c in _MD_SPECIALS else c for c in text)
+
+
+def _cited(ids):
+    return "From: " + " · ".join(f"{_RECORD_KINDS.get(i.split('-')[0], 'Record')} {i}" for i in ids)
+
+
+def _patient_assist_section(pid):
+    """The weekly summary and the per-patient AI switches. Hidden entirely when no key is configured (SC-003)."""
+    if not ptassist_config.available():
+        return
+    with _open_store() as store:
+        switches = ptassistant.switches(store, pid)
+        since = {k: store.assist_switched_on_at(pid, k) for k in switches}
+        saved = ptassistant.notes(store, pid)
+    st.markdown("### Weekly summary")
+    if switches["summaries"]:
+        _summary_panel(pid)
+    else:
+        st.caption("Weekly summaries and drafts are off for this patient. Turn them on under AI settings below.")
+    if saved:
+        with st.expander(f"Session notes ({len(saved)})"):
+            for n in saved:
+                st.caption(n["created_at"][:16].replace("T", " ")
+                           + (" · AI-drafted" + (", edited" if n["edited"] else "") if n["ai_drafted"] else ""))
+                st.text(n["body"])
+    _assist_settings(pid, switches, since)
+
+
+def _summary_panel(pid):
+    key = f"assist_summary_{pid}"
+    result = st.session_state.get(key)
+    if result is None:
+        st.caption(f"Uses {pid}'s exercise log, pain log, questionnaires and messages. Nothing is sent to the patient.")
+        if st.button("Summarise the last 7 days", key=f"assist_summarise_{pid}", type="primary"):
+            with st.spinner("Reading 7 days of records. This can take up to 30 seconds."):
+                with _open_store() as store:
+                    st.session_state[key] = ptassistant.weekly_summary(
+                        store, pid, account_id=st.session_state.get("account_id"))
+            st.session_state[f"assist_made_{pid}"] = datetime.now().strftime("%H:%M")
+            st.rerun()
+        return
+    if result.state == "saved":
+        st.success("Saved as a session note. The note keeps the AI-drafted label.")
+        if st.button("Summarise again", key=f"assist_again_{pid}"):
+            st.session_state.pop(key, None)
+            st.rerun()
+        return
+    if result.state == "no_records":
+        st.info(f"**No records this week**\n\n{pid} has not logged exercises, pain or messages since "
+                f"{result.window['from']}. There is nothing to summarise.")
+    elif result.state == "cap":
+        st.warning("You have used today's AI requests. They reset tomorrow.")
+    elif result.state != "ok":
+        st.warning("**The assistant isn't available right now**\n\nYour records are safe. Try again in a few "
+                   "minutes, or read the logs directly.")
+    if result.state != "ok":
+        if st.button("Try again", key=f"assist_retry_{pid}"):
+            st.session_state.pop(key, None)
+            st.rerun()
+        return
+    editing = st.session_state.get(f"assist_editing_{pid}", False)
+    with st.container(border=True):
+        st.caption(f"{result.window['from']} to {result.window['to']} · made today at "
+                   f"{st.session_state.get(f'assist_made_{pid}', '')} from {result.record_count} records")
+        st.markdown("**AI** · AI-drafted — check before acting")
+        if editing:
+            st.text_area("Edit the summary", value=result.as_text(), key=f"assist_edit_text_{pid}", height=260)
+        else:
+            cols = st.columns(min(3, max(1, len(result.sections))))
+            for i, c in enumerate(result.sections):
+                with cols[i % len(cols)]:
+                    st.markdown(f"**{c.heading}**")
+                    st.markdown(_plain(c.text))
+                    st.caption(_cited(c.record_ids))
+            if result.next_steps:
+                st.markdown("**Suggested next steps**")
+                for i, c in enumerate(result.next_steps, 1):
+                    st.markdown(f"{i}\\. {_plain(c.text)}")
+                    st.caption(_cited(c.record_ids))
+        b1, b2, b3, b4 = st.columns([1.4, 0.8, 0.8, 2.4])
+        if b1.button("Save as session note", key=f"assist_save_{pid}", type="primary"):
+            body = st.session_state.get(f"assist_edit_text_{pid}") if editing else result.as_text()
+            with _open_store() as store:
+                ptassistant.save_note(store, pid, body, ai_drafted=True, edited=editing and body != result.as_text(),
+                                      account_id=st.session_state.get("account_id"))
+            st.session_state[key] = ptassistant.SummaryResult("saved")
+            st.session_state.pop(f"assist_editing_{pid}", None)
+            st.rerun()
+        if not editing and b2.button("Edit", key=f"assist_edit_{pid}"):
+            st.session_state[f"assist_editing_{pid}"] = True
+            st.rerun()
+        if b3.button("Discard", key=f"assist_discard_{pid}"):
+            st.session_state.pop(key, None)
+            st.session_state.pop(f"assist_editing_{pid}", None)
+            st.rerun()
+        b4.caption(f"{pid} never sees this summary.")
+        if result.dropped:
+            st.caption(f"{result.dropped} statement{'s' if result.dropped != 1 else ''} left out because "
+                       "they did not point to a record.")
+
+
+def _assist_settings(pid, switches, since):
+    st.markdown("### AI settings")
+    st.caption("Both are off for every new patient. Turn them on only after you have told the patient.")
+    blurbs = {
+        "summaries": ("Weekly summaries and drafts",
+                      f"Lets you make AI summaries of the last 7 days and AI-drafted replies in the inbox. Nothing "
+                      f"reaches {pid} unless you send it.", f"What {pid} is shown", ptassistant.NOTICE_SUMMARIES),
+        "coach": ("Patient exercise coach",
+                  f"{pid} will be able to ask an AI assistant about their own program (arriving in a later update). "
+                  f"It answers only from the program and sends worse pain, new symptoms, medicine and program "
+                  f"changes to you.", f"What {pid} is shown before their first question", ptassistant.NOTICE_COACH),
+    }
+    for which, (title, blurb, shown_label, notice) in blurbs.items():
+        with st.container(border=True):
+            wanted = st.toggle(title, value=switches[which], key=f"assist_sw_{which}_{pid}")
+            if wanted != switches[which]:
+                with _open_store() as store:
+                    ptassistant.set_switch(store, pid, which, wanted, account_id=st.session_state.get("account_id"))
+                st.rerun()
+            st.caption((f"On since {since[which][:10]}. " if switches[which] and since[which] else "Off. ") + blurb)
+            st.caption(f"**{shown_label}:** “{notice}”")
+    with st.expander("Past coach conversations"):
+        st.caption("Read only. The exercise coach arrives in a later update; its conversations will appear here.")
+
+
+def _inbox_assist(pid, plan_id):
+    """Draft a reply, or the withheld notice and Mark as handled by phone (feature 018 US2)."""
+    with _open_store() as store:
+        flagged = ptassistant.needs_attention(store, pid, plan_id)
+    if flagged:
+        from src.assist import redflags
+        words = []
+        for m in flagged:
+            words += [w for w in redflags.found_words(m.body) if w not in words]
+        st.error(f"**This message may need a direct response**\n\n{pid} mentioned "
+                 + ", ".join(f"“{_plain(w)}”" for w in words)
+                 + ". The assistant has not drafted a reply. Please contact the patient directly.")
+        c1, c2 = st.columns([1, 2])
+        c1.button("Draft a reply", key="inbox_draft", disabled=True)
+        c2.caption("Drafting is off for this message.")
+        if st.button("Mark as handled by phone", key="inbox_handled"):
+            with _open_store() as store:
+                for m in flagged:
+                    ptassistant.mark_handled(store, m.id, st.session_state.get("account_id"))
+            st.rerun()
+        return
+    c1, c2 = st.columns([1, 2])
+    c1.button("Draft a reply", key="inbox_draft", on_click=_inbox_make_draft, args=(pid, plan_id))
+    c2.caption(f"Uses this conversation and {pid}'s program. Nothing is sent.")
+    notice = st.session_state.pop("inbox_draft_notice", None)
+    if notice:
+        st.warning(notice)
+
+
+_DRAFT_NOTICES = {
+    "nothing": "There is no new message from the patient to reply to.",
+    "cap": "You have used today's AI requests. They reset tomorrow.",
+    "unavailable": "The assistant isn't available right now. Write the reply yourself, or try again in a few minutes.",
+    "off": "Weekly summaries and drafts are off for this patient.",
+    "withheld": "This message may need a direct response, so no draft was made.",
+}
+
+
+def _inbox_make_draft(pid, plan_id):
+    """Button callback: put a draft in the reply box. It is never sent; the therapist edits and sends it."""
+    with _open_store() as store:
+        result = ptassistant.draft_reply(store, pid, plan_id, account_id=st.session_state.get("account_id"))
+    if result.state == "ok":
+        st.session_state["inbox_reply"] = result.text
+        st.session_state["inbox_drafted"] = (pid, plan_id, result.text)
+    else:
+        st.session_state["inbox_draft_notice"] = _DRAFT_NOTICES.get(result.state, _DRAFT_NOTICES["unavailable"])
+
+
+def _inbox_discard_draft():
+    st.session_state["inbox_reply"] = ""
+    st.session_state.pop("inbox_drafted", None)
+
 
 _PLAN_STATUS = {"active": "Active", "completed": "Completed", "archived": "Archived (read-only)"}
 
@@ -2148,8 +2340,10 @@ def _inbox_send(pid, confirm, plan_id=None):
         with _open_store() as store:
             files = [(f.type or "", f.getvalue()) for f in chosen]
             ptmessages.send(store, pid, "therapist", reply, confirm=confirm, plan_id=plan_id,
-                            files=files, media_dir=store.media_dir)
+                            files=files, media_dir=store.media_dir,
+                            from_draft=(st.session_state.get("inbox_drafted") or ())[:2] == (pid, plan_id))
         st.session_state["inbox_reply"] = ""
+        st.session_state.pop("inbox_drafted", None)
         st.session_state["inbox_files_n"] = st.session_state.get("inbox_files_n", 0) + 1
         st.session_state.pop("inbox_warned", None)
     except ptmessages.NeedsConfirmation:
@@ -2297,8 +2491,26 @@ def page_inbox():
         elif not enabled:
             st.info("Messaging is off for this patient.")
         else:
+            held = st.session_state.get("inbox_drafted")
+            if held and held[:2] != (pid, plan_id):            # a draft never follows you to another conversation
+                if st.session_state.get("inbox_reply", "") == held[2]:
+                    st.session_state["inbox_reply"] = ""
+                st.session_state.pop("inbox_drafted", None)
+            assist_on = ptassist_config.available()
+            if assist_on:
+                with _open_store() as store:
+                    assist_on = ptassistant.switches(store, pid)["summaries"]
+            if assist_on:
+                _inbox_assist(pid, plan_id)
+            drafted = assist_on and (st.session_state.get("inbox_drafted") or ())[:2] == (pid, plan_id)
+            if drafted:
+                st.markdown("**AI** · AI-drafted — check before sending")
             st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH,
                          help="Plain text. Do not include names or contact details.")
+            if drafted:
+                d1, d2 = st.columns([1, 3])
+                d1.button("Discard draft", key="inbox_discard_draft", on_click=_inbox_discard_draft)
+                d2.caption("This draft is never sent on its own. Edit it, then press Send, or discard it.")
             st.file_uploader("Attach up to 4 photos or 1 PDF", type=["jpg", "jpeg", "png", "heic", "pdf"],
                              accept_multiple_files=True, key=f"inbox_files_{st.session_state.get('inbox_files_n', 0)}",
                              help="Photos are re-saved on this computer without location or camera details.")

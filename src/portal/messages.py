@@ -70,7 +70,8 @@ def set_enabled(store: SessionStore, patient_id: str, enabled: bool) -> None:
 
 
 def send(store: SessionStore, patient_id: str, sender: str, text, confirm: bool = False,
-         plan_id: Optional[int] = None, files: Sequence[Tuple[str, bytes]] = (), media_dir=None) -> Message:
+         plan_id: Optional[int] = None, files: Sequence[Tuple[str, bytes]] = (), media_dir=None,
+         from_draft: bool = False) -> Message:
     """Send into one plan (the current one when none is named), optionally with photos or a PDF
     (feature 017). With attachments the text may be empty."""
     if sender not in SIDES:
@@ -93,10 +94,12 @@ def send(store: SessionStore, patient_id: str, sender: str, text, confirm: bool 
     if reasons and not confirm:
         raise NeedsConfirmation(reasons)
     if not files:
-        return store.message_add(patient_id, sender, body, warned=bool(reasons), plan_id=plan_id)
+        return store.message_add(patient_id, sender, body, warned=bool(reasons), plan_id=plan_id,
+                                 from_draft=from_draft and sender == "therapist")
     from src.portal import attachments
     ready = attachments.prepare(files)                    # refused before anything is stored
-    message = store.message_add(patient_id, sender, body, warned=bool(reasons), plan_id=plan_id, commit=False)
+    message = store.message_add(patient_id, sender, body, warned=bool(reasons), plan_id=plan_id, commit=False,
+                                from_draft=from_draft and sender == "therapist")
     message.attachments = attachments.attach(store, media_dir, message, ready)
     return message
 

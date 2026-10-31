@@ -308,6 +308,14 @@ def build(db_path: Path, seed: int = 7) -> None:
         _plans.schedule(s, "P-021", at(19, "14:00"), 30, "Shoulder assessment", plan_id=shoulder.id)
         _plans.schedule(s, "P-023", at(2, "16:00"), 60, "Return-to-sport testing")
 
+        # The AI assistant (feature 018): switched on for two demo patients. P-023's latest message trips the
+        # red-flag list, so a draft is withheld there and the inbox asks the therapist to call.
+        from src.assist import assistant as _assistant
+        for pid in ("P-021", "P-023"):
+            _assistant.set_switch(s, pid, "summaries", True)
+        clock.now = datetime.now() - timedelta(hours=2)
+        messages.send(s, "P-023", "patient", "I had a fall this morning getting out of the car. Now my knee feels numb.")
+
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)
         s.set_installation_threshold("adherence", 65)

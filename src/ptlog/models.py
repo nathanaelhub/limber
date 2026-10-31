@@ -604,6 +604,7 @@ class Message:
     warned: bool = False             # sent after the writer was warned that it looks identifying
     media_id: Optional[str] = None   # the voice note this message carries, if any (feature 014)
     plan_id: Optional[int] = None    # the plan of care the conversation belongs to (feature 017)
+    from_draft: bool = False         # began as an AI draft the therapist edited and sent (feature 018)
     attachments: List["Attachment"] = field(default_factory=list)
 
 

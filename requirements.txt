@@ -110,3 +110,11 @@ pytest>=7.4.0
 
 # flake8 - Linting
 # flake8>=6.1.0
+
+# -----------------------------------------------------------------------------
+# AI assistant (feature 018)
+# -----------------------------------------------------------------------------
+
+# anthropic - the official Claude API client, used only by src/assist/. Justified under constitution
+# Principle V: hand-written HTTP calls would re-implement its retries, typed errors, and beta parameters.
+anthropic>=2.3.0

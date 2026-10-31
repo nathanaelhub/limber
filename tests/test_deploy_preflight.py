@@ -47,7 +47,7 @@ def test_a_ready_installation_passes(ready):
     assert {c.name for c in required} == {"therapist_password", "server_key", "record_writable", "pose_assets",
                                          "public_origin", "therapist_url"}
     # Writing out voice notes (feature 014) is reported but never required: no model is installed here.
-    (speech,) = [c for c in checks if c.optional]
+    (speech,) = [c for c in checks if c.name == "speech_model"]
     assert speech.name == "speech_model" and speech.ok is False and "still arrive and play" in speech.detail
 
 

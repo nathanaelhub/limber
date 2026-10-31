@@ -38,6 +38,7 @@ from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
 from src.portal import access, accounts, admin, attachments, diary, frames, live, messages, plans, questionnaires, uploads, viewmodels, voice  # noqa: E402
 from src.ptlog import origin  # noqa: E402
+from src.assist import assistant as ai_assistant, config as ai_config  # noqa: E402
 from src.ptlog.models import PlanArchived, PlanNotFound, PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
@@ -739,6 +740,17 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 return _json({"error": "Please sign in."}, 401)
             return _json(accounts.set_patient_prefs(store, patient_id, body if isinstance(body, dict) else {}))
 
+    async def assistant_notice(request: Request):
+        """What the patient is told about the AI assistant, one notice per switch the therapist turned on
+        (feature 018). Nothing when no key is configured, because then nothing can be sent."""
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            on = ai_assistant.switches(store, patient_id) if ai_config.available() else {}
+        texts = {"summaries": ai_assistant.NOTICE_SUMMARIES, "coach": ai_assistant.NOTICE_COACH}
+        return _json({"notices": [texts[k] for k in ai_assistant.SWITCHES if on.get(k)]})
+
     # ------------------------------------------------------------------ guided session
 
     STATE_KEYS = ("exercise", "index", "rep_count", "phase", "form_status", "form_messages", "feedback",
@@ -879,6 +891,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/invites/{token}", invite_status, methods=["GET"]),
         Route("/api/invites/{token}", invite_accept, methods=["POST"]),
         Route("/api/me/preferences", preferences, methods=["GET", "POST"]),
+        Route("/api/me/assistant", assistant_notice),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),

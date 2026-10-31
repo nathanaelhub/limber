@@ -88,6 +88,13 @@ def run(db_path: Path, assets_dir: Path, public_origin: Optional[str], therapist
                         f"not written out. To turn it on: install the speech library and run "
                         f"`python scripts/fetch_speech_model.py --from <downloaded> --into {transcribe.model_dir()}`.",
                         optional=True))
+    # The AI assistant is optional too: with no key it is off and every AI control is hidden (feature 018).
+    from src.assist import config as assist_config
+    ai_ok = assist_config.available()
+    checks.append(Check("ai_assistant", ai_ok, assist_config.status_line() if ai_ok else
+                        f"{assist_config.status_line()}. To turn it on, set {assist_config.KEY_ENV} in the "
+                        f"environment or the gitignored .env; each patient's switches stay off until a therapist "
+                        f"turns them on.", optional=True))
     therapist = urlparse(therapist_url or "")
     therapist_ok = origin_ok and therapist.scheme == "https" and therapist.netloc == origin.netloc and therapist.path not in ("", "/")
     checks.append(Check("therapist_url", therapist_ok, therapist_url if therapist_ok else
