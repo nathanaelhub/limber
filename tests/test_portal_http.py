@@ -204,6 +204,13 @@ class TestPagesAndHeaders:
         css = client.get("/static/portal.css").text
         assert re.search(r"\[hidden\]\s*\{\s*display:\s*none\s*!important", css)
 
+    def test_the_round_exercise_check_does_not_shrink_settings_labels(self, client):
+        """Issue #14: a bare `.check` rule (the round done/to-do mark on Today) also matched the Settings labels
+        (`label.check`), sizing them 2.4rem wide so every word wrapped onto its own line."""
+        css = client.get("/static/portal.css").text
+        assert not re.search(r"(?:^|[},]\s*)\.check\s*[{,]", css, re.M)
+        assert re.search(r"span\.check\s*\{[^}]*width:\s*2\.4rem", css)
+
     def test_pages_load_nothing_from_other_sites(self):
         """FR-018: every script, style, and model file comes from the service itself."""
         from interfaces import patient_portal

@@ -46,10 +46,10 @@ button:disabled { opacity: .5; cursor: default; }
 .exercises li.todo { background: var(--bg); }
 .exercises .name { flex: 1; font-size: 1.1rem; }
 .exercises .amount { color: var(--muted-text); }
-.check { flex: none; width: 2.4rem; height: 2.4rem; border-radius: 50%; display: grid; place-items: center; }
+span.check { flex: none; width: 2.4rem; height: 2.4rem; border-radius: 50%; display: grid; place-items: center; }   /* span: label.check is the Settings checkbox (#14) */
 .done .check { background: var(--teal); }
 .todo .check { border: 3px solid var(--coral); }
-.check svg { width: 1.1rem; height: 1.1rem; }
+span.check svg { width: 1.1rem; height: 1.1rem; }
 .stats { display: flex; gap: 2.5rem; margin: 1.6rem 0 0; padding-top: 1.2rem; border-top: 1px solid var(--line); }
 .big { display: block; font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; }
 .unit { color: var(--muted-text); font-size: .9rem; }
