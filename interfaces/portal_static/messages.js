@@ -267,6 +267,15 @@
   $("edit-message").addEventListener("click", function () { hideWarning(); box.focus(); });
   box.addEventListener("input", hideWarning);
 
-  loadPlans().then(loadThread);
+  // From the coach's referral card (feature 018): the question is copied in, for the patient to change or send.
+  function prefill() {
+    var wanted = new URLSearchParams(window.location.search).get("text");
+    if (!wanted || box.value) { return; }
+    box.value = wanted.slice(0, 2000);
+    try { history.replaceState(null, "", current ? "/messages?plan=" + current.id : "/messages"); } catch (e) {}
+    if (!form.hidden) { box.focus(); }
+  }
+
+  loadPlans().then(loadThread).then(prefill);
   window.setInterval(function () { loadPlans().then(loadThread); }, 30000);
 }());

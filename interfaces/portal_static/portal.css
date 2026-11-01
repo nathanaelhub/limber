@@ -314,3 +314,44 @@ html.a11y-contrast .msg-row.them .bubble, html.a11y-contrast .dt, html.a11y-cont
 html.a11y-contrast .cal .ap { background: var(--ink); }
 html.a11y-contrast .bd-ok, html.a11y-contrast .bd-req { color: var(--ink); }
 @media (max-width: 640px) { .today-top { width: calc(100% - 1.25rem); margin-top: 1rem; } }
+
+/* The exercise coach (feature 018 slice B), from design/limber-export/screens/Coach.html and CoachSafety.html. */
+.ai-mark { display: inline-grid; place-items: center; flex: none; height: 1.4rem; min-width: 1.8rem; padding: 0 .3rem; font-size: .7rem; font-weight: 800;
+           letter-spacing: .04em; line-height: 1; color: var(--ink); background: var(--card); border: 1.5px solid var(--ink); border-radius: 6px; }
+.ai-bar { display: flex; gap: .6rem; align-items: flex-start; margin: 0 0 1rem; padding: .65rem .8rem; font-size: .85em; color: var(--ink);
+          background: var(--teal-tint); border: var(--bw) solid var(--line); border-radius: 14px; }
+.back { display: inline-flex; align-items: center; gap: .25rem; min-height: 44px; margin-bottom: .2rem; color: var(--teal-dark); font-weight: 700; text-decoration: none; }
+.coach-empty h2 { font-size: 1.1em; margin: .3rem 0 .2rem; }
+.coach-empty .small { margin: 0 0 .8rem; }
+.sugg { display: grid; gap: .6rem; margin-bottom: 1.2rem; }
+.sugg button { margin: 0; min-height: 3.5rem; padding: .75rem 1rem; text-align: left; color: var(--ink); background: var(--card);
+               border: var(--bw) solid var(--line-strong); font-weight: 600; }
+.sugg button:hover { background: var(--bg); }
+.bubble.aib { background: var(--card); border: var(--bw) solid var(--line); border-bottom-left-radius: 6px; display: grid; gap: .45rem; }
+.msg-row .from.ai { display: inline-flex; align-items: center; gap: .4rem; color: var(--ink); }
+.src { margin: 0; font-size: .8em; font-weight: 700; color: var(--teal-dark); }
+.xs { margin: 0; font-size: .8rem; color: var(--muted-text); }
+.think-row { display: flex; align-items: center; gap: .7rem; margin: 0; }
+.dots { display: inline-flex; gap: .35rem; align-items: center; }
+.dots i { display: block; width: .55rem; height: .55rem; border-radius: 999px; background: var(--muted); animation: coach-pulse 1.2s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes coach-pulse { 0%, 80%, 100% { opacity: .3; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dots i { animation: none; opacity: .7; } }
+.refer { display: grid; gap: .7rem; padding: 1.1rem; list-style: none; background: var(--teal-tint); border: 2px solid var(--teal); border-radius: 22px; }
+.refer h2, .refer p { margin: 0; }
+.refer .button, .state .button, #limit .button { margin: 0; text-align: center; }
+.thread .emerg { list-style: none; }
+.emerg p { margin: 0; }
+.state { display: grid; justify-items: center; gap: .8rem; padding: 1.5rem .5rem; text-align: center; }
+.state h2 { margin: 0; font-size: 1.2em; }
+.state p { margin: 0; color: var(--muted-text); }
+.state .ring { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; color: var(--teal-dark); background: var(--card);
+               border: var(--bw) solid var(--line); border-radius: 999px; }
+.coach-entry { display: flex; align-items: center; gap: .8rem; color: var(--ink); text-decoration: none; }
+.coach-entry .grow { display: grid; gap: .1rem; }
+.coach-entry.inline { min-height: 3.5rem; margin: 0 0 1rem; padding: .7rem 1rem; background: var(--teal-tint); border: var(--bw) solid var(--line); border-radius: 14px; }
+html.a11y-contrast .ai-bar, html.a11y-contrast .bubble.aib, html.a11y-contrast .sugg button, html.a11y-contrast .coach-entry.inline,
+html.a11y-contrast .state .ring { border-width: 2px; border-color: var(--ink); }
+html.a11y-contrast .refer { border-color: var(--ink); }
+html.a11y-contrast .src { color: var(--ink); text-decoration: underline; }
+html.a11y-large .ai-mark { height: 1.7rem; min-width: 2.2rem; font-size: .8rem; }
