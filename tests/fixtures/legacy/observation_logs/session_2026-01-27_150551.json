@@ -1,0 +1,16 @@
+{
+  "session_id": "session_2026-01-27_150440",
+  "source": "video",
+  "start_time": "2026-01-27T15:04:40.250000",
+  "end_time": "2026-01-27T15:05:51.000000",
+  "duration_seconds": 70.8,
+  "initial_exercise": "Squat",
+  "target_reps": 10,
+  "events": [
+    {"type": "session_start", "timestamp": "2026-01-27T15:04:40.250000", "exercise": "Squat", "target_reps": 10},
+    {"type": "rep", "timestamp": "2026-01-27T15:04:50.000000", "rep_number": 1, "exercise": "Squat", "rom": 83.0, "form_score": 88.0, "duration_seconds": 2.4, "min_angle": 88.0, "max_angle": 171.0},
+    {"type": "rep", "timestamp": "2026-01-27T15:04:58.000000", "rep_number": 2, "exercise": "Squat", "rom": 83.0, "form_score": 86.0, "duration_seconds": 2.5, "min_angle": 87.5, "max_angle": 170.5},
+    {"type": "session_end", "timestamp": "2026-01-27T15:05:51.000000", "total_reps": 2, "avg_form_score": 87.0, "avg_rom": 83.0, "duration_seconds": 70.8}
+  ],
+  "summary": {"total_reps": 2, "exercises_performed": [{"exercise": "Squat", "reps": 2, "avg_form_score": 87.0, "avg_rom": 83.0}], "avg_form_score": 87.0, "avg_rom": 83.0, "warnings": []}
+}

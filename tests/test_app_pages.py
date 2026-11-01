@@ -1004,7 +1004,7 @@ def test_my_settings_saves_and_applies(seeded_env):
     at.session_state["current_page"] = "settings"
     at.run()
     assert not at.exception, [e.value for e in at.exception]
-    at.checkbox[0].check().run()
+    at.checkbox[0].check()  # no run in between: a form keeps values only until Save (Streamlit 1.66)
     at.button(key="FormSubmitter:my_settings-Save").click().run()
     assert not at.exception, [e.value for e in at.exception]
     from src.portal import accounts

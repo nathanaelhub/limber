@@ -1,0 +1,21 @@
+{
+  "session_summary": {
+    "exercise": "Knee Extension",
+    "start_time": "2026-01-27T13:45:10.100000",
+    "end_time": "2026-01-27T13:48:57.900000",
+    "total_reps": 3,
+    "target_reps": 10,
+    "completion_rate": 30.0,
+    "avg_range_of_motion": 78.4,
+    "max_range_of_motion": 79.1,
+    "avg_form_score": 94.0,
+    "tempo_consistency_std": 0.1
+  },
+  "rep_details": [
+    {"rep_number": 1, "min_angle": 10.2, "max_angle": 88.6, "rom": 78.4, "duration_seconds": 3.1, "form_score": 95.0, "timestamp": "2026-01-27T13:45:18.000000"},
+    {"rep_number": 2, "min_angle": 9.8, "max_angle": 88.9, "rom": 79.1, "duration_seconds": 3.0, "form_score": 94.0, "timestamp": "2026-01-27T13:45:25.000000"},
+    {"rep_number": 3, "min_angle": 11.0, "max_angle": 88.8, "rom": 77.8, "duration_seconds": 3.2, "form_score": 93.0, "timestamp": "2026-01-27T13:45:32.000000"}
+  ],
+  "recommendations": ["Completed 3/10 reps - keep building endurance"],
+  "warnings": []
+}
