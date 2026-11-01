@@ -71,7 +71,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -749,6 +749,22 @@ CREATE TABLE IF NOT EXISTS message_handled (
 ALTER TABLE messages ADD COLUMN from_draft INTEGER NOT NULL DEFAULT 0;
 """
 
+SCHEMA_V17_SQL = """
+CREATE TABLE IF NOT EXISTS coach_turns (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id   TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    plan_id      INTEGER,
+    asked_at     TEXT NOT NULL,
+    question     TEXT NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('answer', 'referral', 'refusal', 'emergency', 'off', 'limit',
+                                               'no_program', 'unavailable')),
+    answer       TEXT,
+    exercise     TEXT,
+    called       INTEGER NOT NULL DEFAULT 0 CHECK (called IN (0, 1))
+);
+CREATE INDEX IF NOT EXISTS idx_coach_turns_patient ON coach_turns(patient_id, asked_at);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -766,6 +782,7 @@ MIGRATIONS: List[tuple] = [
     (14, SCHEMA_V14_SQL),
     (15, SCHEMA_V15_SQL),
     (16, SCHEMA_V16_SQL),
+    (17, SCHEMA_V17_SQL),
 ]
 
 
@@ -2880,8 +2897,9 @@ class SessionStore:
         self.conn.commit()
 
     def assist_calls_on(self, day: str, account_id: Optional[int]) -> int:
-        """Calls made on one day (YYYY-MM-DD) by one account; `None` is the account-less private machine."""
-        sql = "SELECT COUNT(*) FROM assist_calls WHERE substr(at, 1, 10) = ? AND account_id " + \
+        """Therapist calls made on one day (YYYY-MM-DD) by one account; `None` is the account-less private machine.
+        The patient coach has its own per-patient cap (`coach_questions_on`), so its calls are not counted here."""
+        sql = "SELECT COUNT(*) FROM assist_calls WHERE substr(at, 1, 10) = ? AND purpose != 'coach' AND account_id " + \
               ("IS NULL" if account_id is None else "= ?")
         args = (day,) if account_id is None else (day, int(account_id))
         return self.conn.execute(sql, args).fetchone()[0]
@@ -2906,6 +2924,33 @@ class SessionStore:
             return []
         return [self._note(r) for r in self.conn.execute(
             "SELECT * FROM therapist_notes WHERE patient_id = ? ORDER BY id DESC", (patient_id,))]
+
+    # ---------------------------------------------------------------- the exercise coach (feature 018, slice B)
+
+    def coach_turn_add(self, patient_id: str, question: str, kind: str, answer: Optional[str] = None,
+                       exercise: Optional[str] = None, called: bool = False, plan_id: Optional[int] = None) -> dict:
+        """One question to the coach and what the patient was shown. Kept on the host so the therapist can read it."""
+        self._require_patient(patient_id)
+        cur = self.conn.execute(
+            "INSERT INTO coach_turns (patient_id, plan_id, asked_at, question, kind, answer, exercise, called) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (patient_id, plan_id, self._now(), question, kind, answer, exercise, 1 if called else 0))
+        self.conn.commit()
+        return dict(self.conn.execute("SELECT * FROM coach_turns WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+    def coach_turns(self, patient_id: str, day: Optional[str] = None) -> List[dict]:
+        """A patient's coach turns, oldest first; one day's (YYYY-MM-DD) when `day` is given."""
+        if not self._vis(patient_id):
+            return []
+        sql, args = "SELECT * FROM coach_turns WHERE patient_id = ?", [patient_id]
+        if day is not None:
+            sql, args = sql + " AND substr(asked_at, 1, 10) = ?", args + [day]
+        return [dict(r) for r in self.conn.execute(sql + " ORDER BY asked_at, id", args)]
+
+    def coach_questions_on(self, patient_id: str, day: str) -> int:
+        """Questions that reached the AI processor on one day, for the coach's daily cap."""
+        return self.conn.execute("SELECT COUNT(*) FROM coach_turns WHERE patient_id = ? AND called = 1 AND "
+                                 "substr(asked_at, 1, 10) = ?", (patient_id, day)).fetchone()[0]
 
     def message_mark_handled(self, message_id: int, how: str, account_id: Optional[int]) -> None:
         self.conn.execute("INSERT OR REPLACE INTO message_handled (message_id, how, account_id, at) VALUES (?, ?, ?, ?)",

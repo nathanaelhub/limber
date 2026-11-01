@@ -22,7 +22,7 @@ CUSTOM_NAME = "Custom"
 
 @dataclass
 class Catalog:
-    exercises: Dict[str, Dict] = field(default_factory=dict)   # key -> display_name, side, up_angle, down_angle, target_reps
+    exercises: Dict[str, Dict] = field(default_factory=dict)   # key -> display_name, side, up_angle, down_angle, target_reps, description
     programs: Dict[str, Program] = field(default_factory=dict)
 
 
@@ -51,6 +51,7 @@ def load_catalog(config_path: Optional[Path] = None) -> Catalog:
             "up_angle": float(ex.get("up_angle", 0.0)),
             "down_angle": float(ex.get("down_angle", 0.0)),
             "target_reps": int(ex.get("target_reps", 10)),
+            "description": str(ex.get("description") or ""),
         }
     for prog_id, prog in (data.get("programs") or {}).items():
         keys = [str(k) for k in (prog.get("exercises") or [])]
