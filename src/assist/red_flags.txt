@@ -6,6 +6,9 @@ chest (?:is )?tight
 short(?:ness)? of breath
 can'?t breathe
 trouble breathing
+can'?t catch my breath
+breathless
+(?:hard|struggling|struggle|difficult|difficulty) (?:to )?breath(?:e|ing)
 numb
 numbness
 can'?t feel
@@ -18,6 +21,11 @@ swollen and hot
 hot and swollen
 red and hot
 calf (?:is |feels )?(?:swollen|hot|tender|hard)
+# Clot signs described without the words above (issue #15): swelling with redness or warmth, in one sentence
+(?:swollen|swelling|puffy)[^.!?]{0,40}\b(?:red|warm|hot)\b
+\b(?:red|warm|hot)\b[^.!?]{0,40}\b(?:swollen|swelling|puffy)
+\bred and warm
+\bwarm and red
 faint(?:ed|ing)?
 pass(?:ed)? out
 blood

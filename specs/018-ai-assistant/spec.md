@@ -174,6 +174,9 @@ Tasks and tests: `specs/018-ai-assistant/tasks.md`. Where the build differs from
 - **Red flags (FR-005)**: the list is `src/assist/red_flags.txt`. A draft is withheld when any patient message
   since the therapist's last reply in that plan trips it, not only the last one. The notice quotes the words
   the patient wrote ("P-023 mentioned “had a fall”, “numb”").
+  The list also catches signs described without the keywords (issue #15): swelling together with redness or
+  warmth in one sentence, and breathlessness ("can't catch my breath", "hard to breathe"). Curly apostrophes,
+  as phones type them, are read as straight ones.
 - **Mark as handled by phone (FR-009)** clears the message from the attention flag and allows a draft again;
   it is recorded in `message_handled` with the account and time. The unread count clears when the therapist
   opens the conversation, as for every message.

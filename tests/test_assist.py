@@ -130,6 +130,14 @@ class TestRedFlags:
     def test_flags(self, text):
         assert redflags.screen(text)
 
+    @pytest.mark.parametrize("text", [   # issue #15: clot and breathing signs described without the keywords
+        "The back of my leg below the knee is really puffy, red and warm to touch.",
+        "My shin is red and warm", "my thigh is swollen and warm", "there's warm red swelling in my calf",
+        "I can't catch my breath when I climb the stairs since yesterday.", "I get breathless sitting down",
+        "it's hard to breathe", "I'm struggling to breathe", "I can\u2019t breathe"])
+    def test_flags_indirect_clot_and_breathing_signs(self, text):
+        assert redflags.screen(text)
+
     @pytest.mark.parametrize("text", [
         "Harder on Thursday, knee felt tight.", "How far should I bend in heel slides?", "I fall asleep easily now",
         "Thanks, see you Tuesday", ""])
