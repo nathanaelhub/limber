@@ -144,6 +144,16 @@ class TestRedFlags:
     def test_does_not_flag(self, text):
         assert redflags.screen(text) == []
 
+    @pytest.mark.parametrize("text", [   # issue #16: idioms, not falls
+        "I fell behind on my exercises this week, how do I catch up?", "I've fallen behind", "I fell asleep early",
+        "Don't let me fall behind", "I fall behind on weekends"])
+    def test_falling_behind_is_not_a_fall(self, text):
+        assert redflags.screen(text) == []
+
+    @pytest.mark.parametrize("text", ["I fell yesterday", "I fell behind, then I fell on the ice", "I've fallen twice"])
+    def test_a_real_fall_still_flags(self, text):
+        assert redflags.screen(text)
+
     def test_the_words_found_are_what_the_patient_wrote(self):
         assert sorted(redflags.found_words("I had a Fall and now my foot is numb")) == ["had a fall", "numb"]
 
