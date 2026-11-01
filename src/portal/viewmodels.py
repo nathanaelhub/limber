@@ -204,6 +204,12 @@ def plan_cards(store: SessionStore, patient_id: str, assignment, now: datetime) 
     return {"plans": cards, "next_visit": upcoming[0] if upcoming else None}
 
 
+def coach_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
+    """The exercise coach entry (feature 018 slice B): shown only with a key and the therapist's switch on."""
+    from src.assist import assistant, config
+    return {"enabled": config.available() and assistant.switches(store, patient_id)["coach"]}
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     from src.portal import diary
     _require(store, patient_id)
@@ -217,7 +223,8 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
                             "diary": diary.options(store, patient_id, now=now),
                             "logs": logs_badge(store, patient_id, now),
                             "questionnaires": questionnaire_badge(store, patient_id, now),
-                            "voice": voice_badge(store, patient_id)}
+                            "voice": voice_badge(store, patient_id),
+                            "coach": coach_badge(store, patient_id)}
     assignment = store.active_assignment(patient_id, today)
     view.update(plan_cards(store, patient_id, assignment, now))
     if assignment is None:

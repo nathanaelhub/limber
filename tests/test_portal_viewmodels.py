@@ -12,7 +12,8 @@ D0 = datetime(2026, 3, 23, 9, 15, 0)
 REP = [(90.0, 80.0, 2.4)]
 ALLOWED_TODAY = {"patient_id", "date", "program", "exercises", "week", "streak_weeks", "message", "notes",
                  "messages", "checkin", "clips", "diary", "logs", "questionnaires", "voice",
-                 "plans", "next_visit"}                                    # feature 017: no diagnosis in either
+                 "plans", "next_visit",                                    # feature 017: no diagnosis in either
+                 "coach"}                                                  # feature 018: whether the coach is on
 FORBIDDEN = ("flag", "review", "next_step", "threshold", "label")
 
 

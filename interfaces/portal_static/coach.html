@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Ask about your exercises</title>
+</head>
+<body data-page="coach">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav class="tabs" aria-label="Main"><a href="/today" aria-current="page"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Today</span></a><a href="/progress"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg><span>Progress</span></a><a id="nav-messages" href="/messages" hidden><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg><span>Messages</span><span id="nav-unread" class="badge" hidden></span></a><a href="/visits"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Visits</span></a><a href="/settings"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <main class="card wide conversation coach">
+    <a class="back" href="/today"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Today</a>
+    <h1>Ask about your exercises</h1>
+    <p id="coach-plan" class="lead"></p>
+    <p id="load-error" class="error" role="alert" hidden></p>
+    <section id="coach-off" class="state" role="status" hidden>
+      <span class="ring"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></span>
+      <h2>The coach is turned off</h2>
+      <p>Your therapist hasn't turned on the exercise coach for you. You can still ask them anything in Messages.</p>
+      <a class="button" href="/messages">Go to Messages</a>
+    </section>
+    <div id="coach-on" hidden>
+      <p class="ai-bar"><span class="ai-mark" aria-hidden="true">AI</span><span>Answers come from an AI assistant using your exercise program. Your therapist can read this chat.</span></p>
+      <section id="empty" class="coach-empty" hidden>
+        <h2>What would you like to know?</h2>
+        <p class="small">I can only answer from your program. For anything else, message your therapist.</p>
+        <div id="suggestions" class="sugg" role="list" aria-label="Suggested questions"></div>
+      </section>
+      <ol id="thread" class="thread" aria-live="polite"></ol>
+      <section id="limit" class="ended" role="status" hidden>
+        <h2>You've reached today's question limit</h2>
+        <p>You can ask the coach again tomorrow. For anything sooner, message your therapist.</p>
+        <a class="button" href="/messages">Go to Messages</a>
+      </section>
+      <form id="ask">
+        <div class="c-row">
+          <label class="sr" for="question">Your question</label>
+          <textarea id="question" class="field" rows="2" maxlength="500" placeholder="Ask about an exercise"></textarea>
+          <button id="send" class="ib p" type="submit" aria-label="Ask" disabled><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4 18-7z"/></svg></button>
+        </div>
+        <p id="ask-error" class="error" role="alert" hidden></p>
+        <p class="note emergency" role="note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>Not for emergencies. If you need help now, call 911.</p>
+      </form>
+    </div>
+  </main>
+  <template id="emergency-card">
+    <li class="emerg" role="alert">
+      <h2><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h0"/></svg><span>Please get help now</span></h2>
+      <p>What you described can be serious. It needs a doctor today, not at your next visit.</p>
+      <p class="b">Call 911 or go to the nearest emergency room.</p>
+      <a class="call" href="tel:911"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h4l2 5-3 2a12 12 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/></svg>Call 911</a>
+      <a class="er-link" target="_blank" rel="noopener noreferrer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>Find the nearest emergency room</a>
+      <p class="xs">This is a set safety message from your clinic, not an AI answer.</p>
+    </li>
+  </template>
+  <template id="referral-card">
+    <li class="refer" role="region" aria-label="That's one for your therapist">
+      <h2>That's one for your therapist</h2>
+      <p class="small">Questions about pain getting worse, new symptoms, medicine or changing your program need your therapist. The coach can't answer them.</p>
+      <a class="button message-link">Message your therapist</a>
+      <p class="xs">Your question is copied into a new message. You can change it before you send.</p>
+      <p class="xs">This is a set message from your clinic.</p>
+    </li>
+  </template>
+  <script src="/static/portal.js"></script>
+  <script src="/static/coach.js"></script>
+</body>
+</html>

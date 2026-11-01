@@ -231,12 +231,20 @@
   }
 
   if (page === "session" || page === "progress" || page === "messages" || page === "clip" || page === "visits" ||
-      page === "diary" || page === "log" || page === "questionnaire" || page === "voice" || page === "settings") {
+      page === "diary" || page === "log" || page === "questionnaire" || page === "voice" || page === "settings" ||
+      page === "coach") {
     api("/api/today").then(function (res) {
       if (res.status === 401) { window.location.href = "/"; return; }
       text("patient-id", res.data.patient_id);
       if (page !== "messages") { messagesLink(res.data.messages); }
+      if (page === "messages") { coachEntry(res.data.coach); }
     });
+  }
+
+  // The exercise coach entry on Today and Messages (feature 018 slice B): only when the therapist turned it on.
+  function coachEntry(c) {
+    var entry = document.getElementById("coach-entry");
+    if (entry) { entry.hidden = !(c && c.enabled); }
   }
 
   // Today's plan cards and next visit (feature 017)
@@ -274,12 +282,13 @@
       text("visit-note", v.note || "");
     }
     card.hidden = !v;
-    top.hidden = !(d.plans && d.plans.length) && !v;
+    top.hidden = !(d.plans && d.plans.length) && !v && !(d.coach && d.coach.enabled);
   }
 
   function renderToday(d) {
       text("patient-id", d.patient_id);
       messagesLink(d.messages);
+      coachEntry(d.coach);
       renderPlans(d);
       if (d.checkin && d.checkin.today) { var cd = text("checkin-done", "Check-ins today: " + d.checkin.today); cd.hidden = false; }
       if (d.diary) { document.getElementById("diary-link").hidden = !d.diary.enabled; }

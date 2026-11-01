@@ -38,7 +38,7 @@ from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
 from src.portal import access, accounts, admin, attachments, diary, frames, live, messages, plans, questionnaires, uploads, viewmodels, voice  # noqa: E402
 from src.ptlog import origin  # noqa: E402
-from src.assist import assistant as ai_assistant, config as ai_config  # noqa: E402
+from src.assist import assistant as ai_assistant, coach as ai_coach, config as ai_config  # noqa: E402
 from src.ptlog.models import PlanArchived, PlanNotFound, PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
@@ -751,6 +751,68 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         texts = {"summaries": ai_assistant.NOTICE_SUMMARIES, "coach": ai_assistant.NOTICE_COACH}
         return _json({"notices": [texts[k] for k in ai_assistant.SWITCHES if on.get(k)]})
 
+    # ------------------------------------------------------------------ the exercise coach (feature 018 slice B)
+
+    def coach_view(store: SessionStore, patient_id: str) -> dict:
+        on = ai_config.available() and ai_assistant.switches(store, patient_id)["coach"]
+        plan = ai_coach.program_plan(store, patient_id)
+        view = {"state": "on" if on else "off", "patient_id": patient_id, "plan": plan.title if plan else None,
+                "notice": ai_assistant.NOTICE_COACH, "er_url": ai_coach.ER_SEARCH_URL}
+        if not on:
+            return view
+        data = ai_coach.program_extract(store, patient_id)
+        left = ai_coach.questions_left_today(store, patient_id)
+        turns = [{"question": t["question"], "kind": t["kind"], "exercise": t["exercise"] or "",
+                  "text": t["answer"] if t["kind"] == "answer" else ai_coach.SET_TEXT[t["kind"]],
+                  "at": t["asked_at"][:16]}
+                 for t in store.coach_turns(patient_id, store._now()[:10])]
+        view.update({"suggestions": ai_coach.suggestions(data), "turns": turns, "left": left,
+                     "has_program": data is not None})
+        return view
+
+    async def coach_get(request: Request):
+        with open_store() as store:
+            patient_id = signed_in(request, store)
+            if patient_id is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json(coach_view(store, patient_id))
+
+    async def coach_post(request: Request):
+        """One question to the coach. Red flags are checked before anything else, on the host."""
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        question = body.get("question") if isinstance(body, dict) else None
+        if not isinstance(question, str):
+            return _json({"error": "Write a question first."}, 400)
+
+        def ask():
+            with open_store() as store:
+                patient_id = signed_in(request, store)
+                if patient_id is None:
+                    return None
+                if not ai_config.available():
+                    # no key: never sent anywhere; red flags still get the emergency card
+                    if ai_coach.redflags.screen(question):
+                        return ai_coach.ask(store, patient_id, question), 0
+                    return ai_coach.CoachResult("off", ai_coach.OFF_TEXT), 0
+                result = ai_coach.ask(store, patient_id, question)
+                return result, ai_coach.questions_left_today(store, patient_id)
+
+        try:
+            answered = await run_in_threadpool(ask)
+        except ValueError as err:
+            return _json({"error": str(err)}, 400)
+        if answered is None:
+            return _json({"error": "Please sign in."}, 401)
+        result, left = answered
+        return _json({"kind": result.kind, "text": result.text, "exercise": result.exercise, "ai": result.ai,
+                      "at": result.asked_at[:16], "left": left})
+
     # ------------------------------------------------------------------ guided session
 
     STATE_KEYS = ("exercise", "index", "rep_count", "phase", "form_status", "form_messages", "feedback",
@@ -887,11 +949,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/voice", inner_page("voice")),
         Route("/settings", inner_page("settings")),
         Route("/visits", inner_page("visits")),
+        Route("/coach", inner_page("coach")),
         Route("/invite/{token}", invite_page),
         Route("/api/invites/{token}", invite_status, methods=["GET"]),
         Route("/api/invites/{token}", invite_accept, methods=["POST"]),
         Route("/api/me/preferences", preferences, methods=["GET", "POST"]),
         Route("/api/me/assistant", assistant_notice),
+        Route("/api/coach", coach_get, methods=["GET"]),
+        Route("/api/coach", coach_post, methods=["POST"]),
         Route("/api/login", login, methods=["POST"]),
         Route("/api/logout", logout, methods=["POST"]),
         Route("/api/today", today),
