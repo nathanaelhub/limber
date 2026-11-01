@@ -162,3 +162,28 @@ class TestDraftReply:
         with SessionStore(db).open() as s:
             assert s.messages_handled([m.id]) == {m.id}
         assert fake.bodies == []
+
+
+class TestCoachLog:
+    """Feature 018 slice B, US3 scenario 4: the therapist can read every coach conversation."""
+
+    def test_empty_then_every_turn_read_only(self, ai_on):
+        db, _ = ai_on
+        at = _app("patients", patients_edit_select="P-017")
+        assert not at.exception, [e.value for e in at.exception]
+        assert "P-017 hasn't asked the coach anything yet." in _text(at)
+        from src.assist import coach
+        with SessionStore(db).open() as s:
+            assistant.set_switch(s, "P-017", "coach", True)
+            s.coach_turn_add("P-017", "How many knee extensions?", "answer", "Knee Extension: 10 reps.",
+                             "Knee Extension", True)
+            coach.ask(s, "P-017", "My calf is swollen and hot")
+        at = _app("patients", patients_edit_select="P-017")
+        assert not at.exception, [e.value for e in at.exception]
+        log = next(d.value for d in at.dataframe if "Questions" in d.value.columns)
+        assert list(log["Questions"]) == [2]
+        assert "1 answered" in log["Outcome"][0] and "1 emergency card shown" in log["Outcome"][0]
+        text = _text(at)
+        assert "How many knee extensions?" in text and "Knee Extension: 10 reps." in text
+        assert "No AI text was shown" in text
+        assert not [w for w in at.text_area if "coach" in (w.key or "")]          # read only: nothing to edit

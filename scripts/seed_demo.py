@@ -316,6 +316,21 @@ def build(db_path: Path, seed: int = 7) -> None:
         clock.now = datetime.now() - timedelta(hours=2)
         messages.send(s, "P-023", "patient", "I had a fall this morning getting out of the car. Now my knee feels numb.")
 
+        # The exercise coach (feature 018 slice B): on for P-021, with yesterday's simulated conversation so the
+        # therapist's coach log has something to show. These turns are seed text, not calls to the AI.
+        from src.assist import coach as _coach
+        _assistant.set_switch(s, "P-021", "coach", True)
+        program = _coach.program_extract(s, "P-021")
+        if program:
+            first = program["exercises"][0]
+            clock.now = datetime.now() - timedelta(days=1, hours=3)
+            s.coach_turn_add("P-021", f"How many {first['name'].lower()} should I do?", "answer",
+                             f"{first['name']}: {first['reps']} reps. Move slowly and stop if you feel sharp pain.",
+                             first["name"], True)
+            clock.now = datetime.now() - timedelta(days=1, hours=2, minutes=56)
+            s.coach_turn_add("P-021", "My hip is sorer this week. Should I skip the exercises?", "referral", called=True)
+        clock.now = datetime.now()
+
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)
         s.set_installation_threshold("adherence", 65)

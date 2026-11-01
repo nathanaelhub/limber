@@ -1301,9 +1301,9 @@ def _assist_settings(pid, switches, since):
                       f"Lets you make AI summaries of the last 7 days and AI-drafted replies in the inbox. Nothing "
                       f"reaches {pid} unless you send it.", f"What {pid} is shown", ptassistant.NOTICE_SUMMARIES),
         "coach": ("Patient exercise coach",
-                  f"{pid} will be able to ask an AI assistant about their own program (arriving in a later update). "
-                  f"It answers only from the program and sends worse pain, new symptoms, medicine and program "
-                  f"changes to you.", f"What {pid} is shown before their first question", ptassistant.NOTICE_COACH),
+                  f"{pid} can ask an AI assistant about their own program, on Today and Messages. It answers only "
+                  f"from the program and sends worse pain, new symptoms, medicine and program changes to you. Red "
+                  f"flags get the emergency card without calling the AI.", f"What {pid} is shown before their first question", ptassistant.NOTICE_COACH),
     }
     for which, (title, blurb, shown_label, notice) in blurbs.items():
         with st.container(border=True, key=f"card_ai_{which}_{pid}"):
@@ -1321,9 +1321,61 @@ def _assist_settings(pid, switches, since):
             st.caption(("" if switches[which] else "Off. ") + blurb)
             st.markdown(f"<div class='nav-group' style='margin-left:0'>{shown_label}</div>", unsafe_allow_html=True)
             st.info(f"“{notice}”")
+    _coach_log(pid)
+
+
+_COACH_OUTCOMES = {"answer": "answered", "referral": "sent to you", "emergency": "emergency card shown",
+                   "refusal": "not about the program", "off": "coach was off", "limit": "daily limit",
+                   "no_program": "no program", "unavailable": "not available"}
+_COACH_SET_LINES = {"referral": "That's one for your therapist. {pid} was offered Message your therapist.",
+                    "emergency": "Emergency card: call 911 or go to the nearest emergency room. No AI text was shown.",
+                    "refusal": "Only answers about the program; {pid} was pointed to Messages.",
+                    "off": "The coach is turned off — message your therapist instead.",
+                    "limit": "Today's question limit was reached.",
+                    "no_program": "No program to answer from yet.",
+                    "unavailable": "The coach wasn't available; {pid} was pointed to Messages."}
+
+
+def _coach_log(pid):
+    """Every coach conversation, read only, newest day first (feature 018 slice B, US3 scenario 4)."""
+    from src.assist import coach as ptcoach
     st.markdown("### Past coach conversations")
-    st.caption("Read only. Newest first. The exercise coach arrives in a later update; its conversations will "
-               "appear here.")
+    st.caption("Read only. Newest first.")
+    with _open_store() as store:
+        days = ptcoach.conversations(store, pid)
+    if not days:
+        st.caption(f"{pid} hasn't asked the coach anything yet.")
+        return
+
+    def outcome(turns):
+        counts = {}
+        for t in turns:
+            counts[t["kind"]] = counts.get(t["kind"], 0) + 1
+        return ", ".join(f"{n} {_COACH_OUTCOMES[k]}" for k, n in counts.items())
+
+    def label(day):
+        return datetime.fromisoformat(day).strftime("%a %-d %b")
+
+    st.dataframe(pd.DataFrame([{"Date": label(d["day"]), "Questions": len(d["turns"]), "Outcome": outcome(d["turns"])}
+                               for d in days]), use_container_width=True, hide_index=True, key=f"coach_log_{pid}")
+    for i, d in enumerate(days):
+        kinds = {t["kind"] for t in d["turns"]}
+        title = f"{label(d['day'])} · {len(d['turns'])} question{'s' if len(d['turns']) != 1 else ''}" + \
+            (" · emergency card" if "emergency" in kinds else "")
+        with st.expander(title, expanded=i == 0):
+            for t in d["turns"]:
+                with st.chat_message("user", avatar=":material/person:"):
+                    st.caption(f"{pid} · {t['asked_at'][11:16]}")
+                    st.text(t["question"])
+                if t["kind"] == "answer":
+                    with st.chat_message("assistant", avatar=":material/smart_toy:"):
+                        st.markdown(app_theme.ai_label("AI assistant" + (f" · {t['exercise']}" if t["exercise"] else "")),
+                                    unsafe_allow_html=True)
+                        st.text(t["answer"] or "")
+                else:
+                    with st.chat_message("assistant", avatar=":material/campaign:"):
+                        st.caption(f"Set message · {_COACH_OUTCOMES[t['kind']]}")
+                        st.text(_COACH_SET_LINES[t["kind"]].format(pid=pid))
 
 
 def _inbox_assist(pid, plan_id):

@@ -189,3 +189,40 @@ Tasks and tests: `specs/018-ai-assistant/tasks.md`. Where the build differs from
   test pins it.
 - **Deleting a patient** also deletes their rows in the call log, which has no foreign key because it is a log.
 
+
+## Slice B as built (2026-10-31)
+
+The patient exercise coach (US3) is built. Tasks and tests: `specs/018-ai-assistant/tasks.md` (T013–T019).
+Where the build differs from or adds to the text above:
+
+- **Model and request (FR-003, FR-004)**: `claude-sonnet-5-5`, adaptive thinking, effort `low` for a fast answer,
+  structured output (`output_config.format`, a JSON schema with `kind` = answer | referral | refusal, `exercise`
+  limited to the program's exercise names, and `answer`). No server-side fallbacks: FR-003 asks for them on the Opus
+  requests only. The system prompt and the program each carry a cache breakpoint; live requests were about
+  920 input tokens, above the model's 512-token minimum, so repeated questions can reuse the cached prefix.
+- **What the model writes**: only an answer. The referral ("That's one for your therapist") and the "only your
+  program" refusal are set clinic text chosen by the model's `kind`, as in the design (TherapistAISettings shows
+  the referral as a "Set message"). Every patient-visible card except an AI answer is labelled as clinic text.
+- **Red flags first (FR-005)**: the host screen runs before the switch, the cap and the key check, so a red-flag
+  question gets the emergency card even when the coach is off, capped, or no key is configured. The model is never
+  called for it. The card links `tel:911` and a maps search for "emergency room near me"; Limber sends no location.
+- **What is sent (FR-006)**: the patient code, the plan title the program belongs to, the program name, sessions per
+  week, and per exercise its name, prescribed reps, any range-of-motion goal, the catalogue's one-line
+  description, and whether it was done today. No logs, messages, notes, label, diagnosis, or account field.
+  The spec's "the therapist's notes on each exercise" has no store yet; the catalogue's clinician notes are written
+  for therapists and are not sent.
+- **Dose check (edge case)**: every number in an answer must appear in the program or in the patient's question;
+  otherwise the answer is replaced by the referral. An answer naming an exercise outside the program is treated
+  the same way.
+- **One question at a time**: each request holds the program and the one question, not the earlier turns. The page
+  shows today's conversation; a follow-up has to name the exercise again.
+- **Daily cap**: per patient, `coach_daily_cap` in clinic settings, default 20, counting questions that reached the
+  API. Coach calls do not count toward the therapist's cap of 50.
+- **Stored for the therapist (US3 scenario 4)**: schema v17 adds `coach_turns` (question, what was shown, the
+  exercise, whether the API was called); it goes with the patient on delete. The call log still has no content.
+  The therapist reads the turns, newest day first, in the patient's AI settings tab.
+- **Entry points**: an "Ask about your exercises" row on Today and on Messages, shown only with a key and the
+  switch on. The referral's **Message your therapist** opens Messages with the question copied into the box.
+- **States from the design**: empty with three suggested questions drawn from the program, thinking (the dots stop
+  with Less motion and with the system's reduced-motion setting), answer with "From your program: …", referral,
+  emergency, turned off, daily limit, and "no program yet". Live answers took 1–5 s.

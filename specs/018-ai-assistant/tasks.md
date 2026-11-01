@@ -44,3 +44,24 @@ per-patient switch.
       to Anthropic. Tests: `tests/test_portal_assist_http.py`.
 - [x] T012 Live smoke test, opt-in (`LIMBER_LIVE_AI=1`), against demo data only:
       `tests/test_assist_live.py`. Demo seed turns the switches on for P-021.
+
+## Slice B, the patient exercise coach (US3)
+
+- [x] T013 Schema v17: `coach_turns` (question, kind shown, answer, exercise, called), removed with the patient; the
+      therapist's daily cap no longer counts coach calls. Tests: `tests/test_assist_coach.py::TestSchema`,
+      `TestOffAndLimits::test_coach_calls_do_not_use_the_therapists_cap`.
+- [x] T014 The program extract: only the signed-in patient's program, under the code, attached to the plan the
+      program belongs to. Tests: `TestAnswers::test_the_request_holds_only_this_patients_program`, `TestPlan`
+      (FR-006).
+- [x] T015 The coach request and answer: `claude-sonnet-5-5`, adaptive thinking, effort low, JSON schema, cache
+      breakpoints; set text for referral and refusal; the dose check; refusal, cut-off, errors and bad output are
+      unavailable. Tests: `TestAnswers`, `TestReferralAndRefusal`, `TestUnavailable` (US3 scenarios 1–2, FR-003,
+      FR-004, edge cases).
+- [x] T016 Red flags before anything else, the switch, the daily cap of 20, no program. Tests: `TestEmergency`,
+      `TestOffAndLimits` (US3 scenarios 3 and 5, FR-005).
+- [x] T017 Portal: `GET/POST /api/coach`, the `/coach` page with every design state, the entry rows on Today and
+      Messages, the referral's hand-over into Messages. Tests: `tests/test_portal_coach_http.py`.
+- [x] T018 Therapist: the coach log in AI settings, read only, newest day first. Tests:
+      `tests/test_app_assist.py::TestCoachLog` (US3 scenario 4).
+- [x] T019 Demo seed: the coach on for P-021 with yesterday's simulated conversation. Browser walk at 390px and
+      768px, with Larger text, Higher contrast and Less motion, and the therapist log at 1280px, with live answers.
