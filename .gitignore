@@ -45,13 +45,14 @@ models/*.pt
 models/*.onnx
 
 # User data and outputs
-data/
-exports/
-sessions/
-output/
-observation_logs/
-pta_logs/
-logs/
+# Anchored to the repo root: unanchored, these also hid src/ptlog/exports/ and test fixtures
+/data/
+/exports/
+/sessions/
+/output/
+/observation_logs/
+/pta_logs/
+/logs/
 *.mp4
 *.avi
 *.mov

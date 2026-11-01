@@ -1,0 +1,16 @@
+{
+  "session_id": "P-002_20260203_111424",
+  "patient_id": "P-002",
+  "date": "2026-02-03",
+  "start_time": "11:10:00",
+  "end_time": "11:14:24",
+  "duration_minutes": 4.4,
+  "exercises": [
+    {"exercise_name": "Shoulder Flexion", "reps_completed": 4, "target_reps": 10, "avg_form_score": 81.0,
+     "min_rom": 20.0, "max_rom": 165.0, "rom_range": 145.0, "avg_rep_duration": 2.2, "form_warnings": [], "notes": ""}
+  ],
+  "overall_form_score": 81.0,
+  "therapist_notes": "",
+  "flags_for_review": ["Shoulder Flexion: Completed only 4/10 reps"],
+  "metadata": {}
+}
