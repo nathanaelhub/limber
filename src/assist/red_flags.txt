@@ -15,8 +15,9 @@ can'?t feel
 pins and needles
 tingl(?:e|es|ing) (?:in|down) my (?:leg|arm|foot|feet|hand|groin)
 (?:had|have|took) a fall
-\bfall(?:s|en)?\b(?! asleep)
-\bfell\b
+# Not "fell behind" or "fell asleep" (issue #16): a false alarm teaches the patient to ignore the card
+\bfall(?:s|en)?\b(?! (?:asleep|behind))
+\bfell\b(?! (?:asleep|behind))
 swollen and hot
 hot and swollen
 red and hot
