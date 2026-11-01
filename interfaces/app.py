@@ -2512,10 +2512,10 @@ def page_inbox():
                 "When": (r.last_at or "")[:16].replace("T", " "), "Messaging": "on" if r.enabled else "off"} for r in active]),
                 use_container_width=True, hide_index=True, key="inbox_table", selection_mode="single-row",
                 on_select=lambda order=[r.patient_id for r in active]: _inbox_pick(order),
-                column_order=["Patient", "Plan", "Unread"],
+                column_order=["Patient", "Unread", "Plan"],
                 column_config={"Patient": st.column_config.TextColumn(width="small"),
-                               "Plan": st.column_config.TextColumn(width="medium"),
-                               "Unread": st.column_config.NumberColumn(width="small")})
+                               "Unread": st.column_config.NumberColumn(width="small"),
+                               "Plan": st.column_config.TextColumn(width="large")})
             st.caption("Select a row to open the conversation.")
         else:
             st.info("No conversations yet. Turn messaging on for a patient below to start one.")

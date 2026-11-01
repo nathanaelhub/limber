@@ -95,3 +95,12 @@ class TestPatientTabs:
         at = _app("patients", patients_edit_select="P-021")
         at.button(key="patient_to_inbox_P-021").click().run()
         assert at.session_state["current_page"] == "inbox" and at.session_state["inbox_open"] == "P-021"
+
+
+class TestInbox:
+    def test_unread_sits_before_the_long_plan_column(self, seeded_env):  # noqa: F811
+        """A long Plans cell must not push Unread off the right edge at laptop width (issue #6)."""
+        _seed(seeded_env)
+        at = _app("inbox")
+        assert not at.exception, [e.value for e in at.exception]
+        assert list(at.dataframe(key="inbox_table").proto.column_order) == ["Patient", "Unread", "Plan"]
