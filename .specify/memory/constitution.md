@@ -1,17 +1,14 @@
 <!--
 Sync Impact Report (temporary; remove before the next amendment)
-Version change: 1.1.0 -> 1.2.0 (MINOR: materially expanded guidance, no principle removed)
-Rationale: the owner decided that patients will use Limber on their phones outside therapy and
-upload short video clips and voice notes for the therapist (features 010-014). Principle III said
-camera video never leaves the device, written for guided sessions; that rule is kept for guided
-sessions, and deliberate patient uploads are allowed under stated guarantees. Principle IV's
-"no model weights in the suite" is widened from the pose model to any model (a speech model
-arrives with transcription). The installed app may keep a device signed in for 30 days.
-Modified: Principle III (video sentence replaced by a bullet on uploads); Principle IV (weights
-wording); Technical Constraints data-directory list (data/media/).
+Version change: 1.2.0 -> 1.3.0 (MINOR: materially expanded guidance, no principle removed)
+Rationale: the owner chose to use an Anthropic API key for a therapist assistant (weekly summaries,
+draft replies) and a patient exercise coach (feature 018). Principle III forbade third-party
+processing; it now allows one named AI processor for patient text records under stated guarantees.
+Audio, video, photos, and documents still never leave the host.
+Modified: Principle III (new bullet on one named AI processor).
 Added sections: none. Removed sections: none.
-Follow-ups: specs/010+ carry the Principle III check; retention, consent text, and identifiable
-media must be covered by the compliance review before real-patient use.
+Follow-ups: specs/018 carries the Constitution Check; the processor's retention terms are stated
+there; real-clinic use still waits for the compliance review.
 -->
 
 # PT Assist Constitution
@@ -83,6 +80,14 @@ Patient data stays on the user's machine, and patients are never identifiable fr
   and processed (for example transcribed) only on the Limber host, never by a third-party
   service. An installed patient app MAY keep a device signed in for up to 30 days, revocable by
   the therapist at any time.
+- A feature MAY send a patient's text records (logs, diary, questionnaire answers, messages, and
+  transcripts produced on the host) to one named AI processor, only if: it is off until the
+  therapist turns it on for that patient; the patient has been told in plain words that their
+  records are processed by that service; requests carry the pseudonymous ID and never the display
+  name, username, or any account field; no audio, video, photo, or document is sent; every request
+  and response is logged on the host with its size and purpose, without its content; and the
+  processor's data-retention terms are stated in the feature's spec. The named processor is
+  Anthropic (Claude API). Real clinic patients still require the compliance review.
 - Patients MUST be identified by pseudonymous IDs. Names, dates of birth, medical record
   numbers, and contact details MUST NOT appear in filenames, log lines, screenshots, test
   fixtures, commit messages, or committed files.
@@ -186,4 +191,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-23
+**Version**: 1.3.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-10-30

@@ -1,0 +1,33 @@
+# Words and phrases that mean a message needs a person, not a draft or a coach answer (feature 018, FR-005).
+# One per line, matched case-insensitively on word boundaries. A line may be a regular expression.
+# Err on the side of flagging: a false alarm costs the therapist a phone call; a miss could cost more.
+chest pain
+chest (?:is )?tight
+short(?:ness)? of breath
+can'?t breathe
+trouble breathing
+numb
+numbness
+can'?t feel
+pins and needles
+tingl(?:e|es|ing) (?:in|down) my (?:leg|arm|foot|feet|hand|groin)
+(?:had|have|took) a fall
+\bfall(?:s|en)?\b(?! asleep)
+\bfell\b
+swollen and hot
+hot and swollen
+red and hot
+calf (?:is |feels )?(?:swollen|hot|tender|hard)
+faint(?:ed|ing)?
+pass(?:ed)? out
+blood
+fever
+dizz(?:y|iness)
+can'?t (?:move|walk|stand)
+bladder
+bowel
+sudden(?:ly)? (?:severe|worse|sharp)
+worst pain
+kill myself
+suicid
+want to die

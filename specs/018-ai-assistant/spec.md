@@ -20,7 +20,7 @@ transcription on the Limber host, built and waiting for a model file. Once that 
 (A) can read it like any other text, since the transcript stays on the host and only text goes to the
 API, under the same rules as the rest of (A).
 
-## Constitution amendment v1.3.0 (Principle III), proposed
+## Constitution amendment v1.3.0 (Principle III), applied 2026-10-30
 
 Principle III currently forbids third-party processing of patient uploads and requires every networked
 feature to be opt-in and specified. This feature sends patient **text** to Anthropic, so it needs an
@@ -150,3 +150,42 @@ the nearest emergency room) and nothing else.
   setting (default 50 calls).
 - No AI answer is ever sent to a patient without a therapist, except the coach's answers, which the
   therapist turned on and can read.
+
+## Slice A as built (2026-10-30)
+
+The therapist assistant (US1, US2, FR-009) is built; the coach (US3) is not, and only its switch is stored.
+Tasks and tests: `specs/018-ai-assistant/tasks.md`. Where the build differs from or adds to the text above:
+
+- **Fallbacks (FR-003)**: server-side fallbacks are documented for the installed SDK (`anthropic` 2.3.0), so
+  requests send `fallbacks: "default"` with the `server-side-fallback-2026-07-01` beta through
+  `client.beta.messages.create`. Live calls accept it together with the JSON output schema.
+- **Effort**: `medium` for both summaries and drafts, set explicitly (the model's default). Live summaries on
+  the demo record took 13–16 s, drafts 4–7 s, inside the 30-second target.
+- **Prompt caching (FR-004)**: both cache breakpoints are sent (system prompt, then the extract), but slice A
+  requests are about 1,300–2,100 input tokens, below the model's minimum cacheable prefix, so nothing is
+  cached yet. The breakpoints cost nothing and will take effect for the coach's longer, repeated prefix.
+- **Summary output**: a JSON schema through structured outputs (`output_config.format`). The host still
+  validates it: a claim or next step with no record ID from the extract is dropped, at most 3 next steps are
+  kept, and the panel says how many statements were left out. Output that does not parse is "unavailable".
+- **The extract (FR-006)** leaves out the plan's diagnosis, the patient's label, and the patient's notes as well
+  as every account field, because none of them is in the amendment's list of text records. Photos,
+  documents, and recordings are named as sent, never included; the prompts say so, so a draft never claims
+  one did not arrive.
+- **Red flags (FR-005)**: the list is `src/assist/red_flags.txt`. A draft is withheld when any patient message
+  since the therapist's last reply in that plan trips it, not only the last one. The notice quotes the words
+  the patient wrote ("P-023 mentioned “had a fall”, “numb”").
+- **Mark as handled by phone (FR-009)** clears the message from the attention flag and allows a draft again;
+  it is recorded in `message_handled` with the account and time. The unread count clears when the therapist
+  opens the conversation, as for every message.
+- **Session notes**: Limber had no free-standing therapist note, so slice A adds `therapist_notes`. A saved
+  summary keeps an "AI-drafted" marker, plus "edited" when the therapist changed it. The design's "until you
+  edit and sign it" is not used, because Limber does not sign notes.
+- **Daily cap**: counted per signed-in account per day (the account-less private machine counts as one);
+  `assist_daily_cap` in clinic settings, default 50. Every call that reached the API counts, whatever its
+  outcome.
+- **Patient notice**: the Settings page shows, in plain words, each switch the therapist turned on and that
+  the processor is Anthropic (`GET /api/me/assistant`). Nothing shows when no key is configured.
+- **A draft never follows the therapist to another conversation**: found in the browser walk and fixed; a
+  test pins it.
+- **Deleting a patient** also deletes their rows in the call log, which has no foreign key because it is a log.
+

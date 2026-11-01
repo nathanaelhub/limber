@@ -178,6 +178,12 @@
       Object.keys(PREFS).forEach(function (k) { document.getElementById(k).checked = res.data[k] === true; });
     });
     previewPrefs();
+    api("/api/me/assistant").then(function (res) {           // feature 018: told in plain words, when it is on
+      if (res.status !== 200 || !res.data.notices.length) { return; }
+      var box = document.getElementById("assistant-notices");
+      res.data.notices.forEach(function (n) { var p = document.createElement("p"); p.textContent = n; box.appendChild(p); });
+      document.getElementById("assistant-notice").hidden = false;
+    });
     document.getElementById("prefs").addEventListener("submit", function (event) {
       event.preventDefault();
       var saved = document.getElementById("saved"), error = document.getElementById("prefs-error");

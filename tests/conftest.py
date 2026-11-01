@@ -163,3 +163,11 @@ def caseload(make_session):
         return ids
 
     return _build
+
+
+@pytest.fixture(autouse=True)
+def _no_ai_key(monkeypatch, tmp_path_factory):
+    """No test sees the real Anthropic key (feature 018): the assistant is off unless a test turns it on
+    with a fake client. The repository's .env is never read during tests."""
+    monkeypatch.delenv("LIMBER_ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("LIMBER_ENV_FILE", str(tmp_path_factory.getbasetemp() / "no-such.env"))
