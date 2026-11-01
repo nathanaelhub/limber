@@ -104,7 +104,9 @@ class TestReferralAndRefusal:
 
 
 class TestEmergency:
-    @pytest.mark.parametrize("q", ["My calf is swollen and hot", "I had a fall", "I have chest pain"])
+    @pytest.mark.parametrize("q", ["My calf is swollen and hot", "I had a fall", "I have chest pain",
+                                   "The back of my leg below the knee is really puffy, red and warm to touch.",
+                                   "I can't catch my breath when I climb the stairs since yesterday."])
     def test_red_flags_never_call_the_model(self, store, q):
         """US3 scenario 3: the emergency message, and the model is not called."""
         fake = _fake()
