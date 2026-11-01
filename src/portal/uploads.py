@@ -71,6 +71,7 @@ MIN_CHUNK, MAX_CHUNK = 1024, CHUNK_BYTES
 def begin(store: SessionStore, media_dir: Path, patient_id: str, kind: str, total_bytes, sha256: str,
           chunk_bytes: int = CHUNK_BYTES):
     """Open an upload. Refuses over-limit declarations before a byte is sent."""
+    store.require_writable_plan(patient_id)           # an archived plan takes no new uploads (feature 017)
     if not isinstance(chunk_bytes, int) or isinstance(chunk_bytes, bool) or not MIN_CHUNK <= chunk_bytes <= MAX_CHUNK:
         raise PortalError("The part size is out of range.")
     if kind not in PER_DAY:

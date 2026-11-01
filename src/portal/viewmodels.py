@@ -129,9 +129,16 @@ def messages_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     return {"enabled": enabled, "unread": messages.unread_count(store, patient_id, viewer="patient") if enabled else 0}
 
 
+def attachment_json(a) -> Dict[str, Any]:
+    return {"id": a.id, "kind": a.kind, "type": a.mime, "bytes": a.bytes, "width": a.width, "height": a.height,
+            "deleted": a.deleted_at is not None}
+
+
 def message_json(m) -> Dict[str, Any]:
     return {"id": m.id, "from": "you" if m.sender == "patient" else "therapist", "text": m.body,
-            "sent_at": m.sent_at[:16], "removed": m.removed, "media_id": m.media_id}
+            "sent_at": m.sent_at[:16], "removed": m.removed, "media_id": m.media_id, "plan_id": m.plan_id,
+            "seen": m.read_at is not None,           # the other side has opened it ("Seen" on the patient's own)
+            "attachments": [attachment_json(a) for a in getattr(m, "attachments", [])]}
 
 
 def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
@@ -141,6 +148,18 @@ def messages_view(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     enabled = messages.is_enabled(store, patient_id)
     thread = messages.thread(store, patient_id, viewer="patient") if enabled else []
     return {"patient_id": patient_id, "enabled": enabled, "notice": messages.NOT_FOR_EMERGENCIES,
+            "messages": [message_json(m) for m in thread]}
+
+
+def plan_messages_view(store: SessionStore, patient_id: str, plan_id) -> Dict[str, Any]:
+    """One plan's conversation (feature 017); opening it marks the therapist's messages in it read."""
+    from src.portal import messages, plans
+    _require(store, patient_id)
+    plan = plans.own_plan(store, patient_id, plan_id)
+    enabled = messages.is_enabled(store, patient_id)
+    thread = messages.thread(store, patient_id, viewer="patient", plan_id=plan.id) if enabled else []
+    return {"patient_id": patient_id, "enabled": enabled, "notice": messages.NOT_FOR_EMERGENCIES,
+            "plan": plans.plan_json(plan), "can_send": enabled and not plan.read_only,
             "messages": [message_json(m) for m in thread]}
 
 
@@ -168,6 +187,23 @@ def voice_badge(store: SessionStore, patient_id: str) -> Dict[str, Any]:
     return voice.options(store, patient_id)
 
 
+def plan_cards(store: SessionStore, patient_id: str, assignment, now: datetime) -> Dict[str, Any]:
+    """Today's plan cards (feature 017): one per active plan, with the therapist's unread messages in it and
+    whether the current program belongs to it, and the next upcoming visit."""
+    from src.portal import plans
+    unread = store.messages_unread_by_plan("therapist", patient_id)
+    program_plan = None
+    if assignment is not None:
+        row = store.conn.execute("SELECT plan_id FROM assignments WHERE id = ?", (assignment.id,)).fetchone()
+        program_plan = row["plan_id"] if row else None
+    cards = [{"id": p.id, "title": p.title, "unread": unread.get(p.id, 0),
+              "has_program": assignment is not None and program_plan == p.id}
+             for p in store.plans(patient_id) if p.status == "active"]
+    upcoming = [a for a in plans.appointments_view(store, patient_id) if a["state"] == "upcoming"]
+    upcoming.sort(key=lambda a: a["starts_local"])
+    return {"plans": cards, "next_visit": upcoming[0] if upcoming else None}
+
+
 def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     from src.portal import diary
     _require(store, patient_id)
@@ -183,6 +219,7 @@ def today_view(store: SessionStore, patient_id: str, now: Optional[datetime] = N
                             "questionnaires": questionnaire_badge(store, patient_id, now),
                             "voice": voice_badge(store, patient_id)}
     assignment = store.active_assignment(patient_id, today)
+    view.update(plan_cards(store, patient_id, assignment, now))
     if assignment is None:
         view["message"] = NO_PROGRAM
         return view

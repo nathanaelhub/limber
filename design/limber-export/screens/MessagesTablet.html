@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messages, tablet</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<div class="board" style="width: 864px; height: 1160px;">
+  <div class="frame">
+    <div class="cap">1g · Messages at 768 <span>plans become a list beside the thread</span></div>
+    <div class="tablet lb">
+      <div style="flex: 1; display: flex; min-height: 0;">
+        <aside style="width: 272px; flex: none; border-right: 1px solid #EDEAE2; padding: 28px 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div class="col" style="gap: 4px; padding: 0 6px;"><h1>Messages</h1><span class="code">P-021</span></div>
+          <nav aria-label="Plans of care" class="col" style="gap: 8px;">
+            <span class="xs b mut" style="padding: 0 6px;">ACTIVE PLANS</span>
+            <a href="#" aria-current="true" class="card" style="padding: 14px; border-radius: 16px; text-decoration: none; color: #16302C; border-color: #16302C; border-width: 2px; display: flex; flex-direction: column; gap: 2px;"><span class="b">Right knee, post-op</span><span class="xs mut">Week 3 · All read</span></a>
+            <a href="#" class="card" style="padding: 14px; border-radius: 16px; text-decoration: none; color: #16302C; display: flex; justify-content: space-between; align-items: center; gap: 8px;"><span class="col" style="gap: 2px;"><span class="b">Left shoulder</span><span class="xs mut">Week 1</span></span><span class="cnt">1 new</span></a>
+            <span class="xs b mut" style="padding: 10px 6px 0;">PAST PLANS</span>
+            <a href="#" class="card" style="padding: 14px; border-radius: 16px; text-decoration: none; color: #16302C; display: flex; align-items: center; gap: 10px; background: #FAF8F4;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v11h14V9M10 13h4"/></svg><span class="col" style="gap: 2px;"><span class="b small">Left ankle</span><span class="xs mut">Ended 12 August</span></span></a>
+          </nav>
+          <a href="Coach.html" class="card" style="margin-top: auto; padding: 14px; border-radius: 16px; text-decoration: none; color: #16302C; display: flex; flex-direction: column; gap: 8px;">
+            <span class="ai"><span class="ai-mark">AI</span>Exercise coach</span>
+            <span class="small"><span class="b">Quick question about an exercise?</span> Ask the coach.</span>
+          </a>
+        </aside>
+        <section style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 28px 28px 12px; border-bottom: 1px solid #EDEAE2; display: flex; flex-direction: column; gap: 2px;">
+            <h2>Right knee, post-op</h2>
+            <span class="small mut">With your therapist · Started 3 weeks ago</span>
+          </div>
+          <div class="body" style="padding: 8px 28px 16px;">
+            <div class="thread">
+              <span class="day">Wednesday 29 October</span>
+              <span class="who">Your therapist</span>
+              <div class="msg them" style="max-width: 70%;">How did the stairs feel this week?</div>
+              <span class="meta">10:14</span>
+              <span class="day">Thursday 30 October</span>
+              <span class="who me">You</span>
+              <div class="msg me" style="max-width: 70%;">Harder on Thursday, knee felt tight. Photo of the swelling attached.</div>
+              <div class="att">
+                <button class="ph" style="width: 168px; height: 168px; padding: 0;" aria-label="Open photo: swelling, 30 October"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Photo</button>
+              </div>
+              <span class="meta me">18:12 · Seen</span>
+            </div>
+          </div>
+          <div class="composer" style="padding: 14px 28px 16px;">
+            <div class="tray" role="list" aria-label="Attached photos">
+              <div class="thumb" role="listitem"><div class="ph">Photo 1</div><button class="rm" aria-label="Remove photo 1"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button></div>
+              <div class="thumb" role="listitem"><div class="ph">Photo 2</div><button class="rm" aria-label="Remove photo 2"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button></div>
+              <span class="xs mut" style="align-self: center;">2 of 4 photos</span>
+            </div>
+            <div class="c-row">
+              <button class="btn btn-s" style="padding: 0 14px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+              <label class="sr" for="t1">Message to your therapist</label>
+              <textarea id="t1" class="field" rows="1" placeholder="Write a message"></textarea>
+              <button class="btn btn-p"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z"/></svg>Send</button>
+            </div>
+            <span class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg>Not for emergencies. If you need help now, call 911.</span>
+          </div>
+        </section>
+      </div>
+      <nav class="tabbar" aria-label="Main" style="padding: 8px 120px 20px;">
+        <a class="tab" href="Today.html"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages<span class="dot">1<span class="sr"> unread</span></span></a>
+        <a class="tab" href="Appointments.html"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+</div>
+</body>
+</html>

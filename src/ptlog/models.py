@@ -603,6 +603,8 @@ class Message:
     removed: bool = False
     warned: bool = False             # sent after the writer was warned that it looks identifying
     media_id: Optional[str] = None   # the voice note this message carries, if any (feature 014)
+    plan_id: Optional[int] = None    # the plan of care the conversation belongs to (feature 017)
+    attachments: List["Attachment"] = field(default_factory=list)
 
 
 @dataclass
@@ -614,6 +616,80 @@ class ConversationSummary:
     first_line: str
     last_sender: Optional[str]
     last_at: Optional[str]
+
+
+# --------------------------------------------------------------------------------------
+# Plans of care, appointments, and attachments (feature 017)
+# --------------------------------------------------------------------------------------
+
+PLAN_STATUSES = ("active", "completed", "archived")
+APPOINTMENT_STATUSES = ("scheduled", "cancelled")
+
+
+class PlanArchived(PTLogError):
+    """A write reached a plan of care that is archived. The portal answers 409."""
+
+    def __init__(self, why: str = "This plan of care is archived. It can be read but not changed."):
+        super().__init__(why)
+
+
+class PlanNotFound(PTLogError):
+    """No plan of care with that id for this patient."""
+
+
+@dataclass
+class Plan:
+    """An episode of care: everything new for the patient belongs to one."""
+    id: int
+    patient_id: str
+    title: str
+    diagnosis: str                   # free text by the therapist; never in filenames or logs
+    diagnosis_visible: bool          # shown to the patient only when the therapist chooses
+    start_date: str
+    end_date: Optional[str]
+    status: str                      # active | completed | archived
+    created_at: str
+    archived_at: Optional[str] = None
+
+    @property
+    def read_only(self) -> bool:
+        return self.status == "archived"
+
+
+@dataclass
+class Appointment:
+    """A visit on a plan. The start is stored in UTC and shown in the clinic's time zone."""
+    id: int
+    plan_id: int
+    patient_id: str
+    starts_at: str                   # ISO 8601, UTC
+    minutes: int
+    note: str
+    status: str                      # scheduled | cancelled
+    reschedule_requested: bool
+    request_note: str
+    response_note: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class Attachment:
+    """A photo or a PDF sent with a message. The file lives under the patient's media folder."""
+    id: str
+    patient_id: str
+    message_id: int
+    plan_id: int
+    kind: str                        # photo | document
+    ext: str
+    mime: str
+    bytes: int
+    width: int
+    height: int
+    sha256: str
+    created_at: str
+    deleted_at: Optional[str] = None
+    deleted_by: Optional[str] = None
 
 
 # --------------------------------------------------------------------------------------

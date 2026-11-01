@@ -36,9 +36,9 @@ from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
-from src.portal import access, accounts, admin, diary, frames, live, messages, questionnaires, uploads, viewmodels, voice  # noqa: E402
+from src.portal import access, accounts, admin, attachments, diary, frames, live, messages, plans, questionnaires, uploads, viewmodels, voice  # noqa: E402
 from src.ptlog import origin  # noqa: E402
-from src.ptlog.models import PortalError, PTLogError  # noqa: E402
+from src.ptlog.models import PlanArchived, PlanNotFound, PortalError, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "portal_static"
@@ -84,6 +84,19 @@ class SecurityHeaders:
 
 def _json(data, status: int = 200, headers: Optional[dict] = None) -> JSONResponse:
     return JSONResponse(data, status_code=status, headers={"Cache-Control": "no-store", **(headers or {})})
+
+
+def _bad(err: Exception) -> JSONResponse:
+    """A refused write: 409 when the plan of care is archived (feature 017), otherwise 400."""
+    if isinstance(err, PlanArchived):
+        return _json({"error": str(err), "archived": True}, 409)
+    if isinstance(err, PlanNotFound):
+        return _json({"error": str(err)}, 404)
+    return _json({"error": str(err)}, 400)
+
+
+# 4 photos of 15 MB, or one PDF of 20 MB, plus the text and the form's own overhead.
+ATTACHMENT_REQUEST_MAX = attachments.MAX_PHOTOS * attachments.PHOTO_MAX + 1024 * 1024
 
 
 def pose_assets_present(static_dir: Path) -> bool:
@@ -178,7 +191,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             try:
                 return _json(viewmodels.today_view(store, patient_id, now=clock()))
             except PTLogError as err:
-                return _json({"error": str(err)}, 400)
+                return _bad(err)
 
     def progress(request: Request):
         with open_store() as store:
@@ -219,7 +232,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 except messages.TooManyMessages as many:
                     return _json({"error": str(many)}, 429)
                 except PTLogError as err:
-                    return _json({"error": str(err)}, 400)
+                    return _bad(err)
         return await run_in_threadpool(work)
 
     def entries_get(request: Request):
@@ -269,7 +282,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                         payload, score = entry_rules.validate(body.get("kind"), body.get("data"),
                                                               choices={"item": store.medication_list(patient_id)})
                 except PTLogError as err:
-                    return _json({"error": str(err)}, 400)
+                    return _bad(err)
                 note = payload.get("note") or ""
                 reasons = messages.check_text(note) if note else []
                 if reasons and body.get("confirm") is not True:
@@ -278,8 +291,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                   "reasons": reasons}, 409)
                 recorded_at, adjusted = entry_rules.accept_recorded_at(body.get("recorded_at"), clock())
                 before = {e.client_id for e in store.entries(patient_id, body.get("kind"), newest_first=True, limit=50)}
-                entry = store.entry_add(patient_id, body.get("kind"), payload, score, recorded_at, client_id, phase,
-                                        session_id, warned=bool(reasons), time_adjusted=adjusted)
+                try:
+                    entry = store.entry_add(patient_id, body.get("kind"), payload, score, recorded_at, client_id, phase,
+                                            session_id, warned=bool(reasons), time_adjusted=adjusted)
+                except PlanArchived as err:
+                    return _bad(err)
                 return _json(viewmodels.entry_json(entry), 200 if client_id in before else 201)
         return await run_in_threadpool(work)
 
@@ -317,7 +333,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 except PortalError as off:
                     return _json({"error": str(off)}, 403)
                 except PTLogError as err:
-                    return _json({"error": str(err)}, 400)
+                    return _bad(err)
                 view = viewmodels.today_view(store, patient_id, now=clock())
                 return _json({"session_id": session.id, "origin": origin.capture_origin(session),
                               "total_reps": session.total_reps, "summary": diary.summary(session),
@@ -366,7 +382,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     st = uploads.begin(store, media_dir, pid, body.get("kind"), body.get("total_bytes"), body.get("sha256"),
                                        chunk_bytes=body.get("chunk_bytes", uploads.CHUNK_BYTES))
                 except PTLogError as err:
-                    return _json({"error": str(err)}, 400)
+                    return _bad(err)
                 return _json(_upload_json(st), 201)
         return await run_in_threadpool(work)
 
@@ -496,6 +512,122 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 return _json({"error": "Not found."}, 404)
             return _json({})
 
+    # ------------------------------------------------------------------ plans of care (feature 017)
+
+    def plans_get(request: Request):
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json({"patient_id": pid, "plans": plans.plans_view(store, pid)})
+
+    def plan_messages_get(request: Request):
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            try:
+                return _json(viewmodels.plan_messages_view(store, pid, request.path_params["plan_id"]))
+            except PTLogError as err:
+                return _bad(err)
+
+    async def plan_messages_post(request: Request):
+        """A message into one plan: JSON for text alone, multipart/form-data with `files` for photos or a PDF."""
+        multipart = request.headers.get("content-type", "").lower().startswith("multipart/form-data")
+        refused = check_post(request, "multipart/form-data" if multipart else "application/json")
+        if refused:
+            return refused
+        if int(request.headers.get("content-length") or 0) > ATTACHMENT_REQUEST_MAX:
+            return _json({"error": "These files are too large to send together."}, 413)
+        files = []
+        try:
+            if multipart:
+                form = await request.form(max_files=attachments.MAX_PHOTOS + 1, max_fields=10)
+                text, confirm = form.get("text"), form.get("confirm") in ("true", "1", "yes")
+                for upload in form.getlist("files"):
+                    files.append((upload.content_type or "", await upload.read(attachments.PDF_MAX + 1)))
+                await form.close()
+            else:
+                body = await request.json()
+                body = body if isinstance(body, dict) else {}
+                text, confirm = body.get("text"), body.get("confirm") is True
+        except ValueError:
+            return _json({"error": "Send JSON, or a form with the files."}, 400)
+        text = text if isinstance(text, str) or text is None else None
+
+        def work():
+            with open_store() as store:
+                pid = signed_in(request, store)
+                if pid is None:
+                    return _json({"error": "Please sign in."}, 401)
+                try:
+                    plan = plans.own_plan(store, pid, request.path_params["plan_id"])
+                    sent = messages.send(store, pid, "patient", text, confirm=confirm, plan_id=plan.id,
+                                         files=files, media_dir=media_dir)
+                    return _json(viewmodels.message_json(sent), 201)
+                except messages.NeedsConfirmation as warn:
+                    return _json({"error": str(warn), "reasons": warn.reasons}, 409)
+                except messages.MessagingOff as off:
+                    return _json({"error": str(off)}, 403)
+                except messages.TooManyMessages as many:
+                    return _json({"error": str(many)}, 429)
+                except PTLogError as err:
+                    return _bad(err)
+        return await run_in_threadpool(work)
+
+    def attachment_file(request: Request):
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            a = attachments.get(store, pid, request.path_params["attachment_id"])
+        if a is None or a.deleted_at is not None:
+            return _json({"error": "Not found."}, 404)
+        path = attachments.path(media_dir, a)
+        if not path.is_file():
+            return _json({"error": "Not found."}, 404)
+        return FileResponse(str(path), media_type=a.mime, headers={
+            "Cache-Control": "private, no-store", "Content-Security-Policy": "sandbox",
+            "X-Content-Type-Options": "nosniff", "Content-Disposition": f'inline; filename="{a.kind}.{a.ext}"'})
+
+    def attachment_delete(request: Request):
+        if (request.headers.get("origin") or "").rstrip("/") not in origins:
+            return _json({"error": "This request did not come from the Limber page."}, 403)
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            if not attachments.delete(store, media_dir, pid, request.path_params["attachment_id"], by="patient"):
+                return _json({"error": "Not found."}, 404)
+            return _json({})
+
+    def appointments_get(request: Request):
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            return _json({"patient_id": pid, "time_zone": str(plans.clinic_zone(store)),
+                          "appointments": plans.appointments_view(store, pid)})
+
+    async def appointment_reschedule(request: Request):
+        refused = check_post(request)
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        body = body if isinstance(body, dict) else {}
+        with open_store() as store:
+            pid = signed_in(request, store)
+            if pid is None:
+                return _json({"error": "Please sign in."}, 401)
+            try:
+                a = plans.request_reschedule(store, pid, request.path_params["appointment_id"], body.get("note"))
+            except PTLogError as err:
+                return _bad(err)
+            return _json(plans.appointment_json(store, a))
+
     def manifest(_request: Request):
         return _json(pwa.manifest(), headers={"Content-Type": "application/manifest+json"})
 
@@ -579,7 +711,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             except accounts.InviteInvalid as bad:
                 return _json({"error": str(bad)}, 410)
             except PTLogError as err:
-                return _json({"error": str(err)}, 400)
+                return _bad(err)
         if account.role != "patient":
             return _json({"redirect": f"{therapist_url.rstrip('/')}/?pass={a_pass}"})
         response = _json({"redirect": "/today", "patient_id": account.patient_id})
@@ -742,6 +874,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/questionnaire", inner_page("questionnaire")),
         Route("/voice", inner_page("voice")),
         Route("/settings", inner_page("settings")),
+        Route("/visits", inner_page("visits")),
         Route("/invite/{token}", invite_page),
         Route("/api/invites/{token}", invite_status, methods=["GET"]),
         Route("/api/invites/{token}", invite_accept, methods=["POST"]),
@@ -752,6 +885,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/progress", progress),
         Route("/api/messages", messages_get, methods=["GET"]),
         Route("/api/messages", messages_post, methods=["POST"]),
+        Route("/api/plans", plans_get, methods=["GET"]),
+        Route("/api/plans/{plan_id:int}/messages", plan_messages_get, methods=["GET"]),
+        Route("/api/plans/{plan_id:int}/messages", plan_messages_post, methods=["POST"]),
+        Route("/api/attachments/{attachment_id}", attachment_file, methods=["GET"]),
+        Route("/api/attachments/{attachment_id}", attachment_delete, methods=["DELETE"]),
+        Route("/api/appointments", appointments_get, methods=["GET"]),
+        Route("/api/appointments/{appointment_id:int}/reschedule", appointment_reschedule, methods=["POST"]),
         Route("/api/entries", entries_get, methods=["GET"]),
         Route("/api/entries", entries_post, methods=["POST"]),
         Route("/api/diary", diary_post, methods=["POST"]),

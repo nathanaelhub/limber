@@ -104,3 +104,38 @@ declines with a note. No approval workflow beyond that.
 
 - No calendar sync (iCal, Google); a later networked feature could add it.
 - No video in messages beyond what 011 already provides.
+
+## Deviations recorded while building (2026-10-30)
+
+- **HEIC**: Pillow cannot read HEIC on its own, and a photo that cannot be read cannot have its metadata
+  removed. HEIC is accepted and converted to JPEG only when the optional `pillow-heif` plug-in is installed
+  on the host. Without it, HEIC is refused with a plain message that says how to send a compatible photo.
+  No new required dependency was added (Principle V). iPhone Safari usually converts HEIC to JPEG on upload
+  anyway.
+- **PDFs** are checked by type and size and stored as sent. They are not rewritten, because rewriting a PDF
+  safely needs a PDF library. This matches the Constitution Check, which only asks that photos be re-encoded.
+- **Where writes land**: a write that names no plan goes to the patient's newest active plan, or to the
+  newest completed one if no plan is active. If every plan is archived, the write is refused with 409.
+- **Attachments** have their own table (not `media`), because `media.kind` is a CHECK constraint that would
+  need a table rebuild. The files still follow the 011 layout under the pseudonymous ID, in an
+  `attachments/` subfolder.
+- **`plan_id`** columns added to existing tables have no foreign key, because SQLite cannot add one without a
+  rebuild. Plans are removed with the patient.
+- **Default clinic time zone** is America/Chicago (the demo clinic). It is a setting.
+
+### Screens (T009–T012, from the Claude Design export in `design/limber-export/`)
+
+- **Navigation** follows the design: a bottom tab bar on phones (≤640px) and the top bar on wider screens, with
+  **Visits** added as a fifth destination on every patient page (owner's decision, 2026-10-30).
+- **Today** shows one card per active plan, not a full program per plan. A patient still has one active
+  program at a time (feature 003), so the card says which plan it belongs to; any other active plan's card
+  says "Your therapist hasn't added exercises yet."
+- **Therapist screens** keep the Streamlit layout: the inbox keeps one row per patient (with a Plans column
+  showing unread per plan) and adds a "Plan of care" picker above the thread, rather than one row per plan.
+  Plans and visits are sections of the patient page, not tabs.
+- **Not built here**: the coach entry row on Messages and Today (feature 018), and "Mark as handled by phone",
+  which is now FR-009 of feature 018. The emergency-card and nearest-emergency-room link styles are in
+  `portal.css` for 018 to use.
+- **Contrast fix**: small grey text now uses `--muted-text` (#5E6E6C, 5.1:1 on the background). The old `--muted`
+  was 3.8:1 and failed WCAG AA. Unread badges are ink on coral, because white on coral failed.
+

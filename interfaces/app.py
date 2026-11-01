@@ -61,6 +61,8 @@ from src.portal import access as ptaccess
 from src.portal import accounts as ptaccounts
 from src.portal import admin as ptadmin
 from src.portal import messages as ptmessages
+from src.portal import plans as ptplans
+from src.portal import attachments as ptattach
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -1114,11 +1116,140 @@ def page_patients():
         except PTLogError as exc:
             st.error(str(exc))
 
+    _patient_plans_section(pid)
+    _patient_appointments_section(pid)
     _patient_program_section(pid)
     _patient_home_access_section(pid, current)
     _patient_logs_section(pid, current)
     _patient_questionnaire_section(pid, current)
     _patient_discharge_section(pid)
+
+_PLAN_STATUS = {"active": "Active", "completed": "Completed", "archived": "Archived (read-only)"}
+
+
+def _plan_action(fn, *args, done=None, **kwargs):
+    try:
+        with _open_store() as store:
+            fn(store, *args, **kwargs)
+        if done:
+            st.session_state["plans_notice"] = done
+        st.rerun()
+    except PTLogError as exc:
+        st.error(str(exc))
+
+
+def _patient_plans_section(pid):
+    """Plans of care for one patient (feature 017): open, edit, complete, archive."""
+    st.markdown("### Plans of care")
+    st.caption("Everything new (program, logs, messages, visits) belongs to a plan. An archived plan is kept "
+               "read-only. The diagnosis is seen by the patient only if you turn that on.")
+    notice = st.session_state.pop("plans_notice", None)
+    if notice:
+        st.success(notice)
+    with _open_store() as store:
+        plan_list = store.plans(pid)
+    if plan_list:
+        st.dataframe(pd.DataFrame([{
+            "Plan": p.title, "Status": _PLAN_STATUS[p.status], "Started": p.start_date, "Ended": p.end_date or "",
+            "Diagnosis shown to patient": "yes" if p.diagnosis_visible else "no"} for p in plan_list]),
+            use_container_width=True, hide_index=True)
+
+    with st.expander("Open a new plan", expanded=len(plan_list) == 0):
+        st.text_input("Title", key=f"plan_new_title_{pid}", placeholder="Right knee, post-op", max_chars=ptplans.TITLE_MAX)
+        st.text_area("Diagnosis", key=f"plan_new_diagnosis_{pid}", max_chars=ptplans.DIAGNOSIS_MAX,
+                     help="Your own words. Never put names or dates of birth here.")
+        st.toggle("Show the diagnosis to the patient", key=f"plan_new_show_dx_{pid}", value=False)
+        if st.button("Open plan", key="plan_open"):
+            _plan_action(ptplans.open_plan, pid, st.session_state.get(f"plan_new_title_{pid}"),
+                         st.session_state.get(f"plan_new_diagnosis_{pid}", ""),
+                         st.session_state.get(f"plan_new_show_dx_{pid}", False),
+                         done=f"Opened “{(st.session_state.get('plan_new_title_' + pid) or '').strip()}”.")
+
+    if not plan_list:
+        return
+    by_id = {p.id: p for p in plan_list}
+    if st.session_state.get(f"plan_edit_select_{pid}") not in by_id:
+        st.session_state[f"plan_edit_select_{pid}"] = plan_list[-1].id
+    chosen = st.selectbox("Plan to change", list(by_id), key=f"plan_edit_select_{pid}",
+                          format_func=lambda i: f"{by_id[i].title} · {_PLAN_STATUS[by_id[i].status]}")
+    plan = by_id[chosen]
+    locked = plan.read_only
+    title = st.text_input("Title", value=plan.title, key=f"plan_title_{plan.id}", disabled=locked,
+                          max_chars=ptplans.TITLE_MAX)
+    diagnosis = st.text_area("Diagnosis", value=plan.diagnosis, key=f"plan_dx_{plan.id}", disabled=locked,
+                             max_chars=ptplans.DIAGNOSIS_MAX)
+    show = st.toggle("Show the diagnosis to the patient", value=plan.diagnosis_visible,
+                     key=f"plan_show_dx_{plan.id}", disabled=locked)
+    if locked:
+        st.info("This plan is archived. Everything in it can be read; nothing can be added or changed.")
+        return
+    c1, c2, c3 = st.columns(3)
+    if c1.button("Save changes", key=f"plan_save_{plan.id}"):
+        _plan_action(ptplans.edit_plan, plan.id, title=title, diagnosis=diagnosis, diagnosis_visible=show,
+                     done="Plan saved.")
+    if plan.status == "active":
+        if c2.button("Mark completed", key=f"plan_complete_{plan.id}"):
+            _plan_action(ptplans.complete, plan.id, done=f"“{plan.title}” is completed.")
+    else:
+        if c2.button("Reopen", key=f"plan_reopen_{plan.id}"):
+            _plan_action(ptplans.reopen, plan.id, done=f"“{plan.title}” is active again.")
+        if c3.button("Archive (read-only)", key=f"plan_archive_{plan.id}",
+                     help="Keeps everything readable and stops any new messages, logs, or visits in this plan."):
+            _plan_action(ptplans.archive, plan.id, done=f"“{plan.title}” is archived.")
+
+
+def _patient_appointments_section(pid):
+    """Visits for one patient (feature 017): add, change the time, answer a reschedule request, cancel.
+    Times are the clinic's (a setting); the patient sees the same wall-clock time on any device."""
+    from datetime import timedelta
+    st.markdown("### Visits")
+    with _open_store() as store:
+        zone = str(ptplans.clinic_zone(store))
+        rows = [(a, ptplans.appointment_json(store, a)) for a in store.appointments(pid)]
+        live_plans = [p for p in store.plans(pid) if not p.read_only]
+    st.caption(f"Times are clinic time ({zone}).")
+    for a, v in rows:
+        label = f"{v['date']} {v['time']} · {v['minutes']} min" + (f" · {v['note']}" if v["note"] else "")
+        state = {"cancelled": "Cancelled", "past": "Past", "upcoming": "Upcoming"}[v["state"]]
+        with st.container(border=True):
+            st.markdown(("~~" + label + "~~" if v["state"] == "cancelled" else label) + f"  \n{state}"
+                        + (" · **reschedule requested**" if v["reschedule_requested"] else ""))
+            if v["reschedule_requested"]:
+                st.warning(f"{pid} asked to reschedule" + (f": “{v['request_note']}”" if v["request_note"] else "."))
+            elif v["response_note"]:
+                st.caption(f"Your reply: {v['response_note']}")
+            if v["state"] != "upcoming":
+                continue
+            m1, m2, m3 = st.columns([1.2, 1, 1])
+            new_day = m1.date_input("New date", value=date.fromisoformat(v["date"]), key=f"appt_move_date_{a.id}")
+            new_time = m2.text_input("New time (HH:MM)", value=v["time"], key=f"appt_move_time_{a.id}")
+            if m3.button("Change time", key=f"appt_move_{a.id}"):
+                _plan_action(ptplans.move, a.id, f"{new_day.isoformat()}T{new_time.strip()}", done="Visit moved.")
+            if v["reschedule_requested"]:
+                r1, r2 = st.columns([3, 1])
+                r1.text_input("Reply without moving it", key=f"appt_reply_{a.id}", max_chars=ptplans.REQUEST_MAX)
+                if r2.button("Decline request", key=f"appt_decline_{a.id}"):
+                    _plan_action(ptplans.decline_request, a.id, st.session_state.get(f"appt_reply_{a.id}", ""),
+                                 done="Request declined; the patient sees your reply.")
+            if st.button("Cancel visit", key=f"appt_cancel_{a.id}"):
+                _plan_action(ptplans.cancel, a.id, done="Visit cancelled. It stays on both calendars, struck through.")
+    if not rows:
+        st.caption("No visits yet.")
+    if not live_plans:
+        st.caption("Open a plan of care to add visits.")
+        return
+    with st.expander("Add a visit", expanded=not rows):
+        c1, c2, c3 = st.columns(3)
+        day = c1.date_input("Date", value=date.today() + timedelta(days=7), key=f"appt_new_date_{pid}")
+        at = c2.text_input("Time (HH:MM)", value="09:00", key=f"appt_new_time_{pid}")
+        minutes = c3.number_input("Length (minutes)", min_value=5, max_value=480, value=45, step=5, key=f"appt_new_minutes_{pid}")
+        note = st.text_input("Short note", key=f"appt_new_note_{pid}", max_chars=ptplans.NOTE_MAX, placeholder="Re-check range of motion")
+        by_id = {p.id: p for p in live_plans}
+        plan_id = st.selectbox("Plan of care", list(by_id), format_func=lambda i: by_id[i].title, key=f"appt_new_plan_{pid}")
+        if st.button("Add visit", key="appt_add"):
+            _plan_action(ptplans.schedule, pid, f"{day.isoformat()}T{at.strip()}", int(minutes), note, plan_id=plan_id,
+                         done="Visit added.")
+
 
 
 def _patient_questionnaire_section(pid, patient):
@@ -2005,15 +2136,21 @@ def _inbox_voice_note(pid, media_id):
                 st.rerun()
 
 
-def _inbox_send(pid, confirm):
-    """Button callback: send the reply, then empty the box so it cannot be sent twice."""
+def _inbox_send(pid, confirm, plan_id=None):
+    """Button callback: send the reply (and any files) into the open plan, then empty the box and the
+    file picker so nothing can be sent twice."""
     reply = st.session_state.get("inbox_reply", "")
+    picker = f"inbox_files_{st.session_state.get('inbox_files_n', 0)}"
+    chosen = st.session_state.get(picker) or []
     if confirm and st.session_state.get("inbox_warned") != (pid, reply):
         return                                         # the text changed after the warning: check it again
     try:
         with _open_store() as store:
-            ptmessages.send(store, pid, "therapist", reply, confirm=confirm)
+            files = [(f.type or "", f.getvalue()) for f in chosen]
+            ptmessages.send(store, pid, "therapist", reply, confirm=confirm, plan_id=plan_id,
+                            files=files, media_dir=store.media_dir)
         st.session_state["inbox_reply"] = ""
+        st.session_state["inbox_files_n"] = st.session_state.get("inbox_files_n", 0) + 1
         st.session_state.pop("inbox_warned", None)
     except ptmessages.NeedsConfirmation:
         st.session_state["inbox_warned"] = (pid, reply)
@@ -2021,18 +2158,64 @@ def _inbox_send(pid, confirm):
         st.session_state["inbox_error"] = str(exc)
 
 
+def _inbox_attachments(m, media_dir):
+    """Photos as thumbnails and a PDF as a download (feature 017). The files were cleaned on the host."""
+    live = [a for a in m.attachments if a.deleted_at is None]
+    photos = [a for a in live if a.kind == "photo"]
+    if photos:
+        st.caption(f"{len(photos)} photo" + ("" if len(photos) == 1 else "s"))
+        cols = st.columns(min(len(photos), 4))
+        for col, a in zip(cols, photos):
+            path = ptattach.path(media_dir, a)
+            if path.is_file():
+                col.image(path.read_bytes(), width=150)
+    for a in live:
+        if a.kind != "photo":
+            path = ptattach.path(media_dir, a)
+            if path.is_file():
+                st.download_button(f"Download PDF ({max(1, a.bytes // 1024)} KB)", data=path.read_bytes(),
+                                   file_name=f"document-{a.id[:8]}.pdf", mime=a.mime, key=f"inbox_pdf_{a.id}")
+    if len(live) < len(m.attachments):
+        st.caption("An attachment was removed.")
+
+
+def _reschedule_flags(store):
+    """Every reschedule request the therapist can see, for the inbox and the patient page."""
+    rows = []
+    for a in ptplans.reschedule_requests(store):
+        view = ptplans.appointment_json(store, a)
+        rows.append((a, view))
+    return rows
+
+
+def _plan_summary(store, pid):
+    """One line per patient for the inbox table: each plan with the patient's unread messages in it."""
+    unread = store.messages_unread_by_plan("patient", pid)
+    parts = []
+    for p in store.plans(pid):
+        if p.read_only and not unread.get(p.id):
+            continue
+        parts.append(p.title + (f" ({unread[p.id]})" if unread.get(p.id) else ""))
+    return " · ".join(parts)
+
+
 def page_inbox():
     """The therapist's inbox: one conversation per patient (feature 008). Text is shown as plain text."""
     st.markdown("## ✉️ Inbox")
     with _open_store() as store:
         rows = ptmessages.inbox(store, include_empty=True)
+        flagged = _reschedule_flags(store)
+        plan_lines = {r.patient_id: _plan_summary(store, r.patient_id) for r in rows}
+    for a, view in flagged:
+        st.warning(f"{a.patient_id} asked to reschedule the visit on {view['date']} at {view['time']}"
+                   + (f": “{a.request_note}”" if a.request_note else ".") + " Answer it on the Patients page.")
     if not rows:
         st.info("No patients yet.")
         return
     active = [r for r in rows if r.last_at]
     if active:
         st.dataframe(pd.DataFrame([{
-            "Patient": r.patient_id, "Unread": r.unread,
+            "Patient": r.patient_id, "Unread": r.unread, "Plans": plan_lines.get(r.patient_id, ""),
             "Latest message": ("You: " if r.last_sender == "therapist" else "") + r.first_line,
             "When": (r.last_at or "")[:16].replace("T", " "), "Messaging": "on" if r.enabled else "off"} for r in active]),
             use_container_width=True, hide_index=True)
@@ -2045,18 +2228,37 @@ def page_inbox():
     by_id = {r.patient_id: r for r in rows}
     pid = st.selectbox("Conversation", ids, key="inbox_open",
                        format_func=lambda i: f"{i}" + (f" · {by_id[i].unread} unread" if by_id[i].unread else ""))
+
+    with _open_store() as store:
+        plan_list = store.plans(pid)
+        by_plan = store.messages_unread_by_plan("patient", pid)
+    plan_ids = [p.id for p in plan_list]
+    if plan_ids and st.session_state.get("inbox_plan") not in plan_ids:
+        unread_first = [p.id for p in plan_list if by_plan.get(p.id)]
+        live = [p.id for p in plan_list if not p.read_only]
+        st.session_state["inbox_plan"] = (unread_first or live or plan_ids)[0]
+    plans_by_id = {p.id: p for p in plan_list}
+    plan_id = None
+    if plan_ids:
+        plan_id = st.selectbox(
+            "Plan of care", plan_ids, key="inbox_plan",
+            format_func=lambda i: plans_by_id[i].title + (" · archived" if plans_by_id[i].read_only else
+                                                         " · completed" if plans_by_id[i].status == "completed" else "")
+            + (f" · {by_plan[i]} unread" if by_plan.get(i) else ""))
+    plan = plans_by_id.get(plan_id)
     st.markdown("---")
     left, right = st.columns([2, 1])
 
     with _open_store() as store:
         enabled = ptmessages.is_enabled(store, pid)
-        thread = ptmessages.thread(store, pid, viewer="therapist")        # opening it marks the patient's messages read
+        thread = ptmessages.thread(store, pid, viewer="therapist", plan_id=plan_id)  # opening it marks that plan read
         discharged = store.get_discharge(pid) is not None
         latest = store.list_sessions(pid)[:1]
         flags = ptreview.flags_for(store, pid, "30d").flags if latest else []
+        media_dir = store.media_dir
 
     with left:
-        st.markdown(f"### {pid}")
+        st.markdown(f"### {pid}" + (f" · {plan.title}" if plan else ""))
         wanted = st.toggle("Messaging on for this patient", value=enabled, key="inbox_enabled",
                            help="Off hides the conversation from the patient and refuses new messages; what was written is kept.")
         if wanted != enabled:
@@ -2064,21 +2266,25 @@ def page_inbox():
                 ptmessages.set_enabled(store, pid, wanted)
             st.rerun()
         if not thread:
-            st.caption("No messages yet.")
+            st.caption("No messages in this plan yet.")
         for m in thread:
             who = "You" if m.sender == "therapist" else pid
             when = m.sent_at[:16].replace("T", " ")
             c1, c2 = st.columns([5, 1.3])
             with c1:
-                st.caption(f"{who} · {when}" + (" · sent after a privacy warning" if m.warned else ""))
+                st.caption(f"{who} · {when}" + (" · sent after a privacy warning" if m.warned else "")
+                           + (" · seen" if m.sender == "therapist" and m.read_at else ""))
                 if m.removed:
                     st.markdown("*This message was removed.*")
                 elif m.media_id:
                     _inbox_voice_note(pid, m.media_id)
                 else:
-                    st.text(m.body)                                       # plain text: never rendered as markup
+                    if m.body:
+                        st.text(m.body)                                   # plain text: never rendered as markup
+                    if m.attachments:
+                        _inbox_attachments(m, media_dir)
             with c2:
-                if not m.removed and not m.media_id and st.button(
+                if not m.removed and not m.media_id and not (plan and plan.read_only) and st.button(
                         "Remove", key=f"inbox_remove_{m.id}",
                         help="For a message that contains identifying details. A marker stays."):
                     with _open_store() as store:
@@ -2086,16 +2292,22 @@ def page_inbox():
                     st.rerun()
         if discharged:
             st.info("This patient is discharged; the conversation is read-only.")
+        elif plan and plan.read_only:
+            st.info("This plan of care is archived; its conversation is read-only.")
         elif not enabled:
             st.info("Messaging is off for this patient.")
         else:
             st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH,
                          help="Plain text. Do not include names or contact details.")
+            st.file_uploader("Attach up to 4 photos or 1 PDF", type=["jpg", "jpeg", "png", "heic", "pdf"],
+                             accept_multiple_files=True, key=f"inbox_files_{st.session_state.get('inbox_files_n', 0)}",
+                             help="Photos are re-saved on this computer without location or camera details.")
             reply = st.session_state.get("inbox_reply", "")
             pending = st.session_state.get("inbox_warned") == (pid, reply)
             b1, b2 = st.columns(2)
-            b1.button("Send", key="inbox_send", type="primary", on_click=_inbox_send, args=(pid, False))
-            b2.button("Send anyway", key="inbox_send_anyway", disabled=not pending, on_click=_inbox_send, args=(pid, True))
+            b1.button("Send", key="inbox_send", type="primary", on_click=_inbox_send, args=(pid, False, plan_id))
+            b2.button("Send anyway", key="inbox_send_anyway", disabled=not pending, on_click=_inbox_send,
+                      args=(pid, True, plan_id))
             problem = st.session_state.pop("inbox_error", None)
             if problem:
                 st.error(problem)

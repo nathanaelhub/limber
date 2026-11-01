@@ -11,7 +11,8 @@ from src.ptlog.models import AdherenceWeek
 D0 = datetime(2026, 3, 23, 9, 15, 0)
 REP = [(90.0, 80.0, 2.4)]
 ALLOWED_TODAY = {"patient_id", "date", "program", "exercises", "week", "streak_weeks", "message", "notes",
-                 "messages", "checkin", "clips", "diary", "logs", "questionnaires", "voice"}
+                 "messages", "checkin", "clips", "diary", "logs", "questionnaires", "voice",
+                 "plans", "next_visit"}                                    # feature 017: no diagnosis in either
 FORBIDDEN = ("flag", "review", "next_step", "threshold", "label")
 
 
@@ -55,6 +56,7 @@ class TestTodayView:
         view = vm.today_view(store, "P-017", now=D0)
         assert set(view) <= ALLOWED_TODAY and view["patient_id"] == "P-017" and view["date"] == "2026-03-23"
         assert view["program"] == {"name": "Knee Home Program", "sessions_per_week": 2}
+        assert [(p["title"], p["has_program"]) for p in view["plans"]] == [("Plan of care", True)]
         assert view["exercises"] == [
             {"key": "knee_extension", "name": "Knee Extension", "target_reps": 10, "done_today": False},
             {"key": "squat", "name": "Squat", "target_reps": 15, "done_today": False}]       # the goal's target wins

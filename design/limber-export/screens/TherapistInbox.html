@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Therapist inbox</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<div class="board" style="width: 2696px; height: 1180px;">
+
+  <!-- 5a Inbox with AI draft -->
+  <div class="frame">
+    <div class="cap">5a · Inbox with an AI draft <span>st.sidebar, st.columns, st.dataframe, st.chat_message, st.text_area</span></div>
+    <div class="st" style="height: 1060px;">
+      <aside class="st-side">
+        <div class="col" style="gap: 2px;"><h3 style="font-size: 22px;">Limber</h3><span class="st-cap">Clinic workspace</span></div>
+        <nav class="st-nav" aria-label="Sections">
+          <a href="#" aria-current="page">Inbox <span class="cnt">4</span></a>
+          <a href="#">Patients</a>
+          <a href="#">Schedule</a>
+          <a href="#">Settings</a>
+        </nav>
+        <div><label class="lbl" for="f1" style="font-size: 14px;">Find a patient</label><input id="f1" class="field" style="min-height: 40px; font-size: 15px; padding: 8px 12px;" placeholder="Patient code, for example P-021"></div>
+      </aside>
+      <main class="st-main">
+        <div class="col" style="gap: 4px;"><h1>Inbox</h1><span class="st-cap">Unread messages, grouped by plan of care</span></div>
+        <div class="cols">
+          <div style="width: 360px; flex: none; display: flex; flex-direction: column; gap: 10px;">
+            <table class="tbl" aria-label="Conversations">
+              <thead><tr><th scope="col">PATIENT</th><th scope="col">PLAN</th><th scope="col">UNREAD</th></tr></thead>
+              <tbody>
+                <tr aria-selected="true"><td class="b">P-021</td><td>Right knee, post-op</td><td><span class="cnt">1</span></td></tr>
+                <tr><td class="b">P-021</td><td>Left shoulder</td><td class="st-cap">0</td></tr>
+                <tr><td class="b">P-034</td><td>Left hip<br><span class="st-cap" style="color: #B4432B; font-weight: 700;">May need a direct response</span></td><td><span class="cnt">2</span></td></tr>
+                <tr><td class="b">P-008</td><td>Lower back</td><td><span class="cnt">1</span></td></tr>
+                <tr><td class="b">P-052</td><td>Right ankle</td><td class="st-cap">0</td></tr>
+              </tbody>
+            </table>
+            <span class="st-cap">Select a row to open the conversation.</span>
+          </div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+            <div class="col" style="gap: 2px;"><h2>P-021 · Right knee, post-op</h2><span class="st-cap">Started 3 weeks ago · Next visit Tuesday 4 November, 9:00</span></div>
+            <div class="st-box" style="gap: 4px; padding: 14px 20px;">
+              <div class="st-chat"><span class="av th" aria-hidden="true">YOU</span><div class="col" style="gap: 2px;"><span class="st-cap b">You · Wed 29 Oct, 10:14</span><p>How did the stairs feel this week?</p></div></div>
+              <div class="st-chat"><span class="av pt" aria-hidden="true">P</span><div class="col" style="gap: 8px;"><span class="st-cap b">P-021 · Thu 30 Oct, 18:12</span><p>Harder on Thursday, knee felt tight. Photo of the swelling attached.</p>
+                <div class="row" style="gap: 10px;">
+                  <a href="#" class="ph" style="width: 120px; height: 90px; text-decoration: none;" aria-label="Open photo: swelling, 30 October"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Swelling, 30 Oct</a>
+                  <a href="#" class="st-btn" style="min-height: 44px;"><span class="badge bd-x" style="padding: 1px 6px;">PDF</span>Surgeon letter.pdf · 240 KB</a>
+                </div>
+              </div></div>
+            </div>
+            <div class="row" style="gap: 10px;"><button class="st-btn">Draft a reply</button><span class="st-cap">Uses this conversation and P-021's program. Nothing is sent.</span></div>
+            <div class="col" style="gap: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;"><label class="lbl" for="r1" style="margin: 0; font-size: 15px;">Reply to P-021</label><span class="ai"><span class="ai-mark">AI</span>AI-drafted — check before sending</span></div>
+              <textarea id="r1" class="st-ta" style="background: #FFFFFF; border-color: #0E6B64; border-width: 2px;">Thanks for the photo. Some tightness after stairs is common at this stage, but your pain going from 3 to 6 this week is worth a closer look. Please keep going with heel slides and quad sets, and ice for 15 minutes afterwards. We will check your range of motion and the swelling on Tuesday. If your calf becomes swollen, hot or tender, call us or 911 straight away.</textarea>
+              <span class="st-cap">This draft is never sent on its own. Edit it, then press Send, or discard it.</span>
+            </div>
+            <div class="row" style="gap: 10px;"><button class="st-btn p">Send</button><button class="st-btn">Discard draft</button></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 5b Withheld -->
+  <div class="frame">
+    <div class="cap">5b · Draft withheld <span>chest pain, a fall, numbness and similar</span></div>
+    <div class="st" style="height: 1060px;">
+      <aside class="st-side">
+        <div class="col" style="gap: 2px;"><h3 style="font-size: 22px;">Limber</h3><span class="st-cap">Clinic workspace</span></div>
+        <nav class="st-nav" aria-label="Sections">
+          <a href="#" aria-current="page">Inbox <span class="cnt">4</span></a>
+          <a href="#">Patients</a>
+          <a href="#">Schedule</a>
+          <a href="#">Settings</a>
+        </nav>
+        <div><label class="lbl" for="f2" style="font-size: 14px;">Find a patient</label><input id="f2" class="field" style="min-height: 40px; font-size: 15px; padding: 8px 12px;" placeholder="Patient code, for example P-021"></div>
+      </aside>
+      <main class="st-main">
+        <div class="col" style="gap: 4px;"><h1>Inbox</h1><span class="st-cap">Unread messages, grouped by plan of care</span></div>
+        <div class="cols">
+          <div style="width: 360px; flex: none; display: flex; flex-direction: column; gap: 10px;">
+            <table class="tbl" aria-label="Conversations">
+              <thead><tr><th scope="col">PATIENT</th><th scope="col">PLAN</th><th scope="col">UNREAD</th></tr></thead>
+              <tbody>
+                <tr><td class="b">P-021</td><td>Right knee, post-op</td><td class="st-cap">0</td></tr>
+                <tr><td class="b">P-021</td><td>Left shoulder</td><td class="st-cap">0</td></tr>
+                <tr aria-selected="true"><td class="b">P-034</td><td>Left hip<br><span class="st-cap" style="color: #B4432B; font-weight: 700;">May need a direct response</span></td><td><span class="cnt">2</span></td></tr>
+                <tr><td class="b">P-008</td><td>Lower back</td><td><span class="cnt">1</span></td></tr>
+                <tr><td class="b">P-052</td><td>Right ankle</td><td class="st-cap">0</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+            <div class="col" style="gap: 2px;"><h2>P-034 · Left hip</h2><span class="st-cap">Started 6 weeks ago · Next visit Thursday 6 November, 14:00</span></div>
+            <div class="st-box" style="gap: 4px; padding: 14px 20px;">
+              <div class="st-chat"><span class="av pt" aria-hidden="true">P</span><div class="col" style="gap: 2px;"><span class="st-cap b">P-034 · Today, 07:52</span><p>I had a fall this morning getting out of bed.</p></div></div>
+              <div class="st-chat"><span class="av pt" aria-hidden="true">P</span><div class="col" style="gap: 2px;"><span class="st-cap b">P-034 · Today, 07:55</span><p>Now my left foot feels numb. Should I still do the exercises?</p></div></div>
+            </div>
+            <div class="st-alert st-warn" role="alert">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h0"/></svg>
+              <div class="col" style="gap: 4px;"><span class="b">This message may need a direct response</span><span>P-034 mentioned a fall and numbness. The assistant has not drafted a reply. Please contact the patient directly.</span></div>
+            </div>
+            <div class="row" style="gap: 10px;"><button class="st-btn" disabled>Draft a reply</button><span class="st-cap">Drafting is off for this message.</span></div>
+            <div class="col" style="gap: 8px;">
+              <label class="lbl" for="r2" style="margin: 0; font-size: 15px;">Reply to P-034</label>
+              <textarea id="r2" class="st-ta" placeholder="Write your reply"></textarea>
+            </div>
+            <div class="row" style="gap: 10px;"><button class="st-btn p">Send</button><button class="st-btn">Mark as handled by phone</button></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{"v":3,"createdOnFiles":{"v":1,"at":"2026-10-30T12:00:00Z"},"title":"Limber Messaging and AI","launch":{"view":"canvas"},"pages":[],
+"boards":{
+"Main.dc.html":{"x":0,"y":0,"w":1840,"h":1560,"title":"00 System: tokens, AI label, nav, components"},
+"PatientMessages.dc.html":{"x":0,"y":2120,"w":2636,"h":1000,"title":"01 Messages · 390"},
+"MessagesTablet.dc.html":{"x":2716,"y":2120,"w":864,"h":1160,"title":"01 Messages · 768"},
+"Coach.dc.html":{"x":0,"y":3740,"w":1776,"h":1000,"title":"02 Exercise coach · 390"},
+"CoachSafety.dc.html":{"x":1856,"y":3740,"w":1346,"h":1000,"title":"02 Coach safety and limits · 390"},
+"CoachTablet.dc.html":{"x":3282,"y":3740,"w":864,"h":1160,"title":"02 Exercise coach · 768"},
+"Today.dc.html":{"x":0,"y":5360,"w":1294,"h":1160,"title":"03 Today · 390 and 768"},
+"Appointments.dc.html":{"x":1374,"y":5360,"w":1776,"h":1000,"title":"04 Visits · 390"},
+"AppointmentsTablet.dc.html":{"x":3230,"y":5360,"w":864,"h":1160,"title":"04 Visits · 768"},
+"AccessPatient.dc.html":{"x":0,"y":6980,"w":2206,"h":1000,"title":"A11y · Larger text + Higher contrast · patient"},
+"TherapistInbox.dc.html":{"x":0,"y":8440,"w":2696,"h":1180,"title":"05 Therapist inbox · 1280"},
+"TherapistSummary.dc.html":{"x":2776,"y":8440,"w":2696,"h":1400,"title":"06 Weekly summary · 1280"},
+"TherapistAISettings.dc.html":{"x":5552,"y":8440,"w":1376,"h":1760,"title":"07 AI settings per patient · 1280"},
+"TherapistAccess.dc.html":{"x":0,"y":10560,"w":4016,"h":1300,"title":"A11y · Larger text + Higher contrast · therapist"}
+},
+"order":["Main.dc.html","PatientMessages.dc.html","MessagesTablet.dc.html","Coach.dc.html","CoachSafety.dc.html","CoachTablet.dc.html","Today.dc.html","Appointments.dc.html","AppointmentsTablet.dc.html","AccessPatient.dc.html","TherapistInbox.dc.html","TherapistSummary.dc.html","TherapistAISettings.dc.html","TherapistAccess.dc.html"],
+"notes":{
+"t1":{"x":0,"y":1840,"text":"Patient · Messages","kind":"title1","maxW":3150},
+"t2":{"x":0,"y":3460,"text":"Patient · Ask about your exercises","kind":"title1","maxW":4146},
+"t3":{"x":0,"y":5080,"text":"Patient · Today and Visits","kind":"title1","maxW":4094},
+"t4":{"x":0,"y":6700,"text":"Patient · Larger text + Higher contrast","kind":"title1","maxW":2206},
+"t5":{"x":0,"y":8160,"text":"Therapist · Streamlit","kind":"title1","maxW":6928},
+"t6":{"x":0,"y":10280,"text":"Therapist · Larger text + Higher contrast","kind":"title1","maxW":4016}
+},
+"designSystems":[]}

@@ -29,6 +29,12 @@ from .models import (
     PortalSignIn,
     Account,
     Invitation,
+    Appointment,
+    Attachment,
+    Plan,
+    PlanArchived,
+    PlanNotFound,
+    PLAN_STATUSES,
     ThresholdChange,
     ThresholdValidationError,
     ADHERENCE_THRESHOLD_DEFAULT,
@@ -65,7 +71,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -630,6 +636,79 @@ DROP TABLE portal_admin;
 ALTER TABLE patient_settings ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}';
 """
 
+# v15 (feature 017): plans of care. Every patient gets one active plan and every existing row that
+# belongs to an episode is assigned to it, so nothing reads differently after the upgrade. The new
+# `plan_id` columns carry no foreign key: SQLite cannot add one to an existing table without a rebuild,
+# and the plans go with the patient anyway (ON DELETE CASCADE from patients). Attachments live in their
+# own table because `media.kind` is a CHECK constraint, and a rebuild of media is not worth it.
+SCHEMA_V15_SQL = """
+CREATE TABLE IF NOT EXISTS plans_of_care (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id         TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    title              TEXT NOT NULL,
+    diagnosis          TEXT NOT NULL DEFAULT '',
+    diagnosis_visible  INTEGER NOT NULL DEFAULT 0 CHECK (diagnosis_visible IN (0, 1)),
+    start_date         TEXT NOT NULL,
+    end_date           TEXT,
+    status             TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived')),
+    created_at         TEXT NOT NULL,
+    archived_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_plans_patient ON plans_of_care(patient_id, id);
+INSERT INTO plans_of_care (patient_id, title, start_date, created_at)
+    SELECT id, 'Plan of care', substr(created_at, 1, 10), created_at FROM patients;
+ALTER TABLE messages ADD COLUMN plan_id INTEGER;
+ALTER TABLE sessions ADD COLUMN plan_id INTEGER;
+ALTER TABLE entries ADD COLUMN plan_id INTEGER;
+ALTER TABLE media ADD COLUMN plan_id INTEGER;
+ALTER TABLE assignments ADD COLUMN plan_id INTEGER;
+ALTER TABLE instrument_assignments ADD COLUMN plan_id INTEGER;
+UPDATE messages SET plan_id = (SELECT id FROM plans_of_care p WHERE p.patient_id = messages.patient_id);
+UPDATE sessions SET plan_id = (SELECT id FROM plans_of_care p WHERE p.patient_id = sessions.patient_id);
+UPDATE entries SET plan_id = (SELECT id FROM plans_of_care p WHERE p.patient_id = entries.patient_id);
+UPDATE media SET plan_id = (SELECT id FROM plans_of_care p WHERE p.patient_id = media.patient_id);
+UPDATE assignments SET plan_id = (SELECT id FROM plans_of_care p WHERE p.patient_id = assignments.patient_id);
+UPDATE instrument_assignments SET plan_id =
+    (SELECT id FROM plans_of_care p WHERE p.patient_id = instrument_assignments.patient_id);
+CREATE INDEX IF NOT EXISTS idx_messages_plan ON messages(plan_id, id);
+CREATE TABLE IF NOT EXISTS appointments (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id               INTEGER NOT NULL REFERENCES plans_of_care(id) ON DELETE CASCADE,
+    patient_id            TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    starts_at             TEXT NOT NULL,
+    minutes               INTEGER NOT NULL CHECK (minutes BETWEEN 5 AND 480),
+    note                  TEXT NOT NULL DEFAULT '',
+    status                TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'cancelled')),
+    reschedule_requested  INTEGER NOT NULL DEFAULT 0 CHECK (reschedule_requested IN (0, 1)),
+    request_note          TEXT NOT NULL DEFAULT '',
+    response_note         TEXT NOT NULL DEFAULT '',
+    created_at            TEXT NOT NULL,
+    updated_at            TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments(patient_id, starts_at);
+CREATE TABLE IF NOT EXISTS attachments (
+    id          TEXT PRIMARY KEY,
+    patient_id  TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    message_id  INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    plan_id     INTEGER NOT NULL,
+    kind        TEXT NOT NULL CHECK (kind IN ('photo', 'document')),
+    ext         TEXT NOT NULL,
+    mime        TEXT NOT NULL,
+    bytes       INTEGER NOT NULL,
+    width       INTEGER NOT NULL DEFAULT 0,
+    height      INTEGER NOT NULL DEFAULT 0,
+    sha256      TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    deleted_at  TEXT,
+    deleted_by  TEXT CHECK (deleted_by IN ('patient', 'therapist', 'retention'))
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
+CREATE TABLE IF NOT EXISTS clinic_settings (
+    key    TEXT PRIMARY KEY,
+    value  TEXT NOT NULL
+);
+"""
+
 MIGRATIONS: List[tuple] = [
     (1, SCHEMA_V1_SQL),
     (2, SCHEMA_V2_SQL),
@@ -645,6 +724,7 @@ MIGRATIONS: List[tuple] = [
     (12, SCHEMA_V12_SQL),
     (13, SCHEMA_V13_SQL),
     (14, SCHEMA_V14_SQL),
+    (15, SCHEMA_V15_SQL),
 ]
 
 
@@ -736,6 +816,7 @@ class SessionStore:
                 "INSERT INTO patients (id, label, notes, created_at, is_builtin) VALUES (?, ?, ?, ?, 1)",
                 (UNASSIGNED_ID, UNASSIGNED_LABEL, "Sessions recorded without a chosen patient.", self._now()),
             )
+            self.plan_add(UNASSIGNED_ID, commit=False)
             self.conn.commit()
 
     def _recover_running_sessions(self) -> None:
@@ -801,14 +882,15 @@ class SessionStore:
         (feature 007 changed feature 004's one-per-installation rule to one per patient)."""
         if self.get_patient(patient_id) is None:
             raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        plan = self._plan_for_write(patient_id)
         self._interrupt_running("superseded_by_new_session", patient_id=patient_id)
         cur = self.conn.execute(
             """
-            INSERT INTO sessions (patient_id, schema_version, source, source_ref, source_extras, status, start_time)
-            VALUES (?, ?, ?, ?, ?, 'running', ?)
+            INSERT INTO sessions (patient_id, schema_version, source, source_ref, source_extras, status, start_time, plan_id)
+            VALUES (?, ?, ?, ?, ?, 'running', ?, ?)
             """,
             (patient_id, SCHEMA_VERSION, source, str(source_ref),
-             json.dumps(extras) if extras else None, self._now()),
+             json.dumps(extras) if extras else None, self._now(), plan),
         )
         self.conn.commit()
         return int(cur.lastrowid)
@@ -1051,6 +1133,7 @@ class SessionStore:
             "INSERT INTO patients (id, label, notes, created_at, is_builtin) VALUES (?, ?, ?, ?, 0)",
             (pid, label, (notes or None), self._now()),
         )
+        self.plan_add(pid, commit=False)                  # every patient starts with one plan (feature 017)
         self.conn.commit()
         return self.get_patient(pid)
 
@@ -1229,12 +1312,13 @@ class SessionStore:
         """
         if self.get_patient(patient_id) is None:
             raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        plan = self._plan_for_write(patient_id)
         cur = self.conn.execute(
             """
-            INSERT INTO sessions (patient_id, schema_version, source, source_ref, status, start_time)
-            VALUES (?, ?, ?, ?, 'running', ?)
+            INSERT INTO sessions (patient_id, schema_version, source, source_ref, status, start_time, plan_id)
+            VALUES (?, ?, ?, ?, 'running', ?, ?)
             """,
-            (patient_id, SCHEMA_VERSION, source, source_ref, start_time),
+            (patient_id, SCHEMA_VERSION, source, source_ref, start_time, plan),
         )
         sid = int(cur.lastrowid)
         for ordinal, item in enumerate(sets, 1):
@@ -1592,6 +1676,7 @@ class SessionStore:
             raise ReviewValidationError(str(exc)) from exc
         if self.conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)).fetchone() is None:
             raise SessionNotFoundError(f"Session {session_id} not found")
+        self._check_writable("sessions", session_id)
         self.conn.execute(
             "INSERT OR REPLACE INTO reviews (session_id, reviewed_at, notes, next_step) VALUES (?, ?, ?, ?)",
             (session_id, self._now(), clean_notes, next_step))
@@ -1642,6 +1727,7 @@ class SessionStore:
         end = self._to_date(end_date)
         if end is not None and end < start:
             raise AssignmentValidationError("end date must not be before the start date")
+        plan = self._plan_for_write(patient.id)
         previous_day = (start - timedelta(days=1)).isoformat()
         self.conn.execute(
             "UPDATE assignments SET end_date = ? WHERE patient_id = ? AND (end_date IS NULL OR end_date >= ?)",
@@ -1649,11 +1735,11 @@ class SessionStore:
         cur = self.conn.execute(
             """
             INSERT INTO assignments (patient_id, program_id, program_name, exercise_keys, sessions_per_week,
-                                     start_date, end_date, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                     start_date, end_date, created_at, plan_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (patient.id, program_id, program_name, json.dumps(keys), int(sessions_per_week), start.isoformat(),
-             end.isoformat() if end else None, self._now()))
+             end.isoformat() if end else None, self._now(), plan))
         self.conn.commit()
         row = self.conn.execute("SELECT * FROM assignments WHERE id = ?", (cur.lastrowid,)).fetchone()
         return self._assignment_from_row(row)
@@ -1998,6 +2084,221 @@ class SessionStore:
         rows = self.conn.execute(f"SELECT at, event, client FROM admin_audit ORDER BY id DESC LIMIT {int(limit)}").fetchall()
         return [{"at": r["at"], "event": r["event"], "client": r["client"]} for r in rows]
 
+    # plans of care (feature 017); the rules live in src/portal/plans.py
+
+    @staticmethod
+    def _plan(row) -> Plan:
+        return Plan(id=int(row["id"]), patient_id=row["patient_id"], title=row["title"], diagnosis=row["diagnosis"],
+                    diagnosis_visible=bool(row["diagnosis_visible"]), start_date=row["start_date"],
+                    end_date=row["end_date"], status=row["status"], created_at=row["created_at"],
+                    archived_at=row["archived_at"])
+
+    def plan_add(self, patient_id: str, title: str = "Plan of care", diagnosis: str = "",
+                 diagnosis_visible: bool = False, start_date: Optional[str] = None, commit: bool = True) -> Plan:
+        self._require_patient(patient_id)
+        now = self._now()
+        cur = self.conn.execute(
+            "INSERT INTO plans_of_care (patient_id, title, diagnosis, diagnosis_visible, start_date, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (patient_id, title, diagnosis or "", 1 if diagnosis_visible else 0, start_date or now[:10], now))
+        if commit:
+            self.conn.commit()
+        return self._plan(self.conn.execute("SELECT * FROM plans_of_care WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+    def plan_get(self, plan_id) -> Optional[Plan]:
+        try:
+            plan_id = int(plan_id)
+        except (TypeError, ValueError):
+            return None
+        row = self.conn.execute("SELECT * FROM plans_of_care WHERE id = ?", (plan_id,)).fetchone()
+        return self._plan(row) if row and self._vis(row["patient_id"]) else None
+
+    def plans(self, patient_id: str) -> List[Plan]:
+        if not self._vis(patient_id):
+            return []
+        return [self._plan(r) for r in self.conn.execute(
+            "SELECT * FROM plans_of_care WHERE patient_id = ? ORDER BY id", (patient_id,))]
+
+    def current_plan(self, patient_id: str) -> Optional[Plan]:
+        """Where a write lands when no plan is named: the newest plan that is not archived."""
+        row = self.conn.execute(
+            "SELECT * FROM plans_of_care WHERE patient_id = ? AND status <> 'archived' "
+            "ORDER BY status = 'active' DESC, id DESC LIMIT 1", (patient_id,)).fetchone()
+        return self._plan(row) if row else None
+
+    def _plan_for_write(self, patient_id: str, plan_id: Optional[int] = None) -> int:
+        """The plan a new row belongs to, refusing an archived one (FR-002).
+
+        A patient with no plan at all (one registered by an older build, or the built-in patient) gets
+        one here, so a write never fails for want of a plan."""
+        if plan_id is not None:
+            plan = self.plan_get(plan_id)
+            if plan is None or plan.patient_id != patient_id:
+                raise PlanNotFound(f"No plan of care {plan_id} for this patient")
+            if plan.read_only:
+                raise PlanArchived()
+            return plan.id
+        plan = self.current_plan(patient_id)
+        if plan is not None:
+            return plan.id
+        if self.conn.execute("SELECT 1 FROM plans_of_care WHERE patient_id = ?", (patient_id,)).fetchone():
+            raise PlanArchived()
+        return self.plan_add(patient_id, commit=False).id
+
+    def require_writable_plan(self, patient_id: str) -> None:
+        """Refuse up front (before an upload starts, say) when every plan the patient has is archived."""
+        if self.current_plan(patient_id) is None and self.conn.execute(
+                "SELECT 1 FROM plans_of_care WHERE patient_id = ?", (patient_id,)).fetchone():
+            raise PlanArchived()
+
+    def _check_writable(self, table: str, row_id) -> None:
+        """Refuse an edit to a row whose plan is archived."""
+        row = self.conn.execute(
+            f"SELECT p.status FROM {table} t JOIN plans_of_care p ON p.id = t.plan_id WHERE t.id = ?",
+            (row_id,)).fetchone()
+        if row and row["status"] == "archived":
+            raise PlanArchived()
+
+    def plan_update(self, plan_id: int, **fields) -> Plan:
+        allowed = {"title", "diagnosis", "diagnosis_visible", "start_date", "end_date"}
+        bad = set(fields) - allowed
+        if bad:
+            raise ValueError(f"cannot update {bad}")
+        plan = self.plan_get(plan_id)
+        if plan is None:
+            raise PlanNotFound(f"No plan of care {plan_id}")
+        if plan.read_only:
+            raise PlanArchived()
+        if "diagnosis_visible" in fields:
+            fields["diagnosis_visible"] = 1 if fields["diagnosis_visible"] else 0
+        if fields:
+            sets = ", ".join(f"{k} = ?" for k in fields)
+            self.conn.execute(f"UPDATE plans_of_care SET {sets} WHERE id = ?", (*fields.values(), plan.id))
+            self.conn.commit()
+        return self.plan_get(plan.id)
+
+    def plan_set_status(self, plan_id: int, status: str) -> Plan:
+        if status not in PLAN_STATUSES:
+            raise PTLogError(f"status must be one of {', '.join(PLAN_STATUSES)}")
+        plan = self.plan_get(plan_id)
+        if plan is None:
+            raise PlanNotFound(f"No plan of care {plan_id}")
+        if plan.read_only:
+            raise PlanArchived()
+        if status == "archived" and plan.status != "completed":
+            raise PTLogError("Mark the plan completed before archiving it.")
+        end = plan.end_date or (self._now()[:10] if status != "active" else None)
+        if status == "active":
+            end = None
+        self.conn.execute("UPDATE plans_of_care SET status = ?, end_date = ?, archived_at = ? WHERE id = ?",
+                          (status, end, self._now() if status == "archived" else None, plan.id))
+        self.conn.commit()
+        return self.plan_get(plan.id)
+
+    # appointments (feature 017)
+
+    @staticmethod
+    def _appointment(row) -> Appointment:
+        return Appointment(id=int(row["id"]), plan_id=int(row["plan_id"]), patient_id=row["patient_id"],
+                           starts_at=row["starts_at"], minutes=int(row["minutes"]), note=row["note"],
+                           status=row["status"], reschedule_requested=bool(row["reschedule_requested"]),
+                           request_note=row["request_note"], response_note=row["response_note"],
+                           created_at=row["created_at"], updated_at=row["updated_at"])
+
+    def appointment_add(self, patient_id: str, starts_at_utc: str, minutes: int, note: str = "",
+                        plan_id: Optional[int] = None) -> Appointment:
+        self._require_patient(patient_id)
+        plan = self._plan_for_write(patient_id, plan_id)
+        now = self._now()
+        cur = self.conn.execute(
+            "INSERT INTO appointments (plan_id, patient_id, starts_at, minutes, note, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)", (plan, patient_id, starts_at_utc, int(minutes), note or "", now, now))
+        self.conn.commit()
+        return self.appointment_get(int(cur.lastrowid))
+
+    def appointment_get(self, appointment_id) -> Optional[Appointment]:
+        row = self.conn.execute("SELECT * FROM appointments WHERE id = ?", (appointment_id,)).fetchone()
+        return self._appointment(row) if row and self._vis(row["patient_id"]) else None
+
+    def appointments(self, patient_id: str, plan_id: Optional[int] = None) -> List[Appointment]:
+        if not self._vis(patient_id):
+            return []
+        sql, args = "SELECT * FROM appointments WHERE patient_id = ?", [patient_id]
+        if plan_id is not None:
+            sql += " AND plan_id = ?"
+            args.append(int(plan_id))
+        return [self._appointment(r) for r in self.conn.execute(sql + " ORDER BY starts_at, id", args)]
+
+    def appointment_update(self, appointment_id: int, **fields) -> Appointment:
+        """Change an appointment. A new time answers any reschedule request, so the flag clears."""
+        allowed = {"starts_at", "minutes", "note", "status", "reschedule_requested", "request_note", "response_note"}
+        bad = set(fields) - allowed
+        if bad:
+            raise ValueError(f"cannot update {bad}")
+        current = self.appointment_get(appointment_id)
+        if current is None:
+            raise PTLogError(f"No appointment {appointment_id}")
+        self._check_writable("appointments", current.id)
+        if "starts_at" in fields and fields["starts_at"] != current.starts_at:
+            fields.setdefault("reschedule_requested", False)
+        if "reschedule_requested" in fields:
+            fields["reschedule_requested"] = 1 if fields["reschedule_requested"] else 0
+        fields["updated_at"] = self._now()
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        self.conn.execute(f"UPDATE appointments SET {sets} WHERE id = ?", (*fields.values(), current.id))
+        self.conn.commit()
+        return self.appointment_get(current.id)
+
+    def clinic_setting(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        row = self.conn.execute("SELECT value FROM clinic_settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+    def set_clinic_setting(self, key: str, value: str) -> None:
+        self.conn.execute("INSERT INTO clinic_settings (key, value) VALUES (?, ?) "
+                          "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+        self.conn.commit()
+
+    # attachments (feature 017); the rules live in src/portal/attachments.py
+
+    @staticmethod
+    def _attachment(row) -> Attachment:
+        return Attachment(id=row["id"], patient_id=row["patient_id"], message_id=int(row["message_id"]),
+                          plan_id=int(row["plan_id"]), kind=row["kind"], ext=row["ext"], mime=row["mime"],
+                          bytes=int(row["bytes"]), width=int(row["width"]), height=int(row["height"]),
+                          sha256=row["sha256"], created_at=row["created_at"], deleted_at=row["deleted_at"],
+                          deleted_by=row["deleted_by"])
+
+    def attachment_add(self, a: Attachment, commit: bool = True) -> Attachment:
+        self.conn.execute(
+            "INSERT INTO attachments (id, patient_id, message_id, plan_id, kind, ext, mime, bytes, width, height, sha256, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (a.id, a.patient_id, a.message_id, a.plan_id, a.kind, a.ext, a.mime, a.bytes, a.width, a.height, a.sha256,
+             self._now()))
+        if commit:
+            self.conn.commit()
+        return self.attachment_get(a.id)
+
+    def attachment_get(self, attachment_id: str) -> Optional[Attachment]:
+        row = self.conn.execute("SELECT * FROM attachments WHERE id = ?", (attachment_id,)).fetchone()
+        return self._attachment(row) if row and self._vis(row["patient_id"]) else None
+
+    def attachments_for(self, message_ids: List[int]) -> Dict[int, List[Attachment]]:
+        result: Dict[int, List[Attachment]] = {}
+        ids = [int(i) for i in message_ids]
+        for start in range(0, len(ids), 500):
+            chunk = ids[start:start + 500]
+            marks = ",".join("?" * len(chunk))
+            for r in self.conn.execute(f"SELECT * FROM attachments WHERE message_id IN ({marks}) ORDER BY rowid", chunk):
+                result.setdefault(int(r["message_id"]), []).append(self._attachment(r))
+        return result
+
+    def attachment_mark_deleted(self, attachment_id: str, by: str) -> None:
+        """Deleting an upload is allowed even in an archived plan: retention and the patient's own
+        right to remove what they sent outrank read-only (spec US1, scenario 2)."""
+        self.conn.execute("UPDATE attachments SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+                          (self._now(), by, attachment_id))
+        self.conn.commit()
+
     # messages (feature 008); the rules live in src/portal/messages.py
 
     @staticmethod
@@ -2007,7 +2308,8 @@ class SessionStore:
         return Message(id=row["id"], patient_id=row["patient_id"], sender=row["sender"],
                        body="" if removed else row["body"], sent_at=row["sent_at"], read_at=row["read_at"],
                        removed=removed, warned=bool(row["warned"]),
-                       media_id=(row["media_id"] if "media_id" in keys and not removed else None))
+                       media_id=(row["media_id"] if "media_id" in keys and not removed else None),
+                       plan_id=(row["plan_id"] if "plan_id" in keys else None))
 
     def message_event(self, patient_id: str, event: str, sender: Optional[str] = None, message_id: Optional[int] = None) -> None:
         """History of what happened in a conversation. Never the text."""
@@ -2034,14 +2336,15 @@ class SessionStore:
         self.conn.commit()
 
     def message_add(self, patient_id: str, sender: str, body: str, warned: bool,
-                    media_id: Optional[str] = None) -> Message:
+                    media_id: Optional[str] = None, plan_id: Optional[int] = None, commit: bool = True) -> Message:
         """A message, optionally carrying a recording the patient sent (feature 014).
 
         The recording points at the message rather than the other way round, because `media.message_id`
         has existed since feature 011 and one link is better than two."""
+        plan = self._plan_for_write(patient_id, plan_id)
         cur = self.conn.execute(
-            "INSERT INTO messages (patient_id, sender, body, sent_at, warned) VALUES (?, ?, ?, ?, ?)",
-            (patient_id, sender, body, self._now(), 1 if warned else 0))
+            "INSERT INTO messages (patient_id, sender, body, sent_at, warned, plan_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (patient_id, sender, body, self._now(), 1 if warned else 0, plan))
         if media_id is not None:
             self.conn.execute("UPDATE media SET message_id = ? WHERE id = ? AND patient_id = ?",
                               (cur.lastrowid, media_id, patient_id))
@@ -2049,7 +2352,8 @@ class SessionStore:
         if warned:
             self.message_event(patient_id, "sent_despite_warning", sender, cur.lastrowid)
         self.conn.execute("UPDATE conversations SET updated_at = ? WHERE patient_id = ?", (self._now(), patient_id))
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         return self._message_row(int(cur.lastrowid))
 
     def _message_row(self, message_id: int) -> Message:
@@ -2066,16 +2370,26 @@ class SessionStore:
         return self.conn.execute("SELECT COUNT(*) FROM messages WHERE patient_id = ? AND sender = ? AND sent_at > ?",
                                  (patient_id, sender, since.isoformat())).fetchone()[0]
 
-    def message_thread(self, patient_id: str) -> List[Message]:
-        rows = self.conn.execute(
-            "SELECT m.*, (SELECT id FROM media WHERE message_id = m.id LIMIT 1) AS media_id "
-            "FROM messages m WHERE m.patient_id = ? ORDER BY m.id", (patient_id,)).fetchall()
-        return [self._message(r) for r in rows]
+    def message_thread(self, patient_id: str, plan_id: Optional[int] = None) -> List[Message]:
+        """The conversation oldest first: one plan's, or every plan's when none is named."""
+        sql, args = ("SELECT m.*, (SELECT id FROM media WHERE message_id = m.id LIMIT 1) AS media_id "
+                     "FROM messages m WHERE m.patient_id = ?"), [patient_id]
+        if plan_id is not None:
+            sql += " AND m.plan_id = ?"
+            args.append(int(plan_id))
+        thread = [self._message(r) for r in self.conn.execute(sql + " ORDER BY m.id", args).fetchall()]
+        attached = self.attachments_for([m.id for m in thread])
+        for m in thread:
+            m.attachments = [] if m.removed else attached.get(m.id, [])
+        return thread
 
-    def messages_mark_read(self, patient_id: str, from_sender: str) -> int:
-        cur = self.conn.execute(
-            "UPDATE messages SET read_at = ? WHERE patient_id = ? AND sender = ? AND read_at IS NULL",
-            (self._now(), patient_id, from_sender))
+    def messages_mark_read(self, patient_id: str, from_sender: str, plan_id: Optional[int] = None) -> int:
+        sql, args = "UPDATE messages SET read_at = ? WHERE patient_id = ? AND sender = ? AND read_at IS NULL", \
+            [self._now(), patient_id, from_sender]
+        if plan_id is not None:
+            sql += " AND plan_id = ?"
+            args.append(int(plan_id))
+        cur = self.conn.execute(sql, args)
         if cur.rowcount:
             self.message_event(patient_id, "read", "therapist" if from_sender == "patient" else "patient")
         self.conn.commit()
@@ -2090,10 +2404,19 @@ class SessionStore:
         return {r["patient_id"]: int(r["n"]) for r in self.conn.execute(sql + " GROUP BY patient_id", args)
                 if self._vis(r["patient_id"])}
 
+    def messages_unread_by_plan(self, from_sender: str, patient_id: str) -> Dict[int, int]:
+        """Unread messages written by `from_sender`, per plan of one patient (they roll up to the patient)."""
+        if not self._vis(patient_id):
+            return {}
+        return {int(r["plan_id"]): int(r["n"]) for r in self.conn.execute(
+            "SELECT plan_id, COUNT(*) AS n FROM messages WHERE sender = ? AND patient_id = ? AND read_at IS NULL "
+            "AND removed_at IS NULL AND plan_id IS NOT NULL GROUP BY plan_id", (from_sender, patient_id))}
+
     def message_remove(self, message_id: int) -> bool:
         row = self.conn.execute("SELECT patient_id, removed_at FROM messages WHERE id = ?", (message_id,)).fetchone()
         if row is None or row["removed_at"] is not None:
             return False
+        self._check_writable("messages", message_id)
         self.conn.execute("UPDATE messages SET body = '', removed_at = ? WHERE id = ?", (self._now(), message_id))
         # A removed message must not still play: the recording is detached here and deleted, file and
         # all, through the media pipeline.
@@ -2132,12 +2455,13 @@ class SessionStore:
                                      (patient_id, client_id)).fetchone()
         if existing is not None:
             return self._entry(existing)
+        plan = self._plan_for_write(patient_id)
         try:
             cur = self.conn.execute(
                 "INSERT INTO entries (patient_id, kind, recorded_at, received_at, phase, session_id, score, payload, "
-                "client_id, warned, time_adjusted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "client_id, warned, time_adjusted, plan_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (patient_id, kind, recorded_at, self._now(), phase, session_id, score, json.dumps(payload),
-                 client_id, 1 if warned else 0, 1 if time_adjusted else 0))
+                 client_id, 1 if warned else 0, 1 if time_adjusted else 0, plan))
             self.conn.execute("INSERT INTO portal_audit (at, patient_id, event, client, detail) VALUES (?, ?, ?, NULL, ?)",
                               (self._now(), patient_id, "entry_stored", kind))
             self.conn.commit()
@@ -2162,6 +2486,7 @@ class SessionStore:
         row = self.conn.execute("SELECT patient_id, payload, note_removed FROM entries WHERE id = ?", (entry_id,)).fetchone()
         if row is None or row["note_removed"]:
             return False
+        self._check_writable("entries", entry_id)
         payload = json.loads(row["payload"])
         if "note" in payload:
             payload["note"] = ""
@@ -2188,13 +2513,21 @@ class SessionStore:
                      message_id=row["message_id"], backed_up_at=row["backed_up_at"])
 
     def media_add(self, media: Media) -> Media:
+        plan = self._plan_for_write(media.patient_id)
         self.conn.execute(
             "INSERT INTO media (id, patient_id, kind, ext, container, codec, bytes, duration, width, height, sha256, caption, "
-            "warned, created_at, message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "warned, created_at, message_id, plan_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (media.id, media.patient_id, media.kind, media.ext, media.container, media.codec, media.bytes, media.duration,
-             media.width, media.height, media.sha256, media.caption, 1 if media.warned else 0, self._now(), media.message_id))
+             media.width, media.height, media.sha256, media.caption, 1 if media.warned else 0, self._now(), media.message_id,
+             plan))
         self.conn.commit()
         return self.media_get(media.id)
+
+    def _check_media_writable(self, media_id: str) -> None:
+        row = self.conn.execute("SELECT p.status FROM media m JOIN plans_of_care p ON p.id = m.plan_id WHERE m.id = ?",
+                                (media_id,)).fetchone()
+        if row and row["status"] == "archived":
+            raise PlanArchived()
 
     def media_get(self, media_id: str) -> Optional[Media]:
         row = self.conn.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
@@ -2216,6 +2549,10 @@ class SessionStore:
         bad = set(fields) - allowed
         if bad:
             raise ValueError(f"cannot update {bad}")
+        if set(fields) & {"reviewed_at", "caption", "warned"}:         # deleting stays allowed (retention, the patient)
+            row = self.conn.execute("SELECT rowid FROM media WHERE id = ?", (media_id,)).fetchone()
+            if row is not None:
+                self._check_media_writable(media_id)
         sets = ", ".join(f"{k} = ?" for k in fields)
         self.conn.execute(f"UPDATE media SET {sets} WHERE id = ?", (*fields.values(), media_id))
         self.conn.commit()
@@ -2350,14 +2687,15 @@ class SessionStore:
         from .questionnaires import INTERVAL_KEYS
         if interval not in INTERVAL_KEYS:
             raise AssignmentValidationError(f"How often must be one of: {', '.join(INTERVAL_KEYS)}")
+        plan = self._plan_for_write(patient_id)
         now = self._now()
         start_date = (start or date.fromisoformat(now[:10])).isoformat()
         self.conn.execute(
             "UPDATE instrument_assignments SET ended_at = ? WHERE patient_id = ? AND instrument_key = ? "
             "AND ended_at IS NULL", (now, patient_id, key))
         cur = self.conn.execute(
-            "INSERT INTO instrument_assignments (patient_id, instrument_key, interval, start_date, created_at) "
-            "VALUES (?, ?, ?, ?, ?)", (patient_id, key, interval, start_date, now))
+            "INSERT INTO instrument_assignments (patient_id, instrument_key, interval, start_date, created_at, plan_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)", (patient_id, key, interval, start_date, now, plan))
         self.conn.commit()
         return self._assignment_row(int(cur.lastrowid))
 
@@ -2374,6 +2712,7 @@ class SessionStore:
         return self._to_assignment(row) if row else None
 
     def end_assignment(self, assignment_id: int) -> None:
+        self._check_writable("instrument_assignments", int(assignment_id))
         self.conn.execute("UPDATE instrument_assignments SET ended_at = ? WHERE id = ? AND ended_at IS NULL",
                           (self._now(), int(assignment_id)))
         self.conn.commit()

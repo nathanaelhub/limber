@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E6B64">
+  <link rel="icon" href="/static/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Limber">
+  <link rel="stylesheet" href="/static/portal.css">
+  <title>Limber · Visits</title>
+</head>
+<body data-page="visits">
+  <header class="bar">
+    <a class="brand" href="/today"><img src="/static/limber-mark.svg" alt="" width="36" height="36"><span>Limber</span></a>
+    <nav class="tabs" aria-label="Main"><a href="/today"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Today</span></a><a href="/progress"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg><span>Progress</span></a><a id="nav-messages" href="/messages" hidden><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg><span>Messages</span><span id="nav-unread" class="badge" hidden></span></a><a href="/visits" aria-current="page"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Visits</span></a><a href="/settings"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></a></nav>
+    <span class="who"><span id="patient-id"></span><button id="signout" class="link" type="button">Sign out</button></span>
+  </header>
+  <main class="card wide visits">
+    <h1>Visits</h1>
+    <p id="zone" class="lead">Your appointments at the clinic</p>
+    <div class="seg" role="group" aria-label="Show visits as">
+      <button id="show-list" type="button" aria-pressed="true">List</button>
+      <button id="show-month" type="button" aria-pressed="false">Month</button>
+    </div>
+    <p id="status" class="status-card" role="status" hidden></p>
+    <section id="list-view">
+      <ol id="upcoming" class="appts" aria-label="Upcoming visits"></ol>
+      <p id="none" class="muted" hidden>No visits booked. Your therapist adds them after you agree a time.</p>
+      <h2 id="past-heading" hidden>Earlier</h2>
+      <ol id="past" class="appts" aria-labelledby="past-heading"></ol>
+    </section>
+    <section id="month-view" hidden>
+      <div class="month-head">
+        <button id="prev-month" type="button" class="ib" aria-label="Previous month"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <h2 id="month-title" aria-live="polite"></h2>
+        <button id="next-month" type="button" class="ib" aria-label="Next month"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      <div id="month" class="cal" role="grid" aria-labelledby="month-title"></div>
+      <p class="small">A filled day has a visit. A dashed, crossed-out day was cancelled.</p>
+    </section>
+  </main>
+  <div id="reschedule-sheet" class="sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="reschedule-title" hidden>
+    <div class="scrim" id="reschedule-scrim"></div>
+    <form class="sheet" id="reschedule-form">
+      <span class="grab" aria-hidden="true"></span>
+      <h2 id="reschedule-title">Ask to reschedule</h2>
+      <p id="reschedule-when" class="b"></p>
+      <label for="reschedule-note">What times suit you better?</label>
+      <textarea id="reschedule-note" class="field" rows="3" maxlength="500" placeholder="For example: any afternoon next week"></textarea>
+      <p class="small">Your therapist will change the time or reply in Messages. Your visit stays booked until then.</p>
+      <p id="reschedule-error" class="error" role="alert" hidden></p>
+      <button id="reschedule-send" type="submit">Send request</button>
+      <button id="reschedule-cancel" type="button" class="link">Cancel</button>
+    </form>
+  </div>
+  <script src="/static/portal.js"></script>
+  <script src="/static/visits.js"></script>
+</body>
+</html>

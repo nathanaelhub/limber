@@ -254,7 +254,7 @@ def build(db_path: Path, seed: int = 7) -> None:
             note_path = Path(tempfile.mkdtemp()) / "note.m4a"
             _media_fx.make_audio(note_path, seconds=18.0, rate=16000, chunk=16000)
             audio = note_path.read_bytes()
-            clock.now = datetime.now() - timedelta(days=1, hours=2)
+            clock.now = datetime.now() - timedelta(hours=10)    # after P-021's last written message, so the thread reads in order
             up = _uploads.begin(s, s.media_dir, "P-021", "voice", len(audio),
                                 _hashlib.sha256(audio).hexdigest(), chunk_bytes=len(audio))
             _uploads.put_part(s, s.media_dir, "P-021", up.id, 0, audio)
@@ -262,6 +262,51 @@ def build(db_path: Path, seed: int = 7) -> None:
         except Exception as exc:                          # a demo record is not worth failing the seed over
             print(f"  (no demo voice note: {exc})")
         clock.now = datetime.now()
+
+        # Plans of care, a photo, and visits (feature 017).
+        import io as _io
+        from PIL import Image as _Image, ImageDraw as _Draw
+        from src.portal import plans as _plans
+        hip = s.plans("P-021")[0]
+        _plans.edit_plan(s, s.plans("P-017")[0].id, title="Post-op knee", start_date=(today - timedelta(days=42)).isoformat())
+        _plans.edit_plan(s, s.plans("P-023")[0].id, title="ACL reconstruction",
+                         start_date=(today - timedelta(days=150)).isoformat())
+        _plans.edit_plan(s, hip.id, title="Right hip replacement", diagnosis="Total hip arthroplasty, week 10",
+                         start_date=(today - timedelta(days=70)).isoformat())
+        clock.now = datetime.now() - timedelta(days=4)
+        shoulder = _plans.open_plan(s, "P-021", "Left shoulder", diagnosis="Rotator cuff tendinopathy",
+                                    diagnosis_visible=True)
+        clock.now = datetime.now() - timedelta(days=3, hours=5)
+        messages.send(s, "P-021", "therapist", "I've opened a separate plan for your shoulder so the two don't get "
+                      "mixed up. Exercises for it come at your next visit.", plan_id=shoulder.id)
+        photo = _Image.new("RGB", (640, 480), (232, 214, 200))
+        pen = _Draw.Draw(photo)
+        pen.ellipse((210, 140, 430, 340), fill=(214, 168, 150))
+        pen.rectangle((0, 400, 640, 480), fill=(120, 140, 150))
+        jpg = _io.BytesIO()
+        photo.save(jpg, "JPEG", quality=85)
+        clock.now = datetime.now() - timedelta(hours=9)
+        messages.send(s, "P-021", "patient", "Photo of the outside of the hip, where it pinches.", plan_id=hip.id,
+                      files=[("image/jpeg", jpg.getvalue())], media_dir=s.media_dir)
+        # an earlier episode for P-017, finished and archived: read-only on both sides
+        clock.now = datetime.now() - timedelta(days=130)
+        ankle = _plans.open_plan(s, "P-017", "Left ankle sprain", start=(datetime.now() - timedelta(days=130)).date())
+        clock.now = datetime.now() - timedelta(days=96)
+        messages.send(s, "P-017", "therapist", "You have finished every exercise in this plan. Well done.", plan_id=ankle.id)
+        clock.now = datetime.now() - timedelta(days=95)
+        messages.send(s, "P-017", "patient", "Thank you for all the help.", plan_id=ankle.id)
+        clock.now = datetime.now() - timedelta(days=94)
+        _plans.complete(s, ankle.id)
+        _plans.archive(s, ankle.id)
+        clock.now = datetime.now()
+        at = lambda days, hhmm: f"{(today + timedelta(days=days)).isoformat()}T{hhmm}"   # noqa: E731
+        _plans.schedule(s, "P-017", at(-10, "10:30"), 45, "Range of motion check")
+        _plans.schedule(s, "P-017", at(3, "10:30"), 45, "Progress squats if the knee is calm")
+        nxt = _plans.schedule(s, "P-021", at(5, "09:00"), 45, "Re-check hip strength", plan_id=hip.id)
+        _plans.request_reschedule(s, "P-021", nxt.id, "Afternoons are better for me this week.")
+        _plans.cancel(s, _plans.schedule(s, "P-021", at(12, "14:00"), 30, "Shoulder assessment", plan_id=shoulder.id).id)
+        _plans.schedule(s, "P-021", at(19, "14:00"), 30, "Shoulder assessment", plan_id=shoulder.id)
+        _plans.schedule(s, "P-023", at(2, "16:00"), 60, "Return-to-sport testing")
 
         # Threshold settings with a history to look at.
         clock.now = datetime.now() - timedelta(days=9)

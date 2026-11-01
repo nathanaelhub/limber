@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Messages, phone</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+</helmet>
+<div class="board" style="width: 2636px; height: 1000px;">
+
+  <!-- 1a Thread -->
+  <div class="frame">
+    <div class="cap">1a · Thread <span>plan switcher with unread, coach entry</span></div>
+    <div class="phone lb">
+      <div class="top">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Messages</h1><span class="code">P-021</span></div>
+        <div class="chips" role="group" aria-label="Plans of care">
+          <button class="chip" aria-pressed="true">Right knee, post-op</button>
+          <button class="chip" aria-pressed="false">Left shoulder <span class="cnt">1 new</span></button>
+          <button class="chip" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v11h14V9M10 13h4"/></svg>Past plans</button>
+        </div>
+        <a href="Coach.dc.html" class="card" style="padding: 12px 14px; border-radius: 14px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: #16302C; min-height: 56px;">
+          <span class="ai-mark">AI</span>
+          <span class="grow small"><span class="b">Quick question about an exercise?</span> Ask the coach</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+      <div class="body">
+        <div class="thread">
+          <span class="day">Wednesday 29 October</span>
+          <span class="who">Your therapist</span>
+          <div class="msg them">How did the stairs feel this week?</div>
+          <span class="meta">10:14</span>
+          <span class="day">Thursday 30 October</span>
+          <span class="who me">You</span>
+          <div class="msg me">Harder on Thursday, knee felt tight. Photo of the swelling attached.</div>
+          <div class="att">
+            <button class="ph" style="width: 132px; height: 132px; padding: 0;" aria-label="Open photo: swelling, 30 October"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Photo</button>
+          </div>
+          <span class="meta me">18:12 · Seen</span>
+        </div>
+      </div>
+      <div class="composer">
+        <span class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg>Not for emergencies. If you need help now, call 911.</span>
+        <div class="c-row">
+          <button class="ib" aria-label="Add photo or PDF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <label class="sr" for="m1">Message to your therapist</label>
+          <textarea id="m1" class="field" rows="1" placeholder="Write a message"></textarea>
+          <button class="ib" aria-label="Send" disabled style="color: #5E6E6C; background: #EDEAE2; border-color: #EDEAE2;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z"/></svg></button>
+        </div>
+      </div>
+      <nav class="tabbar" aria-label="Main">
+        <a class="tab" href="Today.dc.html"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages<span class="dot">1<span class="sr"> unread</span></span></a>
+        <a class="tab" href="Appointments.dc.html"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- 1b Photos attached -->
+  <div class="frame">
+    <div class="cap">1b · Compose with photos <span>3 of 4, remove on each</span></div>
+    <div class="phone lb">
+      <div class="top">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Messages</h1><span class="code">P-021</span></div>
+        <div class="chips" role="group" aria-label="Plans of care">
+          <button class="chip" aria-pressed="true">Right knee, post-op</button>
+          <button class="chip" aria-pressed="false">Left shoulder <span class="cnt">1 new</span></button>
+          <button class="chip" aria-pressed="false">Past plans</button>
+        </div>
+      </div>
+      <div class="body">
+        <div class="thread">
+          <span class="day">Thursday 30 October</span>
+          <span class="who me">You</span>
+          <div class="msg me">Harder on Thursday, knee felt tight. Photo of the swelling attached.</div>
+          <span class="meta me">18:12 · Seen</span>
+          <span class="day">Today</span>
+          <span class="who">Your therapist</span>
+          <div class="msg them">Thanks. Could you send one from the side too, and one of the other knee?</div>
+          <span class="meta">08:40</span>
+        </div>
+      </div>
+      <div class="composer">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="xs b">3 of 4 photos</span>
+          <span class="xs mut">You can add 1 more</span>
+        </div>
+        <div class="tray" role="list" aria-label="Attached photos">
+          <div class="thumb" role="listitem"><div class="ph">Photo 1</div><button class="rm" aria-label="Remove photo 1"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button></div>
+          <div class="thumb" role="listitem"><div class="ph">Photo 2</div><button class="rm" aria-label="Remove photo 2"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button></div>
+          <div class="thumb" role="listitem"><div class="ph">Photo 3</div><button class="rm" aria-label="Remove photo 3"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button></div>
+        </div>
+        <div class="c-row">
+          <button class="ib" aria-label="Add photo or PDF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <label class="sr" for="m2">Message to your therapist</label>
+          <textarea id="m2" class="field" rows="2">Here they are. Side view, front, and my other knee.</textarea>
+          <button class="ib p" aria-label="Send"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z"/></svg></button>
+        </div>
+        <span class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg>Not for emergencies. If you need help now, call 911.</span>
+      </div>
+      <nav class="tabbar" aria-label="Main">
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages<span class="dot">1<span class="sr"> unread</span></span></a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- 1c Add menu -->
+  <div class="frame">
+    <div class="cap">1c · Add menu <span>take a photo on phones</span></div>
+    <div class="phone lb">
+      <div class="top">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Messages</h1><span class="code">P-021</span></div>
+        <div class="chips"><button class="chip" aria-pressed="true">Right knee, post-op</button><button class="chip">Left shoulder <span class="cnt">1 new</span></button></div>
+      </div>
+      <div class="body">
+        <div class="thread">
+          <span class="who">Your therapist</span>
+          <div class="msg them">Thanks. Could you send one from the side too, and one of the other knee?</div>
+        </div>
+      </div>
+      <div class="scrim"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="addt">
+        <span class="grab"></span>
+        <div class="col" style="gap: 4px;"><h2 id="addt">Add to your message</h2><p class="small mut">Up to 4 photos, or 1 PDF.</p></div>
+        <div class="col" style="gap: 10px;">
+          <button class="btn btn-s btn-blk" style="justify-content: flex-start; min-height: 60px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</button>
+          <button class="btn btn-s btn-blk" style="justify-content: flex-start; min-height: 60px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Choose photos</button>
+          <button class="btn btn-s btn-blk" style="justify-content: flex-start; min-height: 60px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>Choose a PDF</button>
+        </div>
+        <button class="btn btn-g btn-blk">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1d PDF attached -->
+  <div class="frame">
+    <div class="cap">1d · Compose with a PDF <span>photos off while a PDF is attached</span></div>
+    <div class="phone lb">
+      <div class="top">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Messages</h1><span class="code">P-021</span></div>
+        <div class="chips"><button class="chip" aria-pressed="true">Right knee, post-op</button><button class="chip">Left shoulder <span class="cnt">1 new</span></button><button class="chip">Past plans</button></div>
+      </div>
+      <div class="body">
+        <div class="thread">
+          <span class="who">Your therapist</span>
+          <div class="msg them">If you have the letter from your surgeon, could you send it here?</div>
+          <span class="meta">Yesterday, 16:02</span>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="pdf">
+          <span class="fi">PDF</span>
+          <div class="grow col"><span class="small b">Surgeon letter.pdf</span><span class="xs mut">PDF · 240 KB</span></div>
+          <button class="ib" style="border: 0;" aria-label="Remove Surgeon letter.pdf"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <span class="xs mut">One PDF per message. To add photos instead, remove the PDF.</span>
+        <div class="c-row">
+          <button class="ib" aria-label="Add photo or PDF. Unavailable while a PDF is attached" aria-disabled="true" style="color: #5E6E6C; background: #EDEAE2; border-color: #EDEAE2;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <label class="sr" for="m4">Message to your therapist</label>
+          <textarea id="m4" class="field" rows="1">Here is the letter.</textarea>
+          <button class="ib p" aria-label="Send"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z"/></svg></button>
+        </div>
+        <span class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg>Not for emergencies. If you need help now, call 911.</span>
+      </div>
+      <nav class="tabbar" aria-label="Main">
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages<span class="dot">1<span class="sr"> unread</span></span></a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- 1e Privacy warning -->
+  <div class="frame">
+    <div class="cap">1e · Privacy check <span>phone number or name found</span></div>
+    <div class="phone lb">
+      <div class="top">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Messages</h1><span class="code">P-021</span></div>
+        <div class="chips"><button class="chip" aria-pressed="true">Right knee, post-op</button><button class="chip">Left shoulder <span class="cnt">1 new</span></button></div>
+      </div>
+      <div class="body">
+        <div class="thread">
+          <span class="who">Your therapist</span>
+          <div class="msg them">How did the stairs feel this week?</div>
+          <span class="meta">Wednesday, 10:14</span>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="warnbox" role="alert">
+          <div class="t"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h0"/></svg>
+            <div class="col" style="gap: 4px;"><span class="b">This looks like a phone number or a name</span><span class="small">Messages are safer without personal details. Your clinic already has your contact details.</span></div>
+          </div>
+          <div class="row" style="gap: 10px;"><button class="btn btn-s grow">Edit message</button><button class="btn btn-p grow">Send anyway</button></div>
+        </div>
+        <div class="c-row">
+          <button class="ib" aria-label="Add photo or PDF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <label class="sr" for="m5">Message to your therapist</label>
+          <textarea id="m5" class="field" rows="2" aria-describedby="m5w" style="border-color: #B4432B; border-width: 2px;">Easier to talk. Call me on 615 555 0142, ask for Margaret.</textarea>
+          <button class="ib p" aria-label="Send"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z"/></svg></button>
+        </div>
+        <span class="note" id="m5w"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/></svg>Not for emergencies. If you need help now, call 911.</span>
+      </div>
+      <nav class="tabbar" aria-label="Main">
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages<span class="dot">1<span class="sr"> unread</span></span></a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- 1f Archived plan -->
+  <div class="frame">
+    <div class="cap">1f · Past plan <span>read only, no compose box</span></div>
+    <div class="phone lb">
+      <div class="top">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Messages</h1><span class="code">P-021</span></div>
+        <div class="chips"><button class="chip">Right knee, post-op</button><button class="chip" aria-pressed="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v11h14V9M10 13h4"/></svg>Left ankle · ended</button></div>
+      </div>
+      <div class="body">
+        <div class="thread">
+          <span class="day">Monday 11 August</span>
+          <span class="who">Your therapist</span>
+          <div class="msg them">You have finished every exercise in this plan. Well done.</div>
+          <span class="who me">You</span>
+          <div class="msg me">Thank you for all the help.</div>
+          <span class="day">Tuesday 12 August</span>
+          <span class="who">Your therapist</span>
+          <div class="msg them">I have closed this plan. Your exercise history is still in Progress.</div>
+        </div>
+      </div>
+      <div class="ended" role="status">
+        <div class="row" style="align-items: flex-start; gap: 12px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex: none; margin-top: 2px;"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+          <div class="col" style="gap: 4px;"><span class="b">This plan ended on 12 August</span><span class="small">You can read these messages, but you can't reply here. To ask something new, use an active plan.</span></div>
+        </div>
+        <button class="btn btn-p btn-blk">Go to Right knee, post-op</button>
+      </div>
+      <nav class="tabbar" aria-label="Main">
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Today</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg></span>Progress</a>
+        <a class="tab" href="#" aria-current="page"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg></span>Messages<span class="dot">1<span class="sr"> unread</span></span></a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Visits</a>
+        <a class="tab" href="#"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</a>
+      </nav>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2636,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -32,6 +32,7 @@ class LiveRefused(PortalError):
         "second_device": "A session is already running for you on another device. Stop it there first.",
         "busy": "Limber is busy right now. Please try again in a few minutes.",
         "no_program": "Your therapist has not assigned a program yet.",
+        "plan_archived": "This plan of care is archived. Ask your therapist to open a new one.",
     }
 
     def __init__(self, reason: str):
@@ -87,6 +88,8 @@ class PortalLiveSession:
             self.exercises: List[Dict[str, Any]] = viewmodels.program_exercises(store, patient_id, now.date())
             if not self.exercises:
                 raise LiveRefused("no_program")
+            if store.current_plan(patient_id) is None and store.plans(patient_id):
+                raise LiveRefused("plan_archived")              # feature 017: nothing new in an archived plan
             registry.claim(patient_id, self)
         except Exception:
             store.close()

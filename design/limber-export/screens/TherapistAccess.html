@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Therapist screens, larger text and higher contrast</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A544E}a:hover{color:#16302C}
+</style>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body>
+<div class="board" style="width: 4016px; height: 1300px;">
+
+  <!-- T1 Inbox -->
+  <div class="frame">
+    <div class="cap">T1 · Inbox with draft <span>Larger text + Higher contrast</span></div>
+    <div class="st lb lt hc" style="height: 1180px;">
+      <aside class="st-side">
+        <h3 style="font-size: 24px;">Limber</h3>
+        <nav class="st-nav" aria-label="Sections"><a href="#" aria-current="page">Inbox <span class="cnt">4</span></a><a href="#">Patients</a><a href="#">Schedule</a><a href="#">Settings</a></nav>
+      </aside>
+      <main class="st-main">
+        <h1>Inbox</h1>
+        <table class="tbl" aria-label="Conversations">
+          <thead><tr><th scope="col">PATIENT</th><th scope="col">PLAN</th><th scope="col">UNREAD</th></tr></thead>
+          <tbody>
+            <tr aria-selected="true"><td class="b">P-021</td><td>Right knee, post-op</td><td><span class="cnt">1</span></td></tr>
+            <tr><td class="b">P-034</td><td>Left hip · <span class="b">May need a direct response</span></td><td><span class="cnt">2</span></td></tr>
+          </tbody>
+        </table>
+        <div class="st-box" style="gap: 4px;">
+          <div class="st-chat"><span class="av th" aria-hidden="true">YOU</span><div class="col"><span class="st-cap b">You · Wed 29 Oct</span><p>How did the stairs feel this week?</p></div></div>
+          <div class="st-chat"><span class="av pt" aria-hidden="true">P</span><div class="col" style="gap: 8px;"><span class="st-cap b">P-021 · Thu 30 Oct</span><p>Harder on Thursday, knee felt tight. Photo of the swelling attached.</p><a href="#" class="ph" style="width: 140px; height: 100px; text-decoration: none;" aria-label="Open photo: swelling, 30 October">Swelling, 30 Oct</a></div></div>
+        </div>
+        <div class="row" style="justify-content: space-between;"><button class="st-btn">Draft a reply</button><span class="ai"><span class="ai-mark">AI</span>AI-drafted — check before sending</span></div>
+        <label class="sr" for="h1r">Reply to P-021</label>
+        <textarea id="h1r" class="st-ta" style="min-height: 190px;">Thanks for the photo. Your pain going from 3 to 6 this week is worth a closer look. We will check the swelling on Tuesday. If your calf becomes swollen, hot or tender, call us or 911 straight away.</textarea>
+        <div class="row" style="gap: 10px;"><button class="st-btn p">Send</button><button class="st-btn">Discard draft</button></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- T2 Summary -->
+  <div class="frame">
+    <div class="cap">T2 · Weekly summary <span>Larger text + Higher contrast</span></div>
+    <div class="st lb lt hc" style="height: 1180px;">
+      <aside class="st-side">
+        <h3 style="font-size: 24px;">Limber</h3>
+        <nav class="st-nav" aria-label="Sections"><a href="#">Inbox <span class="cnt">3</span></a><a href="#" aria-current="page">Patients</a><a href="#">Schedule</a><a href="#">Settings</a></nav>
+      </aside>
+      <main class="st-main">
+        <h1>P-021</h1>
+        <nav class="st-tabs" aria-label="Patient sections"><a href="#" aria-current="page">Overview</a><a href="#">Messages</a><a href="#">AI settings</a></nav>
+        <section class="st-box" aria-labelledby="hw">
+          <h2 id="hw">Weekly summary</h2>
+          <span class="ai"><span class="ai-mark">AI</span>AI-drafted — check before acting</span>
+          <p><span class="b">Adherence.</span> Done on 4 of 7 days. <a href="#" class="lnk">Exercise log</a></p>
+          <p><span class="b">Pain trend.</span> Rose from 3/10 to 6/10, highest on Thursday 30 October. <a href="#" class="lnk">Pain log</a></p>
+          <p><span class="b">Questions asked.</span> 3 coach questions, 1 sent to you. 1 message with a photo. <a href="#" class="lnk">Coach chats</a></p>
+          <h3>Suggested next steps</h3>
+          <ol style="margin: 0; padding-left: 26px; display: flex; flex-direction: column; gap: 8px;">
+            <li>Look at the swelling photo before Tuesday. <a href="#" class="lnk">Message · 30 Oct</a></li>
+            <li>Check range of motion and swelling before progressing. <a href="#" class="lnk">Pain log</a></li>
+          </ol>
+          <div class="row" style="gap: 10px; flex-wrap: wrap;"><button class="st-btn p">Save as session note</button><button class="st-btn">Edit</button><button class="st-btn">Discard</button></div>
+        </section>
+        <div class="st-alert st-warn" role="alert"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h0"/></svg><div class="col"><span class="b">The assistant isn't available right now</span><span>Try again in a few minutes.</span></div></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- T3 AI settings -->
+  <div class="frame">
+    <div class="cap">T3 · AI settings and withheld notice <span>Larger text + Higher contrast</span></div>
+    <div class="st lb lt hc" style="height: 1180px;">
+      <aside class="st-side">
+        <h3 style="font-size: 24px;">Limber</h3>
+        <nav class="st-nav" aria-label="Sections"><a href="#">Inbox <span class="cnt">3</span></a><a href="#" aria-current="page">Patients</a><a href="#">Schedule</a><a href="#">Settings</a></nav>
+      </aside>
+      <main class="st-main">
+        <h1>P-021</h1>
+        <nav class="st-tabs" aria-label="Patient sections"><a href="#">Overview</a><a href="#">Messages</a><a href="#" aria-current="page">AI settings</a></nav>
+        <section class="st-box">
+          <div class="tog"><button class="sw" role="switch" aria-checked="true" aria-labelledby="hs1"></button><div class="col"><span id="hs1" class="b">Weekly summaries and drafts · On</span><span class="st-cap">Nothing reaches P-021 unless you send it.</span></div></div>
+          <div class="quote">Your therapist may use an AI assistant to summarise your week and to draft replies. Your therapist reads and checks everything before it reaches you.</div>
+        </section>
+        <section class="st-box">
+          <div class="tog"><button class="sw" role="switch" aria-checked="false" aria-labelledby="hs2"></button><div class="col"><span id="hs2" class="b">Patient exercise coach · Off</span><span class="st-cap">Off by default.</span></div></div>
+          <div class="quote">Your therapist has turned on the exercise coach. It is an AI assistant that answers questions using your exercise program only. Your therapist can read these chats. It is not for emergencies.</div>
+        </section>
+        <div class="st-alert st-warn" role="alert"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h0"/></svg><div class="col"><span class="b">This message may need a direct response</span><span>P-034 mentioned a fall and numbness. No draft was made.</span></div></div>
+      </main>
+    </div>
+  </div>
+</div>
+</body>
+</html>

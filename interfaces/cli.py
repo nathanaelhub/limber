@@ -710,6 +710,8 @@ def cmd_media(args):
                     print(f"{m.id}  {m.patient_id:<10}{m.kind:<6}{m.created_at[:16].replace('T', ' ')}  {m.duration:5.1f} s  {m.bytes // 1024:6d} KB  {state}")
             elif args.media_cmd == "retention":
                 report = uploads.run_retention(store, store.media_dir)
+                from src.portal import attachments
+                report["attachments_deleted"] = attachments.run_retention(store, store.media_dir)
                 print("; ".join(f"{k}: {v}" for k, v in report.items()))
             elif args.media_cmd == "reconcile":
                 cleaned = uploads.clean_expired(store, store.media_dir)
