@@ -65,6 +65,7 @@ from src.portal import plans as ptplans
 from src.portal import attachments as ptattach
 from src.assist import assistant as ptassistant
 from src.assist import config as ptassist_config
+from interfaces import app_theme
 from src.ptlog.models import PERIODS, NEXT_STEPS
 
 
@@ -124,58 +125,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
-st.markdown("""
-<style>
-    /* Limber brand: teal #0E6B64, coral #F2684A, ink #16302C, warm off-white #FAF8F4 */
-    html, body, [class*="css"], .stApp {
-        font-family: "Sora", "Outfit", "Poppins", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-    }
-    h1, h2, h3 { letter-spacing: -0.02em; color: #16302C; }
-    p.main-header, .main-header {
-        font-size: 2.6rem !important;
-        line-height: 1.1;
-        font-weight: 800 !important;
-        letter-spacing: -0.03em;
-        color: #16302C;
-        margin-bottom: 0.5rem;
-    }
-    p.sub-header, .sub-header {
-        font-size: 1.15rem !important;
-        color: #728280;
-        margin-bottom: 2rem;
-    }
-    .metric-card {
-        background-color: #FFFFFF;
-        border: 1px solid #EDEAE2;
-        padding: 1rem;
-        border-radius: 18px;
-        text-align: center;
-    }
-    .metric-value {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #0E6B64;
-    }
-    .metric-label {
-        font-size: 0.9rem;
-        color: #728280;
-    }
-    .form-good { color: #0E6B64; }
-    .form-warning { color: #C98A1B; }
-    .form-poor { color: #F2684A; }
-    .stProgress > div > div > div > div {
-        background-color: #0E6B64;
-    }
-    [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #EDEAE2; }
-    .stButton > button { border-radius: 14px; border-color: #EDEAE2; }
-    .stButton > button:hover { border-color: #0E6B64; color: #0E6B64; }
-    .limber-lockup { display: flex; align-items: center; justify-content: center; gap: 0.6rem; padding: 6px 0 2px; }
-    .limber-lockup svg { width: 46px; height: 46px; }
-    .limber-lockup span { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.04em; color: #16302C; }
-    .limber-tag { text-align: center; color: #728280; font-size: 0.85rem; margin-bottom: 4px; }
-</style>
-""", unsafe_allow_html=True)
+# The look, from the Limber design export (interfaces/app_theme.py)
+st.markdown(app_theme.base_css(), unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -322,64 +273,73 @@ class LiveVideoProcessor(VideoProcessorBase):
 # SIDEBAR NAVIGATION
 # =============================================================================
 
-def render_sidebar():
-    """Render the sidebar navigation."""
-    with st.sidebar:
-        st.markdown(f'''<div class="limber-lockup">{LIMBER_MARK_SVG}<span>Limber</span></div>
-            <div class="limber-tag">Physical therapy, between visits · therapist</div>''', unsafe_allow_html=True)
-        st.markdown("---")
+NAV_PRIMARY = {'inbox': 'Inbox', 'patients': 'Patients', 'schedule': 'Schedule'}
+NAV_TOOLS = {'home': 'Dashboard', 'live': 'Live session', 'video': 'Video analysis', 'sessions': 'Sessions',
+             'obs_logs': 'Observation logs', 'review': 'Review', 'tracker': 'Tracker', 'learn': 'How it works'}
 
-        # Navigation
-        st.markdown("### Navigation")
-        pages = {
-            'home': '🏠 Dashboard',
-            'live': '📹 Live Session',
-            'video': '🎬 Video Analysis',
-            'patients': '👥 Patients',
-            'sessions': '📋 Sessions',
-            'obs_logs': '🔬 Observation Logs',
-            'review': '🩺 Review',
-            'tracker': '🗂️ Tracker',
-            'inbox': '✉️ Inbox',
-            'learn': '📚 How It Works'
-        }
-        me = _account()
-        if me is not None and not me.is_therapist:       # an admin who is not a therapist sees no clinical pages
-            pages = {}
-        if me is not None and me.is_admin:
-            pages['people'] = '🧑‍🤝‍🧑 People'
-        if me is not None:
-            pages['settings'] = '⚙️ My settings'
-        if st.session_state.get("current_page") not in pages:
-            st.session_state.current_page = next(iter(pages), 'home')
+
+def _go(page_id):
+    st.session_state.current_page = page_id
+
+
+def _nav_group(key, items, title=None):
+    """One group of sidebar items. The current page is the white pill; the rest are plain rows."""
+    if not items:
+        return
+    with st.container(key=key):
+        if title:
+            st.markdown(f'<div class="nav-group">{title}</div>', unsafe_allow_html=True)
+        for page_id, label in items.items():
+            current = st.session_state.get("current_page") == page_id
+            st.button(label, key=f"nav_{page_id}", use_container_width=True,
+                      type="secondary" if current else "tertiary", on_click=_go, args=(page_id,))
+
+
+def render_sidebar():
+    """The sidebar from the design: Inbox, Patients, Schedule; then Tools and Admin, shown by role."""
+    me = _account()
+    clinical = me is None or me.is_therapist        # an admin who is not a therapist sees no clinical pages
+    primary = dict(NAV_PRIMARY) if clinical else {}
+    tools = dict(NAV_TOOLS) if clinical else {}
+    admin = {}
+    if me is not None and me.is_admin:
+        admin['people'] = 'People'
+    if me is not None:
+        admin['settings'] = 'My settings'
+    every = {**primary, **tools, **admin}
+    if st.session_state.get("current_page") not in every:
+        st.session_state.current_page = next(iter(every), 'home')
+    if primary:
         with _open_store() as store:
             waiting = ptmessages.total_unread(store)
         if waiting:                                   # who is waiting for a reply, visible from every page
-            pages['inbox'] = f"✉️ Inbox ({waiting})"
+            primary['inbox'] = f"Inbox :orange-badge[{waiting}]"
 
-        for page_id, page_name in pages.items():
-            if st.button(page_name, key=f"nav_{page_id}", use_container_width=True):
-                st.session_state.current_page = page_id
-                st.rerun()
+    with st.sidebar:
+        st.markdown(f'''<div class="limber-lockup">{LIMBER_MARK_SVG}<span>Limber</span></div>
+            <div class="limber-tag">Clinic workspace</div>''', unsafe_allow_html=True)
+        _nav_group("nav_primary", primary)
 
-        st.markdown("---")
-
-        # Patient (pseudonymous IDs from the canonical record, only the signed-in therapist's own)
-        if me is None or me.is_therapist:
-            st.markdown("### Patient")
+        # Find a patient: the pseudonymous IDs of the signed-in therapist's own caseload
+        if clinical:
             with _open_store() as store:
                 patients = store.list_patients()
             ids = [p.id for p in patients]
             labels = {p.id: (f"{p.id} · {p.label}" if p.label else p.id) for p in patients}
-            current = st.session_state.get("patient_id") or "unassigned"
+            current = st.session_state.get("patient_id")
+            if current not in ids:                     # open on a real patient, not the built-in placeholder
+                current = next((p.id for p in patients if not p.is_builtin), "unassigned")
             st.session_state.patient_id = st.selectbox(
-                "Patient", ids, index=ids.index(current) if current in ids else 0,
-                format_func=lambda i: labels.get(i, i), key="patient_select")
+                "Find a patient", ids, index=ids.index(current) if current in ids else 0,
+                format_func=lambda i: labels.get(i, i), key="patient_select",
+                help="Patient code, for example P-021. Sessions, Review and the live session use this patient.")
 
-        st.markdown("### Settings")
-        st.toggle("Show Technical Details", key="show_technical")
+        _nav_group("nav_tools", tools, "Tools")
+        _nav_group("nav_admin", admin, "Admin")
 
         st.markdown("---")
+        if clinical:
+            st.toggle("Show technical details", key="show_technical")
         if st.session_state.get("admin_token"):
             if me is not None:
                 st.caption(f"Signed in as {me.display_name} ({me.username})")
@@ -389,7 +349,6 @@ def render_sidebar():
                 st.session_state.pop("account_id", None)
                 st.rerun()
         st.caption("Limber v1.0 · therapist app")
-        st.caption("Powered by YOLO11 Pose Estimation")
 
 
 # =============================================================================
@@ -529,7 +488,7 @@ def _live_summary_block():
 
 def page_live_session():
     """Live session: the browser stream runs the real engine and is recorded as it happens."""
-    st.markdown("## 📹 Live PT Session")
+    st.title("Live session")
 
     # Hide webrtc default icons and fullscreen toolbar
     st.markdown("""
@@ -640,7 +599,7 @@ def page_live_session():
 
 def page_video_analysis():
     """Render the video analysis page."""
-    st.markdown("## 🎬 Video Analysis")
+    st.title("Video analysis")
 
     # File upload
     uploaded_file = st.file_uploader(
@@ -820,7 +779,7 @@ def page_observation_logs():
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("## 🔬 Observation Logs")
+    st.title("Observation logs")
     st.markdown("*Structured per-rep event logs generated automatically during analysis*")
 
     # Discover log files
@@ -907,7 +866,7 @@ def page_observation_logs():
         rep_events = [e for e in events if e.get("type") == "rep"]
 
         if rep_events:
-            tab1, tab2, tab3 = st.tabs(["📊 Charts", "📋 Rep Table", "🗂 Event Timeline"])
+            tab1, tab2, tab3 = st.tabs(["Charts", "Rep table", "Event timeline"])
 
             with tab1:
                 df_reps = pd.DataFrame(rep_events)
@@ -1061,40 +1020,134 @@ def page_observation_logs():
 # PAGE: PATIENTS (pseudonymous registry)
 # =============================================================================
 
+def _patient_header(store, pid):
+    """The line under the patient code: the active plan, when it started, and any other open plans."""
+    from datetime import timedelta
+    live = [p for p in store.plans(pid) if p.status == "active"]
+    if not live:
+        return "No active plan of care."
+    first = live[0]
+    days = (date.today() - date.fromisoformat(first.start_date[:10])).days
+    ago = ("started today" if days <= 0 else f"started {days} day{'s' if days != 1 else ''} ago" if days < 14
+           else f"started {days // 7} weeks ago")
+    line = f"{first.title} · {ago}"
+    if len(live) > 1:
+        line += " · Also: " + ", ".join(p.title for p in live[1:])
+    return line
+
+
+def _patient_metrics(pid):
+    """Days done in the last 7, the latest pain with its change from the week before, and the next visit."""
+    from datetime import timedelta
+    with _open_store() as store:
+        since = (datetime.now() - timedelta(days=7)).isoformat()
+        days = {r.start_time[:10] for r in store.list_sessions(pid) if r.start_time >= since}
+        pains = [e for e in store.entries(pid, kind="checkin") if e.score is not None]
+        upcoming = [v for v in ptplans.appointments_view(store, pid) if v["state"] == "upcoming"]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Days done, last 7", f"{len(days)} of 7")
+    if pains:
+        latest = pains[-1]
+        before = [e for e in pains if e.recorded_at < (datetime.fromisoformat(latest.recorded_at[:19])
+                                                       - timedelta(days=7)).isoformat()]
+        delta = None
+        if before:
+            change = latest.score - before[-1].score
+            delta = (f"Up {change:g} from last week" if change > 0 else f"Down {-change:g} from last week"
+                     if change < 0 else "Same as last week")
+        c2.metric("Pain, latest", f"{latest.score:g}/10", delta=delta, delta_color="inverse",
+                  delta_arrow="off" if delta and delta.startswith("Same") else "auto")
+    else:
+        c2.metric("Pain, latest", "None logged")
+    if upcoming:
+        v = upcoming[0]
+        when = datetime.fromisoformat(v["starts_local"]).strftime("%a %-d %b, %H:%M")
+        c3.metric("Next visit", when)
+        if v["note"]:
+            c3.caption(v["note"])
+    else:
+        c3.metric("Next visit", "None booked")
+
+
 def page_patients():
-    """Register, edit, and delete pseudonymous patients (all logic lives in src/ptlog)."""
-    st.markdown("## 👥 Patients")
+    """One patient's page (tabs from the design), plus registering patients. All logic lives in src/ptlog."""
+    st.title("Patients")
     st.caption("Patients are identified only by a pseudonymous ID. Do not enter names, dates of birth, "
                "or medical record numbers anywhere on this page.")
 
     with _open_store() as store:
         patients = store.list_patients()
 
-    rows = [{"ID": p.id, "Label": p.label or "", "Sessions": p.session_count,
-             "Last session": ptviews.date_minute(p.last_session_at), "Notes": p.notes or ""} for p in patients]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-
-    st.markdown("### Register a patient")
-    with st.form("add_patient_form", clear_on_submit=True):
-        new_id = st.text_input("Pseudonymous ID", placeholder="P-017", help="1-32 letters, digits, or hyphens")
-        new_label = st.text_input("Label (optional)", placeholder="Post-op knee", help="Max 60 characters")
-        new_notes = st.text_area("Notes (optional)")
-        if st.form_submit_button("Register"):
-            try:
-                with _open_store() as store:
-                    ptaccounts.add_patient(store, _account(), new_id, label=new_label or None, notes=new_notes or None)
-                st.success(f"Registered patient {new_id}")
-                st.rerun()
-            except PTLogError as exc:
-                st.error(str(exc))
+    with st.expander("All patients and registering a new one", expanded=not [p for p in patients if not p.is_builtin]):
+        rows = [{"ID": p.id, "Label": p.label or "", "Sessions": p.session_count,
+                 "Last session": ptviews.date_minute(p.last_session_at), "Notes": p.notes or ""} for p in patients]
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.markdown("### Register a patient")
+        with st.form("add_patient_form", clear_on_submit=True):
+            new_id = st.text_input("Pseudonymous ID", placeholder="P-017", help="1-32 letters, digits, or hyphens")
+            new_label = st.text_input("Label (optional)", placeholder="Post-op knee", help="Max 60 characters")
+            new_notes = st.text_area("Notes (optional)")
+            if st.form_submit_button("Register"):
+                try:
+                    with _open_store() as store:
+                        ptaccounts.add_patient(store, _account(), new_id, label=new_label or None, notes=new_notes or None)
+                    st.success(f"Registered patient {new_id}")
+                    st.rerun()
+                except PTLogError as exc:
+                    st.error(str(exc))
 
     editable = [p for p in patients if not p.is_builtin]
-    st.markdown("### Edit or delete")
     if not editable:
         st.info("No patients registered yet.")
         return
-    pid = st.selectbox("Patient", [p.id for p in editable], key="patients_edit_select")
+    ids = [p.id for p in editable]
+    if st.session_state.get("patients_edit_select") not in ids:      # open the sidebar's patient when there is one
+        sidebar = st.session_state.get("patient_id")
+        st.session_state["patients_edit_select"] = sidebar if sidebar in ids else ids[0]
+    pid = st.selectbox("Open patient", ids, key="patients_edit_select")
     current = next(p for p in editable if p.id == pid)
+    with _open_store() as store:
+        subtitle = _patient_header(store, pid)
+    st.markdown(f"# {pid}")
+    st.markdown(f'<p class="ptitle-sub">{subtitle}</p>', unsafe_allow_html=True)
+
+    ai = ptassist_config.available()
+    names = ["Overview", "Exercises", "Messages", "Session notes"] + (["AI settings"] if ai else []) + ["Details"]
+    tabs = dict(zip(names, st.tabs(names)))
+    with tabs["Overview"]:
+        _patient_metrics(pid)
+        _patient_summary_section(pid)
+        _patient_plans_section(pid)
+        _patient_appointments_section(pid)
+    with tabs["Exercises"]:
+        _patient_program_section(pid)
+        _patient_questionnaire_section(pid, current)
+    with tabs["Messages"]:
+        st.button(f"Open {pid}'s conversation in the inbox", key=f"patient_to_inbox_{pid}",
+                  on_click=_open_conversation, args=(pid,))
+        _patient_home_access_section(pid, current)
+    with tabs["Session notes"]:
+        _patient_notes_section(pid)
+        _patient_logs_section(pid, current)
+    if ai:
+        with tabs["AI settings"]:
+            with _open_store() as store:
+                switches = ptassistant.switches(store, pid)
+                since = {k: store.assist_switched_on_at(pid, k) for k in switches}
+            _assist_settings(pid, switches, since)
+    with tabs["Details"]:
+        _patient_details_section(pid, current)
+        _patient_discharge_section(pid)
+
+
+def _open_conversation(pid):
+    st.session_state["inbox_open"] = pid
+    st.session_state.current_page = "inbox"
+
+
+def _patient_details_section(pid, current):
+    """Label and notes, and deleting the patient."""
+    st.markdown("### Label and notes")
     with st.form("edit_patient_form"):
         label = st.text_input("Label", value=current.label or "")
         notes = st.text_area("Notes", value=current.notes or "")
@@ -1106,26 +1159,20 @@ def page_patients():
                 st.rerun()
             except PTLogError as exc:
                 st.error(str(exc))
+    st.markdown("### Delete")
     confirm = st.checkbox(f"I understand this permanently deletes {pid} and its {current.session_count} sessions",
                           key="patients_delete_confirm")
     if st.button("Delete patient", disabled=not confirm, key="patients_delete_button"):
         try:
             with _open_store() as store:
                 report = store.delete_patient(pid)
+            st.session_state.pop("patients_edit_select", None)
             st.success(f"Deleted {report.patient_id}: {report.sessions} sessions, {report.events} events, "
                        f"{report.export_files} export files removed")
             st.rerun()
         except PTLogError as exc:
             st.error(str(exc))
 
-    _patient_plans_section(pid)
-    _patient_assist_section(pid)
-    _patient_appointments_section(pid)
-    _patient_program_section(pid)
-    _patient_home_access_section(pid, current)
-    _patient_logs_section(pid, current)
-    _patient_questionnaire_section(pid, current)
-    _patient_discharge_section(pid)
 
 # ----------------------------------------------------------------------------- the AI assistant (feature 018)
 
@@ -1142,26 +1189,36 @@ def _cited(ids):
     return "From: " + " · ".join(f"{_RECORD_KINDS.get(i.split('-')[0], 'Record')} {i}" for i in ids)
 
 
-def _patient_assist_section(pid):
-    """The weekly summary and the per-patient AI switches. Hidden entirely when no key is configured (SC-003)."""
+def _patient_summary_section(pid):
+    """The weekly summary panel. Hidden entirely when no key is configured (SC-003)."""
     if not ptassist_config.available():
         return
     with _open_store() as store:
-        switches = ptassistant.switches(store, pid)
-        since = {k: store.assist_switched_on_at(pid, k) for k in switches}
+        on = ptassistant.switches(store, pid)["summaries"]
+    with st.container(border=True, key=f"card_summary_{pid}"):
+        st.markdown("### Weekly summary")
+        if on:
+            _summary_panel(pid)
+        else:
+            st.caption("Weekly summaries and drafts are off for this patient. Turn them on under AI settings.")
+
+
+def _patient_notes_section(pid):
+    """Session notes, including saved AI-drafted summaries (they keep their marker)."""
+    with _open_store() as store:
         saved = ptassistant.notes(store, pid)
-    st.markdown("### Weekly summary")
-    if switches["summaries"]:
-        _summary_panel(pid)
-    else:
-        st.caption("Weekly summaries and drafts are off for this patient. Turn them on under AI settings below.")
-    if saved:
-        with st.expander(f"Session notes ({len(saved)})"):
-            for n in saved:
-                st.caption(n["created_at"][:16].replace("T", " ")
-                           + (" · AI-drafted" + (", edited" if n["edited"] else "") if n["ai_drafted"] else ""))
-                st.text(n["body"])
-    _assist_settings(pid, switches, since)
+    st.markdown("### Session notes")
+    if not saved:
+        st.caption("No session notes yet. A saved weekly summary appears here.")
+    for n in saved:
+        with st.container(border=True, key=f"card_note_{n['id']}"):
+            when = n["created_at"][:16].replace("T", " ")
+            if n["ai_drafted"]:
+                st.markdown(app_theme.ai_label("AI-drafted" + (", edited" if n["edited"] else "") + f" · {when}"),
+                            unsafe_allow_html=True)
+            else:
+                st.caption(when)
+            st.text(n["body"])
 
 
 def _summary_panel(pid):
@@ -1197,10 +1254,10 @@ def _summary_panel(pid):
             st.rerun()
         return
     editing = st.session_state.get(f"assist_editing_{pid}", False)
-    with st.container(border=True):
+    with st.container():
         st.caption(f"{result.window['from']} to {result.window['to']} · made today at "
                    f"{st.session_state.get(f'assist_made_{pid}', '')} from {result.record_count} records")
-        st.markdown("**AI** · AI-drafted — check before acting")
+        st.markdown(app_theme.ai_label("AI-drafted — check before acting"), unsafe_allow_html=True)
         if editing:
             st.text_area("Edit the summary", value=result.as_text(), key=f"assist_edit_text_{pid}", height=260)
         else:
@@ -1238,7 +1295,6 @@ def _summary_panel(pid):
 
 
 def _assist_settings(pid, switches, since):
-    st.markdown("### AI settings")
     st.caption("Both are off for every new patient. Turn them on only after you have told the patient.")
     blurbs = {
         "summaries": ("Weekly summaries and drafts",
@@ -1250,16 +1306,24 @@ def _assist_settings(pid, switches, since):
                   f"changes to you.", f"What {pid} is shown before their first question", ptassistant.NOTICE_COACH),
     }
     for which, (title, blurb, shown_label, notice) in blurbs.items():
-        with st.container(border=True):
-            wanted = st.toggle(title, value=switches[which], key=f"assist_sw_{which}_{pid}")
+        with st.container(border=True, key=f"card_ai_{which}_{pid}"):
+            t1, t2 = st.columns([3, 1])
+            with t1:
+                wanted = st.toggle(f"**{title}**", value=switches[which], key=f"assist_sw_{which}_{pid}")
+            if switches[which] and since[which]:
+                on = datetime.fromisoformat(since[which][:10]).strftime("%-d %B")
+                t2.markdown(f'<div style="text-align:right"><span class="badge teal">On since {on}</span></div>',
+                            unsafe_allow_html=True)
             if wanted != switches[which]:
                 with _open_store() as store:
                     ptassistant.set_switch(store, pid, which, wanted, account_id=st.session_state.get("account_id"))
                 st.rerun()
-            st.caption((f"On since {since[which][:10]}. " if switches[which] and since[which] else "Off. ") + blurb)
-            st.caption(f"**{shown_label}:** “{notice}”")
-    with st.expander("Past coach conversations"):
-        st.caption("Read only. The exercise coach arrives in a later update; its conversations will appear here.")
+            st.caption(("" if switches[which] else "Off. ") + blurb)
+            st.markdown(f"<div class='nav-group' style='margin-left:0'>{shown_label}</div>", unsafe_allow_html=True)
+            st.info(f"“{notice}”")
+    st.markdown("### Past coach conversations")
+    st.caption("Read only. Newest first. The exercise coach arrives in a later update; its conversations will "
+               "appear here.")
 
 
 def _inbox_assist(pid, plan_id):
@@ -1674,7 +1738,7 @@ _EXPORT_LABEL = {"pta_log": "PTA-Log text", "observation_json": "Observation JSO
 
 def page_sessions():
     """Session history newest first, a session's full event log, and the four exports."""
-    st.markdown("## 📋 Sessions")
+    st.title("Sessions")
     scope = st.radio("Show", ["Selected patient", "All patients"], horizontal=True, key="sessions_scope")
     patient_filter = st.session_state.get("patient_id") if scope == "Selected patient" else None
 
@@ -1732,7 +1796,7 @@ REVIEW_SECTIONS = ["Trends", "Flags", "Compare", "Session review", "From the pat
 
 def page_review():
     """Review a patient's course of care; each section renders only when chosen."""
-    st.markdown("## 🩺 Review")
+    st.title("Review")
     pid = st.session_state.get("patient_id") or "unassigned"
     section = st.radio("Section", REVIEW_SECTIONS, horizontal=True, key="review_tab", label_visibility="collapsed")
     if section == "Trends":
@@ -2307,19 +2371,16 @@ def _inbox_voice_note(pid, media_id):
                    + (" This text looks like it contains identifying details." if job.warned else ""))
         st.text(job.text or "Nothing recognisable was said.")
 
-    c1, c2, c3 = st.columns([1.2, 1, 2])
-    with c1:
+    with st.container(horizontal=True):
         if media.reviewed_at is None and st.button("Mark heard", key=f"voice_heard_{media.id}"):
             with _open_store() as store:
                 ptuploads.mark_reviewed(store, media.id)
             st.rerun()
-    with c2:
         if st.button("Delete", key=f"voice_delete_{media.id}",
                      help="Removes the recording and anything written out from it. A marker stays in the conversation."):
             with _open_store() as store:
                 ptvoice.delete(store, store.media_dir, pid, media.id, by="therapist")
             st.rerun()
-    with c3:
         if job is not None and job.state == "done" and not job.removed and job.text:
             if st.button("Remove the text", key=f"voice_text_remove_{media.id}",
                          help="For a transcript that contains identifying details. The recording stays."):
@@ -2393,35 +2454,73 @@ def _plan_summary(store, pid):
     return " · ".join(parts)
 
 
+def _avatar(text, fg, bg):
+    """A small boxed-letters avatar for st.chat_message ("YOU", "P"), as in the design."""
+    import base64
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect x="2" y="2" width="60" height="60" '
+           f'rx="14" fill="{bg}" stroke="{fg}" stroke-width="3"/><text x="32" y="41" text-anchor="middle" '
+           f'font-family="Helvetica, Arial, sans-serif" font-size="{22 if len(text) > 1 else 26}" font-weight="800" '
+           f'fill="{fg}">{text}</text></svg>')
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
+AVATAR_YOU = _avatar("YOU", "#FFFFFF", "#0E6B64")
+AVATAR_PATIENT = _avatar("P", "#B4432B", "#FDEBE5")
+
+
+def _inbox_pick(rows):
+    """Row-selection callback: open the conversation picked in the inbox table."""
+    picked = (st.session_state.get("inbox_table") or {}).get("selection", {}).get("rows") or []
+    if picked and picked[0] < len(rows):
+        st.session_state["inbox_open"] = rows[picked[0]]
+        st.session_state.pop("inbox_plan", None)
+
+
 def page_inbox():
-    """The therapist's inbox: one conversation per patient (feature 008). Text is shown as plain text."""
-    st.markdown("## ✉️ Inbox")
+    """The therapist's inbox (feature 008, laid out as in the design): the list of conversations on the left,
+    the open conversation on the right. Patient text is always shown as plain text."""
+    st.title("Inbox")
+    st.caption("Unread messages, grouped by plan of care")
     with _open_store() as store:
         rows = ptmessages.inbox(store, include_empty=True)
         flagged = _reschedule_flags(store)
         plan_lines = {r.patient_id: _plan_summary(store, r.patient_id) for r in rows}
+        attention = set()
+        if ptassist_config.available():
+            attention = {r.patient_id for r in rows if r.last_at and ptassistant.needs_attention(store, r.patient_id)}
     for a, view in flagged:
-        st.warning(f"{a.patient_id} asked to reschedule the visit on {view['date']} at {view['time']}"
-                   + (f": “{a.request_note}”" if a.request_note else ".") + " Answer it on the Patients page.")
+        st.info(f"{a.patient_id} asked to reschedule the visit on {view['date']} at {view['time']}"
+                + (f": “{a.request_note}”" if a.request_note else ".") + " Answer it on the patient's page.",
+                icon=":material/event_repeat:")
     if not rows:
         st.info("No patients yet.")
         return
     active = [r for r in rows if r.last_at]
-    if active:
-        st.dataframe(pd.DataFrame([{
-            "Patient": r.patient_id, "Unread": r.unread, "Plans": plan_lines.get(r.patient_id, ""),
-            "Latest message": ("You: " if r.last_sender == "therapist" else "") + r.first_line,
-            "When": (r.last_at or "")[:16].replace("T", " "), "Messaging": "on" if r.enabled else "off"} for r in active]),
-            use_container_width=True, hide_index=True)
-    else:
-        st.info("No conversations yet. Turn messaging on for a patient below to start one.")
-
     ids = [r.patient_id for r in rows]
     if st.session_state.get("inbox_open") not in ids:
         st.session_state["inbox_open"] = (active[0].patient_id if active else ids[0])
     by_id = {r.patient_id: r for r in rows}
-    pid = st.selectbox("Conversation", ids, key="inbox_open",
-                       format_func=lambda i: f"{i}" + (f" · {by_id[i].unread} unread" if by_id[i].unread else ""))
+
+    listing, convo = st.columns([1.25, 1.6], gap="large")
+    with listing:
+        if active:
+            st.dataframe(pd.DataFrame([{
+                "Patient": r.patient_id,
+                "Plan": ("⚠ May need a direct response · " if r.patient_id in attention else "") + plan_lines.get(r.patient_id, ""),
+                "Unread": r.unread,
+                "Latest message": ("You: " if r.last_sender == "therapist" else "") + r.first_line,
+                "When": (r.last_at or "")[:16].replace("T", " "), "Messaging": "on" if r.enabled else "off"} for r in active]),
+                use_container_width=True, hide_index=True, key="inbox_table", selection_mode="single-row",
+                on_select=lambda order=[r.patient_id for r in active]: _inbox_pick(order),
+                column_order=["Patient", "Plan", "Unread"],
+                column_config={"Patient": st.column_config.TextColumn(width="small"),
+                               "Plan": st.column_config.TextColumn(width="medium"),
+                               "Unread": st.column_config.NumberColumn(width="small")})
+            st.caption("Select a row to open the conversation.")
+        else:
+            st.info("No conversations yet. Turn messaging on for a patient below to start one.")
+        pid = st.selectbox("Conversation", ids, key="inbox_open",
+                           format_func=lambda i: f"{i}" + (f" · {by_id[i].unread} unread" if by_id[i].unread else ""))
 
     with _open_store() as store:
         plan_list = store.plans(pid)
@@ -2433,15 +2532,14 @@ def page_inbox():
         st.session_state["inbox_plan"] = (unread_first or live or plan_ids)[0]
     plans_by_id = {p.id: p for p in plan_list}
     plan_id = None
-    if plan_ids:
-        plan_id = st.selectbox(
-            "Plan of care", plan_ids, key="inbox_plan",
-            format_func=lambda i: plans_by_id[i].title + (" · archived" if plans_by_id[i].read_only else
-                                                         " · completed" if plans_by_id[i].status == "completed" else "")
-            + (f" · {by_plan[i]} unread" if by_plan.get(i) else ""))
+    with listing:
+        if plan_ids:
+            plan_id = st.selectbox(
+                "Plan of care", plan_ids, key="inbox_plan",
+                format_func=lambda i: plans_by_id[i].title + (" · archived" if plans_by_id[i].read_only else
+                                                             " · completed" if plans_by_id[i].status == "completed" else "")
+                + (f" · {by_plan[i]} unread" if by_plan.get(i) else ""))
     plan = plans_by_id.get(plan_id)
-    st.markdown("---")
-    left, right = st.columns([2, 1])
 
     with _open_store() as store:
         enabled = ptmessages.is_enabled(store, pid)
@@ -2450,40 +2548,49 @@ def page_inbox():
         latest = store.list_sessions(pid)[:1]
         flags = ptreview.flags_for(store, pid, "30d").flags if latest else []
         media_dir = store.media_dir
+        upcoming = [v for v in ptplans.appointments_view(store, pid) if v["state"] == "upcoming"]
+        started = plan.start_date[:10] if plan else None
 
-    with left:
+    with convo:
         st.markdown(f"### {pid}" + (f" · {plan.title}" if plan else ""))
+        bits = []
+        if started:
+            bits.append(f"Started {started}")
+        if upcoming:
+            nxt = datetime.fromisoformat(upcoming[0]["starts_local"])
+            bits.append("Next visit " + nxt.strftime("%A %-d %B, %H:%M"))
+        if bits:
+            st.caption(" · ".join(bits))
         wanted = st.toggle("Messaging on for this patient", value=enabled, key="inbox_enabled",
                            help="Off hides the conversation from the patient and refuses new messages; what was written is kept.")
         if wanted != enabled:
             with _open_store() as store:
                 ptmessages.set_enabled(store, pid, wanted)
             st.rerun()
-        if not thread:
-            st.caption("No messages in this plan yet.")
-        for m in thread:
-            who = "You" if m.sender == "therapist" else pid
-            when = m.sent_at[:16].replace("T", " ")
-            c1, c2 = st.columns([5, 1.3])
-            with c1:
-                st.caption(f"{who} · {when}" + (" · sent after a privacy warning" if m.warned else "")
-                           + (" · seen" if m.sender == "therapist" and m.read_at else ""))
-                if m.removed:
-                    st.markdown("*This message was removed.*")
-                elif m.media_id:
-                    _inbox_voice_note(pid, m.media_id)
-                else:
-                    if m.body:
-                        st.text(m.body)                                   # plain text: never rendered as markup
-                    if m.attachments:
-                        _inbox_attachments(m, media_dir)
-            with c2:
-                if not m.removed and not m.media_id and not (plan and plan.read_only) and st.button(
-                        "Remove", key=f"inbox_remove_{m.id}",
-                        help="For a message that contains identifying details. A marker stays."):
-                    with _open_store() as store:
-                        ptmessages.remove(store, m.id)
-                    st.rerun()
+        with st.container(border=True, key="card_thread"):
+            if not thread:
+                st.caption("No messages in this plan yet.")
+            for m in thread:
+                mine = m.sender == "therapist"
+                when = m.sent_at[:16].replace("T", " ")
+                with st.chat_message("You" if mine else pid, avatar=AVATAR_YOU if mine else AVATAR_PATIENT):
+                    st.caption(f"{'You' if mine else pid} · {when}" + (" · sent after a privacy warning" if m.warned else "")
+                               + (" · seen" if mine and m.read_at else ""))
+                    if m.removed:
+                        st.markdown("*This message was removed.*")
+                    elif m.media_id:
+                        _inbox_voice_note(pid, m.media_id)
+                    else:
+                        if m.body:
+                            st.text(m.body)                               # plain text: never rendered as markup
+                        if m.attachments:
+                            _inbox_attachments(m, media_dir)
+                    if not m.removed and not m.media_id and not (plan and plan.read_only) and st.button(
+                            "Remove", key=f"inbox_remove_{m.id}", type="tertiary",
+                            help="For a message that contains identifying details. A marker stays."):
+                        with _open_store() as store:
+                            ptmessages.remove(store, m.id)
+                        st.rerun()
         if discharged:
             st.info("This patient is discharged; the conversation is read-only.")
         elif plan and plan.read_only:
@@ -2503,23 +2610,26 @@ def page_inbox():
             if assist_on:
                 _inbox_assist(pid, plan_id)
             drafted = assist_on and (st.session_state.get("inbox_drafted") or ())[:2] == (pid, plan_id)
+            r1, r2 = st.columns([1, 2])
+            r1.markdown(f"**Reply to {pid}**")
             if drafted:
-                st.markdown("**AI** · AI-drafted — check before sending")
-            st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH,
-                         help="Plain text. Do not include names or contact details.")
+                r2.markdown(f'<div style="text-align:right">{app_theme.ai_label("AI-drafted — check before sending")}</div>',
+                            unsafe_allow_html=True)
+            st.text_area("Reply", key="inbox_reply", max_chars=ptmessages.MAX_LENGTH, label_visibility="collapsed", height=170,
+                         placeholder="Write your reply", help="Plain text. Do not include names or contact details.")
             if drafted:
-                d1, d2 = st.columns([1, 3])
-                d1.button("Discard draft", key="inbox_discard_draft", on_click=_inbox_discard_draft)
-                d2.caption("This draft is never sent on its own. Edit it, then press Send, or discard it.")
+                st.caption("This draft is never sent on its own. Edit it, then press Send, or discard it.")
             st.file_uploader("Attach up to 4 photos or 1 PDF", type=["jpg", "jpeg", "png", "heic", "pdf"],
                              accept_multiple_files=True, key=f"inbox_files_{st.session_state.get('inbox_files_n', 0)}",
                              help="Photos are re-saved on this computer without location or camera details.")
             reply = st.session_state.get("inbox_reply", "")
             pending = st.session_state.get("inbox_warned") == (pid, reply)
-            b1, b2 = st.columns(2)
-            b1.button("Send", key="inbox_send", type="primary", on_click=_inbox_send, args=(pid, False, plan_id))
-            b2.button("Send anyway", key="inbox_send_anyway", disabled=not pending, on_click=_inbox_send,
-                      args=(pid, True, plan_id))
+            with st.container(horizontal=True):
+                st.button("Send", key="inbox_send", type="primary", on_click=_inbox_send, args=(pid, False, plan_id))
+                if drafted:
+                    st.button("Discard draft", key="inbox_discard_draft", on_click=_inbox_discard_draft)
+                st.button("Send anyway", key="inbox_send_anyway", disabled=not pending, on_click=_inbox_send,
+                          args=(pid, True, plan_id))
             problem = st.session_state.pop("inbox_error", None)
             if problem:
                 st.error(problem)
@@ -2527,26 +2637,76 @@ def page_inbox():
                 st.warning("This reply looks like it contains a " + " and a ".join(ptmessages.check_text(reply)) +
                            ". Edit it, or press Send anyway.")
 
-    with right:
-        st.markdown("### Context")
-        if latest:
-            st.markdown("**Latest session**")
-            with _open_store() as store:
-                st.caption(ptviews.live_summary_line(store.load_session(latest[0].id)))
-            st.caption(f"{latest[0].start_time[:10]} · recorded at {'home' if latest[0].origin == 'home' else 'the clinic'}")
-        else:
-            st.caption("No sessions recorded yet.")
-        st.markdown("**Open flags (30 days)**")
-        if flags:
-            for f in flags[:5]:
-                st.caption(f"[{f.rule}] {f.message}")
-        else:
-            st.caption("None.")
+        with st.expander("Context: latest session and open flags"):
+            if latest:
+                st.markdown("**Latest session**")
+                with _open_store() as store:
+                    st.caption(ptviews.live_summary_line(store.load_session(latest[0].id)))
+                st.caption(f"{latest[0].start_time[:10]} · recorded at {'home' if latest[0].origin == 'home' else 'the clinic'}")
+            else:
+                st.caption("No sessions recorded yet.")
+            st.markdown("**Open flags (30 days)**")
+            if flags:
+                for f in flags[:5]:
+                    st.caption(f"[{f.rule}] {f.message}")
+            else:
+                st.caption("None.")
+
+
+def _open_patient(pid):
+    """Button callback: go to one patient's page (the Patients page with that patient open)."""
+    st.session_state["patients_edit_select"] = pid
+    st.session_state.current_page = "patients"
+
+
+def page_schedule():
+    """Every visit across the signed-in therapist's caseload (feature 017), reschedule requests first."""
+    st.title("Schedule")
+    with _open_store() as store:
+        zone = str(ptplans.clinic_zone(store))
+        patients = [p for p in store.list_patients() if not p.is_builtin]
+        titles, visits = {}, []
+        for p in patients:
+            titles.update({pl.id: pl.title for pl in store.plans(p.id)})
+            visits += [ptplans.appointment_json(store, a) | {"patient_id": a.patient_id}
+                       for a in store.appointments(p.id)]
+    st.caption(f"Visits for your patients, in clinic time ({zone}).")
+    visits.sort(key=lambda v: v["starts_local"])
+    requests = [v for v in visits if v["reschedule_requested"] and v["state"] == "upcoming"]
+    for v in requests:
+        with st.container(border=True, key=f"card_request_{v['id']}"):
+            c1, c2 = st.columns([4, 1])
+            c1.markdown(f"**{v['patient_id']} asked to reschedule** the visit on {v['date']} at {v['time']}"
+                        f" · {titles.get(v['plan_id'], '')}")
+            c1.caption(f"“{v['request_note']}”" if v["request_note"] else "No note.")
+            c2.button(f"Open {v['patient_id']}", key=f"sched_open_{v['id']}", on_click=_open_patient,
+                      args=(v["patient_id"],))
+    upcoming = [v for v in visits if v["state"] == "upcoming"]
+    st.markdown("### Upcoming")
+    if upcoming:
+        st.dataframe(pd.DataFrame([{
+            "Date": v["date"], "Time": v["time"], "Patient": v["patient_id"], "Plan": titles.get(v["plan_id"], ""),
+            "Length": f"{v['minutes']} min", "Note": v["note"],
+            "Status": "Reschedule requested" if v["reschedule_requested"] else "Scheduled"} for v in upcoming]),
+            use_container_width=True, hide_index=True)
+    else:
+        st.info("No upcoming visits. Add one on a patient's page, under Overview.")
+    rest = [v for v in visits if v["state"] != "upcoming"]
+    if rest:
+        with st.expander(f"Past and cancelled ({len(rest)})"):
+            st.dataframe(pd.DataFrame([{
+                "Date": v["date"], "Time": v["time"], "Patient": v["patient_id"], "Plan": titles.get(v["plan_id"], ""),
+                "Note": v["note"], "Status": "Cancelled" if v["state"] == "cancelled" else "Past"}
+                for v in reversed(rest)]), use_container_width=True, hide_index=True)
+    if patients:
+        c1, c2 = st.columns([2, 1])
+        pick = c1.selectbox("Open a patient", [p.id for p in patients], key="sched_pick")
+        c2.button("Open patient", key="sched_open_pick", on_click=_open_patient, args=(pick,))
 
 
 def page_tracker():
     """Manage the caseload; each section renders only when chosen."""
-    st.markdown("## 🗂️ Tracker")
+    st.title("Tracker")
     section = st.radio("Section", TRACKER_SECTIONS, horizontal=True, key="tracker_tab", label_visibility="collapsed")
     if section == "Roster":
         _tracker_roster()
@@ -2702,7 +2862,7 @@ def _tracker_export():
 
 def page_how_it_works():
     """Render the educational page explaining the technology."""
-    st.markdown("## 📚 How It Works")
+    st.title("How it works")
     st.markdown("*Understanding the AI behind Limber*")
 
     # Navigation tabs
@@ -2906,7 +3066,7 @@ def calculate_form_score(rep_data):
     # Toggle technical overlay option
     if st.session_state.get('show_technical', False):
         st.markdown("---")
-        st.markdown("### 🔧 Technical Details")
+        st.markdown("### Technical details")
         st.json({
             "model": "models/yolo11m-pose.pt",
             "framework": "Ultralytics",
@@ -2920,23 +3080,17 @@ def calculate_form_score(rep_data):
 # PAGES: PEOPLE (admins) AND MY SETTINGS (feature 016)
 # =============================================================================
 
-PREF_CSS = {
-    "larger_text": "html, body, .stApp, .stMarkdown p, label, input, textarea { font-size: 20px !important; }",
-    "high_contrast": ".stApp { background: #FFFFFF !important; } .stApp, .stApp p, .stApp label, h1, h2, h3 "
-                     "{ color: #000000 !important; } .stCaption, small { color: #2E2E2E !important; }",
-    "reduced_motion": "*, *::before, *::after { animation: none !important; transition: none !important; }",
-}
 PREF_LABELS = {"larger_text": "Larger text", "high_contrast": "Higher contrast", "reduced_motion": "Less motion"}
 
 
 def _apply_prefs(prefs):
-    rules = " ".join(PREF_CSS[k] for k in ptaccounts.PREFS if prefs.get(k))
-    if rules:
-        st.markdown(f"<style>{rules}</style>", unsafe_allow_html=True)
+    css = app_theme.pref_css(prefs, ptaccounts.PREFS)
+    if css:
+        st.markdown(css, unsafe_allow_html=True)
 
 
 def page_my_settings():
-    st.markdown("## ⚙️ My settings")
+    st.title("My settings")
     me = _account()
     with SessionStore(default_db_path()).open() as store:
         current = ptaccounts.get_prefs(store, me.id)
@@ -2951,7 +3105,7 @@ def page_my_settings():
 
 def page_people():
     """Admins: everyone with an account, invitations, and which therapist each patient belongs to."""
-    st.markdown("## 🧑‍🤝‍🧑 People")
+    st.title("People")
     me = _account()
     with SessionStore(default_db_path()).open() as store:
         try:
@@ -3128,6 +3282,8 @@ def main():
         page_tracker()
     elif page == 'inbox':
         page_inbox()
+    elif page == 'schedule':
+        page_schedule()
     elif page == 'learn':
         page_how_it_works()
     elif page == 'people':
