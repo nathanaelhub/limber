@@ -1,4 +1,4 @@
-"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026.
+"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026 and the photo and video trial of 5 November 2026.
 
     python scripts/build_user_cases_pdf.py            # writes user-cases.html and Limber-User-Cases.pdf
     python scripts/build_user_cases_pdf.py --html     # the HTML only
@@ -214,26 +214,102 @@ CASES = [
                 "apart from the built-in “unassigned” placeholder. Rivera saw only P-018, P-022 and P-024.",
          status="pass", shots=["c16b_invite_link.png", "c16d_nora_empty.png", "c16e_rivera_inbox.png",
                                "c16c_onboarding.png"]),
+    # ---- AI on photos and videos: a trial, 5 November 2026 (issue #27) -----------------------------------
+    dict(id=17, who="trial", trial=True, title="Triage a patient's photo with AI",
+         persona="The therapist, sorting four photos sent with short messages. The photos are public Wikimedia "
+                 "Commons images standing in for patient photos.",
+         goal="A quick note on each photo: what it shows, what to look at sooner, what to ask, and how soon to call.",
+         steps=["Screen each message with Limber's red-flag list.",
+                "Send the photo and message to Claude Opus 5.5 with a triage prompt (a trial script, not the app).",
+                "Compare each note with the photo."],
+         expected="An accurate description, no diagnosis, honesty about what a photo can't show, and a sensible "
+                  "priority.",
+         actual="None of the four messages tripped the red-flag list, so only the photo could raise a concern. "
+                "Claude described each photo accurately and never diagnosed. Each note listed what a photo can't show "
+                "(warmth, smell, change over time) and the questions to ask. Each took about 9 seconds. "
+                "<b>Not in Limber:</b> patients are told photos are never sent to the AI. A feature would need its "
+                "own spec and a new notice.",
+         status="pass", table_below=True, shot_height=1.6,
+         table_head=("Photo", "What the patient wrote", "Claude's priority"),
+         table=[("Staples, day 12", "Day 12 after my knee replacement. The nurse is taking the staples out, does "
+                 "this look normal?", "Routine"),
+                ("Pink incision", "Here's my knee this morning. It's a bit pink along the cut, is that ok?",
+                 "Routine; same day if it is warm or spreading"),
+                ("Ankle in a brace", "Rolled my ankle on the stairs yesterday… should I still do my exercises?",
+                 "Same day: marked swelling against the other foot, bruising toward the toes"),
+                ("Unexplained bruise", "Got this bruise on my knee, not sure how. Doesn't hurt much.",
+                 "Same day: asks about an unreported fall and blood thinners")],
+         credits=True, shots=["c17a_staples_day_12.png", "c17b_pink_incision.png", "c17c_ankle_in_brace.png",
+                              "c17d_unexplained_bruise.png"]),
+    dict(id=18, who="trial", trial=True, title="Check a video analysis with AI",
+         persona="The therapist, reviewing three exercise videos measured by Limber's pose model (YOLO11). The videos "
+                 "are the Ultralytics demo clips: leg extension, squats and push-ups.",
+         goal="Know whether the measured reps and range of motion can be trusted before acting on them.",
+         steps=["Run each clip through video analysis (python analyze.py video).",
+                "Send 8 evenly spaced frames and the measured numbers to Claude Opus 5.5.",
+                "Count the reps by hand from a frame-by-frame sheet."],
+         expected="The measurements match the video, or anything wrong is easy to spot.",
+         actual="<b>Leg extension:</b> Limber counted 1 rep (65°) and 2 partial reps; by hand there are 3. Claude "
+                "said the count and range looked too low because the camera angle and the machine hide the knees. "
+                "<b>Squats:</b> 4 reps, which looks right; Claude flagged rep 1 (72°, against 127–137° for the rest). "
+                "<b>Push-ups:</b> 4 reps, right. But the camera sees the man's right side while the push-up setting "
+                "measures the left arm. Measured on the visible right arm, the same clip gives 73° instead of 85° "
+                "and form 53 instead of 68. Claude spotted the hidden arm in one run, then called the visible arm "
+                "the left in a rerun, so it can't be relied on for left and right. Each check took about 13 "
+                "seconds.",
+         status="issue", issues=[23, 24],
+         shot_height=2.3, shots=["c18a_leg_extension_3_reps.png", "c18b_push_up_overlay.png"]),
+    dict(id=19, who="script", title="Summary and drafts after the video sessions",
+         persona="The therapist, after the three videos were saved under P-021, with summaries and drafts on for "
+                 "P-017, P-021 and P-023.",
+         goal="A weekly summary that includes the new sessions, and safe reply drafts.",
+         steps=["Summarise P-021's and P-017's week.",
+                "Ask for a draft in every plan of care of P-017, P-021 and P-023."],
+         expected="Summaries cite records. Drafts are made for open conversations, P-023's fall message is withheld, "
+                  "and nothing is drafted in an archived plan.",
+         actual="Both summaries cited a record for every claim, and none were dropped. P-021's summary noticed that the "
+                "three video sessions don't match the hip program and suggested checking which plan they belong "
+                "to. P-023's draft was withheld (fall, numb). P-021's draft was careful and asked the patient to "
+                "call before the next hip session. <b>Issues:</b> P-017's draft, made on 5 Nov, called a 29 Oct "
+                "check-in “yesterday”, because drafts aren't told today's date. And when called directly, the "
+                "draft function wrote a reply in P-017's archived plan. The app hides that button, but the "
+                "function itself doesn't refuse.",
+         status="issue", issues=[25, 26], shots=[]),
 ]
 
 FINDINGS = [
-    (14, "Settings labels wrap one word per line and overlap with Larger text."),
-    (15, "Coach red-flag screen misses indirect descriptions of clot and breathing symptoms (safety)."),
-    (16, "“I fell behind on my exercises” shows the emergency card (false alarm)."),
+    (14, "Settings labels wrap one word per line and overlap with Larger text. Fixed (pull request #20)."),
+    (15, "Coach red-flag screen misses indirect descriptions of clot and breathing symptoms (safety). Fixed (#18)."),
+    (16, "“I fell behind on my exercises” shows the emergency card (false alarm). Fixed (#19)."),
+    (23, "Video analysis counts 1 rep where a leg-extension clip has 3."),
+    (24, "Push-up results change by up to 20° depending on which arm the exercise setting measures."),
+    (25, "AI reply drafts don't know today's date, so they say “yesterday” about last week."),
+    (26, "The draft function makes an AI call for an archived plan."),
+]
+PHOTO_CREDITS = [
+    ("Staples, day 12", "HReuter", "CC BY-SA 4.0", "Entfernung_von_Hautklammern_nach_Knie-Operation_7364.jpg"),
+    ("Pink incision", "Ravedave", "CC BY-SA 3.0", "Knee_Replacement.jpg"),
+    ("Ankle in a brace", "Tonku", "CC BY-SA 3.0", "Freshspraininbrace.JPG"),
+    ("Unexplained bruise", "Chmee2", "CC BY-SA 3.0", "Blood_donation_bruise_on_the_knee_-_5th_day_(1).jpg"),
 ]
 NOTES = [
     "Messages opens on the plan with unread messages. A patient who misses the switcher can post into the wrong plan (case 3).",
     "Opening the therapist inbox marks the first conversation read. This is why the app starts on the Dashboard (case 10).",
     "The AI draft offered to phone the patient on a number they had shared. That's fine, because the therapist edits and sends it, but it's a reminder that drafts can commit the therapist to an action (case 11).",
     "Streamlit's upload box still says “200MB per file”. The real limits, 15 MB a photo and 20 MB a PDF, are enforced on the host.",
+    "A video session's stored duration is how long the analysis ran (about 30 s), not the length of the clip (about 7 s) (case 18).",
 ]
+TRIAL_AI = dict(calls=15, photos=4, videos=6, summaries=2, drafts=3, input_tokens=41136, output_tokens=12347,
+                cost="about $0.41")
 AI_TOTALS = dict(calls=15, coach=11, drafts=3, summaries=1, input_tokens=16810, output_tokens=3428,
                  no_model=7, cost="about $0.11",
                  note="Prices from Anthropic's published rates: Claude Opus 5.5 $4 / $20 and Claude Sonnet 5.5 $2 / $10 "
                       "per million input / output tokens.")
 
 WHO = {"patient": ("Patient", "on a phone, 390 px"), "therapist": ("Therapist", "on a laptop, 1280 px"),
-       "admin": ("Clinic administrator", "on a laptop")}
+       "admin": ("Clinic administrator", "on a laptop"),
+       "trial": ("Therapist", "trial, run by script"),
+       "script": ("Therapist", "run by script")}
 
 CSS = """
 @page { size: Letter; margin: 0.55in 0.6in; }
@@ -268,6 +344,8 @@ th { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: 
 .pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 8.5pt; font-weight: 700; }
 .pass { background: var(--tint); color: var(--teal-dark); }
 .issue { background: #FBE7E1; color: var(--warn); }
+.compact td { padding: 3px 8px; }
+.trial { background: #fff; color: var(--ink); border: 1px solid var(--muted); }
 .who { display: inline-block; font-size: 8.5pt; font-weight: 700; color: var(--teal-dark); text-transform: uppercase;
        letter-spacing: .05em; }
 .case-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -291,9 +369,10 @@ def issue_links(nums):
 
 
 def status_pill(c):
+    trial = '<span class="pill trial">Trial</span> ' if c.get("trial") else ""
     if c["status"] == "pass":
-        return '<span class="pill pass">Pass</span>'
-    return f'<span class="pill issue">Issue found → {issue_links(c["issues"])}</span>'
+        return trial + '<span class="pill pass">Pass</span>'
+    return trial + f'<span class="pill issue">Issue found → {issue_links(c["issues"])}</span>'
 
 
 def cover():
@@ -313,9 +392,10 @@ def cover():
       <div class="kpi"><b>{AI_TOTALS['calls']}</b><span>live AI calls, {AI_TOTALS['cost']}</span></div>
     </div>
   </div>
-  <div class="small">Tested 1 November 2026 against a freshly seeded demo clinic. Every patient is simulated and known
-  only by a code such as P-021, never by name. Live AI: Claude Opus 5.5 (therapist summaries and drafts) and Claude
-  Sonnet 5.5 (patient coach). Source: github.com/nathanaelhub/limber, issue #13.</div>
+  <div class="small">Cases 1–16 tested 1 November 2026 against a freshly seeded demo clinic. Cases 17–19 added
+  5 November 2026: a trial of AI on photos and videos. Every patient is simulated and known only by a code such as
+  P-021, never by name. Live AI: Claude Opus 5.5 (therapist summaries, drafts and the trial) and Claude Sonnet 5.5
+  (patient coach). Source: github.com/nathanaelhub/limber, issues #13 and #27.</div>
 </section>"""
 
 
@@ -348,6 +428,11 @@ def about():
   <p>A fresh demo clinic was seeded, then each case was walked through in a real browser (Chrome) at phone and
   laptop sizes, and checked against the database where that mattered: was a draft sent, was a photo's location
   removed, did a visit really move? The live AI was on, so every AI screen shows a real answer.</p>
+  <h3>The photo and video trial (cases 17–19)</h3>
+  <p>Cases 17 and 18 try something Limber does not do: send photos and video frames to the AI. Patients are told
+  photos, documents, videos and recordings never go to it, so no patient media was used. The photos are public
+  images from Wikimedia Commons, the videos are the Ultralytics exercise demo clips, and everything ran on a copy of
+  the demo clinic from a script. Case 19 uses Limber's own summary and draft code on that copy.</p>
 </section>"""
 
 
@@ -358,13 +443,16 @@ def summary_table():
     return f"""
 <section class="page">
   <h2>All cases at a glance</h2>
-  <table><thead><tr><th>#</th><th>Who</th><th>Case</th><th>Result</th></tr></thead><tbody>{rows}</tbody></table>
+  <table class="compact"><thead><tr><th>#</th><th>Who</th><th>Case</th><th>Result</th></tr></thead><tbody>{rows}</tbody></table>
   <h3 style="margin-top:18px">Live AI used during testing</h3>
   <p>{AI_TOTALS['calls']} model calls: {AI_TOTALS['coach']} coach answers, {AI_TOTALS['drafts']} reply drafts and
   {AI_TOTALS['summaries']} weekly summary. About {AI_TOTALS['input_tokens']:,} input and
   {AI_TOTALS['output_tokens']:,} output tokens, {AI_TOTALS['cost']} in total. Another {AI_TOTALS['no_model']} coach
   questions were answered with no model call at all: emergency cards and set messages decided on the host.
   Coach answers took 1–5 seconds, and a reply draft about 8 seconds.</p>
+  <p>The trial (cases 17–19): {TRIAL_AI['calls']} more Claude Opus 5.5 calls ({TRIAL_AI['photos']} photo notes,
+  {TRIAL_AI['videos']} video checks, {TRIAL_AI['summaries']} summaries, {TRIAL_AI['drafts']} drafts), about
+  {TRIAL_AI['input_tokens']:,} input and {TRIAL_AI['output_tokens']:,} output tokens, {TRIAL_AI['cost']}.</p>
   <p class="small">{AI_TOTALS['note']}</p>
 </section>"""
 
@@ -377,6 +465,8 @@ def png_size(name):
 
 def img_style(c, name):
     """Portrait screenshots are sized by height, landscape ones by width, so each page holds its case."""
+    if c.get("shot_height"):                             # one row of mixed portrait and landscape photos
+        return f"height:{c['shot_height']}in"
     w, h = png_size(name)
     shots = [png_size(s) for s in c["shots"]]
     if h > w:
@@ -396,9 +486,17 @@ def case_page(c):
     steps = "".join(f"<li>{esc(s)}</li>" for s in c["steps"])
     table = ""
     if c.get("table"):
+        head = "".join(f"<th>{esc(h)}</th>" for h in
+                       c.get("table_head", ("Angle", "What the patient typed", "What Limber did")))
         body = "".join(f"<tr><td>{esc(a)}</td><td>{esc(q)}</td><td>{esc(r)}</td></tr>" for a, q, r in c["table"])
-        table = f'<table style="margin:6px 0 4px"><thead><tr><th>Angle</th><th>What the patient typed</th>' \
-                f'<th>What Limber did</th></tr></thead><tbody>{body}</tbody></table>'
+        table = f'<table style="margin:6px 0 4px"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
+    if c.get("table_below"):
+        layout = f'{table}<div class="shots">{figs}</div>'
+    elif table:
+        layout = f'<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1">{table}</div>' \
+                 f'<div class="shots" style="margin-top:6px">{figs}</div></div>'
+    else:
+        layout = f'<div class="shots">{figs}</div>' if figs else ""
     return f"""
 <section class="page">
   <div class="case-head"><div><span class="who">{who} · {device}</span><h2>{c['id']}. {esc(c['title'])}</h2></div>
@@ -409,9 +507,15 @@ def case_page(c):
     <div><div class="label">Expected</div><p>{esc(c['expected'])}</p></div>
   </div>
   <div class="label">What happened</div><p>{c['actual']}</p>
-  {f'<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1">{table}</div>'
-   f'<div class="shots" style="margin-top:6px">{figs}</div></div>' if table else f'<div class="shots">{figs}</div>'}
+  {layout}
+  {photo_credits() if c.get("credits") else ""}
 </section>"""
+
+
+def photo_credits():
+    items = "; ".join(f'{esc(what)}: {esc(who)}, {lic} (<a href="https://commons.wikimedia.org/wiki/File:{f}">'
+                      f'Wikimedia Commons</a>)' for what, who, lic, f in PHOTO_CREDITS)
+    return f'<p class="small" style="margin-top:6px">Photos: {items}.</p>'
 
 
 def closing():
@@ -425,9 +529,15 @@ def closing():
   to the patient's program, sending anything clinical to the therapist.</p>
   <p>Trying the coach from unusual angles is where the issues showed up. Its safety screen is a list of phrases
   checked before any AI is used. That makes it fast and predictable, but it can miss a symptom described in other
-  words, and it can fire on a harmless idiom. Both are filed and will get tests before they are fixed.</p>
+  words, and it can fire on a harmless idiom. Both were filed, given tests, and fixed.</p>
+  <p>The photo and video trial showed the AI is a useful second pair of eyes. It picked out the photos worth a
+  same-day call even though no message tripped the red-flag list, and it caught a video measurement that was wrong.
+  But it is not a measurement itself: it mixed up left and right in one run. Using it on real patient media would
+  first need a spec and a new notice to patients.</p>
   <h3>Issues filed</h3><ul>{issues}</ul>
   <h3>Worth knowing (not bugs)</h3><ul>{notes}</ul>
+  <p class="small">Case 17 photos: Wikimedia Commons, credited on that page. Case 18 videos: Ultralytics demo clips
+  (github.com/ultralytics/assets, release v0.0.0).</p>
   <p class="small" style="margin-top:24px">Regenerate this document with
   <code>python scripts/build_user_cases_pdf.py</code>. The screenshots are in <code>docs/user-cases/shots/</code>.</p>
 </section>"""
