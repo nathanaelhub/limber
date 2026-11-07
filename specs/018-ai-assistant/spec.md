@@ -193,6 +193,9 @@ Tasks and tests: `specs/018-ai-assistant/tasks.md`. Where the build differs from
 - **A draft knows today's date (issue #25)**: the reply extract carries `today` ("2026-11-05 (Thursday)"),
   and the prompt says to date records from it, or to name the day, never "yesterday" from the last message's
   date. Before this, a draft written a week after a check-in called it "yesterday".
+- **No draft for an archived plan (issue #26)**: `draft_reply` returns `archived` without a model call, as it
+  returns `off` and `withheld`. The rule was only in the UI, which hides the button; the clinic app (019) will
+  call the function from a route and map `archived` to 409.
 - **Deleting a patient** also deletes their rows in the call log, which has no foreign key because it is a log.
 
 
