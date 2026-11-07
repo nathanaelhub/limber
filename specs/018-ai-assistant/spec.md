@@ -190,6 +190,9 @@ Tasks and tests: `specs/018-ai-assistant/tasks.md`. Where the build differs from
   the processor is Anthropic (`GET /api/me/assistant`). Nothing shows when no key is configured.
 - **A draft never follows the therapist to another conversation**: found in the browser walk and fixed; a
   test pins it.
+- **A draft knows today's date (issue #25)**: the reply extract carries `today` ("2026-11-05 (Thursday)"),
+  and the prompt says to date records from it, or to name the day, never "yesterday" from the last message's
+  date. Before this, a draft written a week after a check-in called it "yesterday".
 - **Deleting a patient** also deletes their rows in the call log, which has no foreign key because it is a log.
 
 

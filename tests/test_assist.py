@@ -338,6 +338,18 @@ class TestDraftReply:
         assert "They were fine." in json.dumps(fake.bodies[0])
         assert fake.bodies[0]["model"] == "claude-opus-5-5"
 
+    def test_the_draft_request_holds_todays_date(self, store, fake_clock):
+        """Issue #25: without today's date the model dated last week's records as 'yesterday'."""
+        _week_of_records(store, fake_clock)
+        fake = aclient.FakeClient([_reply("Thanks for telling me.")])
+        assistant.draft_reply(store, "P-021", client=fake)
+        extract_text = fake.bodies[0]["messages"][0]["content"][0]["text"]
+        assert json.loads(extract_text)["today"] == "2026-03-23 (Monday)"
+
+    def test_the_draft_prompt_says_how_to_refer_to_dates(self):
+        prompt = assistant.DRAFT_SYSTEM
+        assert "`today`" in prompt and "yesterday" in prompt
+
 
 class TestHandledByPhone:
     def test_clears_the_attention_flag_and_is_recorded(self, store):
