@@ -190,6 +190,9 @@ Tasks and tests: `specs/018-ai-assistant/tasks.md`. Where the build differs from
   the processor is Anthropic (`GET /api/me/assistant`). Nothing shows when no key is configured.
 - **A draft never follows the therapist to another conversation**: found in the browser walk and fixed; a
   test pins it.
+- **No draft for an archived plan (issue #26)**: `draft_reply` returns `archived` without a model call, as it
+  returns `off` and `withheld`. The rule was only in the UI, which hides the button; the clinic app (019) will
+  call the function from a route and map `archived` to 409.
 - **Deleting a patient** also deletes their rows in the call log, which has no foreign key because it is a log.
 
 

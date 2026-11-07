@@ -338,6 +338,17 @@ class TestDraftReply:
         assert "They were fine." in json.dumps(fake.bodies[0])
         assert fake.bodies[0]["model"] == "claude-opus-5-5"
 
+    def test_no_draft_for_an_archived_plan(self, store):
+        """Issue #26: an archived plan accepts nothing new, so drafting for it makes no AI call."""
+        from src.portal import plans
+        ankle = store.plan_add("P-021", title="Left ankle sprain")
+        messages.send(store, "P-021", "patient", "Thank you for all the help!", plan_id=ankle.id)
+        plans.complete(store, ankle.id)
+        plans.archive(store, ankle.id)
+        fake = aclient.FakeClient([_reply("You're welcome.")])
+        result = assistant.draft_reply(store, "P-021", plan_id=ankle.id, client=fake)
+        assert result.state == "archived" and fake.bodies == []
+
 
 class TestHandledByPhone:
     def test_clears_the_attention_flag_and_is_recorded(self, store):
