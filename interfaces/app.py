@@ -1412,6 +1412,7 @@ _DRAFT_NOTICES = {
     "cap": "You have used today's AI requests. They reset tomorrow.",
     "unavailable": "The assistant isn't available right now. Write the reply yourself, or try again in a few minutes.",
     "off": "Weekly summaries and drafts are off for this patient.",
+    "archived": "This plan is archived, so it takes no new replies.",
     "withheld": "This message may need a direct response, so no draft was made.",
 }
 
