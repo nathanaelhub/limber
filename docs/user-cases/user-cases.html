@@ -34,6 +34,8 @@ th { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: 
 .pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 8.5pt; font-weight: 700; }
 .pass { background: var(--tint); color: var(--teal-dark); }
 .issue { background: #FBE7E1; color: var(--warn); }
+.compact td { padding: 3px 8px; }
+.trial { background: #fff; color: var(--ink); border: 1px solid var(--muted); }
 .who { display: inline-block; font-size: 8.5pt; font-weight: 700; color: var(--teal-dark); text-transform: uppercase;
        letter-spacing: .05em; }
 .case-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -54,15 +56,16 @@ a { color: var(--teal-dark); }
     the clinic administrator. These cases were tried by hand in the running app, from the angles we care about
     most: safety, privacy, accessibility and keeping the therapist in charge.</p>
     <div class="kpis">
-      <div class="kpi"><b>16</b><span>user cases</span></div>
-      <div class="kpi"><b>14</b><span>passed as expected</span></div>
-      <div class="kpi"><b>3</b><span>issues found and filed</span></div>
+      <div class="kpi"><b>19</b><span>user cases</span></div>
+      <div class="kpi"><b>15</b><span>passed as expected</span></div>
+      <div class="kpi"><b>7</b><span>issues found and filed</span></div>
       <div class="kpi"><b>15</b><span>live AI calls, about $0.11</span></div>
     </div>
   </div>
-  <div class="small">Tested 1 November 2026 against a freshly seeded demo clinic. Every patient is simulated and known
-  only by a code such as P-021, never by name. Live AI: Claude Opus 5.5 (therapist summaries and drafts) and Claude
-  Sonnet 5.5 (patient coach). Source: github.com/nathanaelhub/limber, issue #13.</div>
+  <div class="small">Cases 1–16 tested 1 November 2026 against a freshly seeded demo clinic. Cases 17–19 added
+  5 November 2026: a trial of AI on photos and videos. Every patient is simulated and known only by a code such as
+  P-021, never by name. Live AI: Claude Opus 5.5 (therapist summaries, drafts and the trial) and Claude Sonnet 5.5
+  (patient coach). Source: github.com/nathanaelhub/limber, issues #13 and #27.</div>
 </section>
 <section class="page">
   <h2>What Limber is</h2>
@@ -91,16 +94,24 @@ a { color: var(--teal-dark); }
   <p>A fresh demo clinic was seeded, then each case was walked through in a real browser (Chrome) at phone and
   laptop sizes, and checked against the database where that mattered: was a draft sent, was a photo's location
   removed, did a visit really move? The live AI was on, so every AI screen shows a real answer.</p>
+  <h3>The photo and video trial (cases 17–19)</h3>
+  <p>Cases 17 and 18 try something Limber does not do: send photos and video frames to the AI. Patients are told
+  photos, documents, videos and recordings never go to it, so no patient media was used. The photos are public
+  images from Wikimedia Commons, the videos are the Ultralytics exercise demo clips, and everything ran on a copy of
+  the demo clinic from a script. Case 19 uses Limber's own summary and draft code on that copy.</p>
 </section>
 <section class="page">
   <h2>All cases at a glance</h2>
-  <table><thead><tr><th>#</th><th>Who</th><th>Case</th><th>Result</th></tr></thead><tbody><tr><td>1</td><td>Patient</td><td>First sign-in, then make the app easier to read</td><td><span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/14">#14</a></span></td></tr><tr><td>2</td><td>Patient</td><td>Today, with two plans of care</td><td><span class="pill pass">Pass</span></td></tr><tr><td>3</td><td>Patient</td><td>Send the therapist a photo (and almost a phone number)</td><td><span class="pill pass">Pass</span></td></tr><tr><td>4</td><td>Patient</td><td>Read an old, finished plan</td><td><span class="pill pass">Pass</span></td></tr><tr><td>5</td><td>Patient</td><td>Ask to move a visit</td><td><span class="pill pass">Pass</span></td></tr><tr><td>6</td><td>Patient</td><td>Ask the exercise coach a normal question</td><td><span class="pill pass">Pass</span></td></tr><tr><td>7</td><td>Patient</td><td>Ask the coach something only the therapist should answer</td><td><span class="pill pass">Pass</span></td></tr><tr><td>8</td><td>Patient</td><td>Describe a possible emergency to the coach</td><td><span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/15">#15</a>, <a href="https://github.com/nathanaelhub/limber/issues/16">#16</a></span></td></tr><tr><td>9</td><td>Patient</td><td>Push the coach's limits</td><td><span class="pill pass">Pass</span></td></tr><tr><td>10</td><td>Therapist</td><td>Morning inbox triage</td><td><span class="pill pass">Pass</span></td></tr><tr><td>11</td><td>Therapist</td><td>Draft a reply with the AI, then send it yourself</td><td><span class="pill pass">Pass</span></td></tr><tr><td>12</td><td>Therapist</td><td>A message the AI must not draft for</td><td><span class="pill pass">Pass</span></td></tr><tr><td>13</td><td>Therapist</td><td>Summarise the patient's week</td><td><span class="pill pass">Pass</span></td></tr><tr><td>14</td><td>Therapist</td><td>Answer the reschedule request</td><td><span class="pill pass">Pass</span></td></tr><tr><td>15</td><td>Therapist</td><td>Turn on the coach and read what was asked</td><td><span class="pill pass">Pass</span></td></tr><tr><td>16</td><td>Clinic administrator</td><td>Invite a new therapist; keep caseloads separate</td><td><span class="pill pass">Pass</span></td></tr></tbody></table>
+  <table class="compact"><thead><tr><th>#</th><th>Who</th><th>Case</th><th>Result</th></tr></thead><tbody><tr><td>1</td><td>Patient</td><td>First sign-in, then make the app easier to read</td><td><span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/14">#14</a></span></td></tr><tr><td>2</td><td>Patient</td><td>Today, with two plans of care</td><td><span class="pill pass">Pass</span></td></tr><tr><td>3</td><td>Patient</td><td>Send the therapist a photo (and almost a phone number)</td><td><span class="pill pass">Pass</span></td></tr><tr><td>4</td><td>Patient</td><td>Read an old, finished plan</td><td><span class="pill pass">Pass</span></td></tr><tr><td>5</td><td>Patient</td><td>Ask to move a visit</td><td><span class="pill pass">Pass</span></td></tr><tr><td>6</td><td>Patient</td><td>Ask the exercise coach a normal question</td><td><span class="pill pass">Pass</span></td></tr><tr><td>7</td><td>Patient</td><td>Ask the coach something only the therapist should answer</td><td><span class="pill pass">Pass</span></td></tr><tr><td>8</td><td>Patient</td><td>Describe a possible emergency to the coach</td><td><span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/15">#15</a>, <a href="https://github.com/nathanaelhub/limber/issues/16">#16</a></span></td></tr><tr><td>9</td><td>Patient</td><td>Push the coach's limits</td><td><span class="pill pass">Pass</span></td></tr><tr><td>10</td><td>Therapist</td><td>Morning inbox triage</td><td><span class="pill pass">Pass</span></td></tr><tr><td>11</td><td>Therapist</td><td>Draft a reply with the AI, then send it yourself</td><td><span class="pill pass">Pass</span></td></tr><tr><td>12</td><td>Therapist</td><td>A message the AI must not draft for</td><td><span class="pill pass">Pass</span></td></tr><tr><td>13</td><td>Therapist</td><td>Summarise the patient's week</td><td><span class="pill pass">Pass</span></td></tr><tr><td>14</td><td>Therapist</td><td>Answer the reschedule request</td><td><span class="pill pass">Pass</span></td></tr><tr><td>15</td><td>Therapist</td><td>Turn on the coach and read what was asked</td><td><span class="pill pass">Pass</span></td></tr><tr><td>16</td><td>Clinic administrator</td><td>Invite a new therapist; keep caseloads separate</td><td><span class="pill pass">Pass</span></td></tr><tr><td>17</td><td>Therapist</td><td>Triage a patient's photo with AI</td><td><span class="pill trial">Trial</span> <span class="pill pass">Pass</span></td></tr><tr><td>18</td><td>Therapist</td><td>Check a video analysis with AI</td><td><span class="pill trial">Trial</span> <span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/23">#23</a>, <a href="https://github.com/nathanaelhub/limber/issues/24">#24</a></span></td></tr><tr><td>19</td><td>Therapist</td><td>Summary and drafts after the video sessions</td><td><span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/25">#25</a>, <a href="https://github.com/nathanaelhub/limber/issues/26">#26</a></span></td></tr></tbody></table>
   <h3 style="margin-top:18px">Live AI used during testing</h3>
   <p>15 model calls: 11 coach answers, 3 reply drafts and
   1 weekly summary. About 16,810 input and
   3,428 output tokens, about $0.11 in total. Another 7 coach
   questions were answered with no model call at all: emergency cards and set messages decided on the host.
   Coach answers took 1–5 seconds, and a reply draft about 8 seconds.</p>
+  <p>The trial (cases 17–19): 15 more Claude Opus 5.5 calls (4 photo notes,
+  6 video checks, 2 summaries, 3 drafts), about
+  41,136 input and 12,347 output tokens, about $0.41.</p>
   <p class="small">Prices from Anthropic's published rates: Claude Opus 5.5 $4 / $20 and Claude Sonnet 5.5 $2 / $10 per million input / output tokens.</p>
 </section>
 <section class="page">
@@ -113,6 +124,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Landed on Today. “Saved.” appeared, and Today re-drew with larger, high-contrast text. The settings live on the account, so they follow the patient. <b>Issue:</b> the three Settings labels are squeezed to about 38 px wide at every screen size, so each word wraps onto its own line, and with Larger text on the lines overlap.</p>
   <div class="shots"><figure><img src="shots/c01a_front_door.png" alt="" style="height:3.1in"><figcaption>front door</figcaption></figure><figure><img src="shots/c01b_settings_on.png" alt="" style="height:3.1in"><figcaption>settings on</figcaption></figure><figure><img src="shots/c01c_today_large_contrast.png" alt="" style="height:3.1in"><figcaption>today large contrast</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>2. Today, with two plans of care</h2></div>
@@ -124,6 +136,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Two cards: “Right hip replacement · 0 of 1 exercise done today” and “Left shoulder · Your therapist hasn't added exercises yet.” The next visit is shown as Fri 6 Nov, 9:00 · 45 min, with the “Ask about your exercises” entry below it.</p>
   <div class="shots"><figure><img src="shots/c02a_today_top.png" alt="" style="height:3.1in"><figcaption>today top</figcaption></figure><figure><img src="shots/c02b_today_full.png" alt="" style="height:3.7in"><figcaption>today full</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>3. Send the therapist a photo (and almost a phone number)</h2></div>
@@ -135,6 +148,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Warning: “This message looks like it contains a phone number. Limber works without names or contact details. Edit it, or send it anyway.” After Send anyway the message and thumbnail appeared. The stored copy of the photo was downloaded and checked: <b>no GPS, no camera make</b>. The host had re-encoded it. <b>Finding:</b> Messages opens on whichever plan has an unread message. On the first try that was the shoulder plan, so a note about the hip landed there. The plan switcher is visible, but easy to miss.</p>
   <div class="shots"><figure><img src="shots/c03a_messages.png" alt="" style="height:3.1in"><figcaption>messages</figcaption></figure><figure><img src="shots/c03b_warning.png" alt="" style="height:3.1in"><figcaption>warning</figcaption></figure><figure><img src="shots/c03c_sent.png" alt="" style="height:3.1in"><figcaption>sent</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>4. Read an old, finished plan</h2></div>
@@ -146,6 +160,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>“This plan ended on 30 July. You can read these messages, but you can't reply here.” The compose box is gone. A direct API post was refused with <b>409</b>: “This plan of care is archived. It can be read but not changed.”</p>
   <div class="shots"><figure><img src="shots/c04a_archived_plan.png" alt="" style="height:3.7in"><figcaption>archived plan</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>5. Ask to move a visit</h2></div>
@@ -157,6 +172,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Month view and list both shown. Cancelled visits are struck through. After sending: “Request sent for Friday 20 November, 14:00. Your therapist will change the time or reply in Messages.”</p>
   <div class="shots"><figure><img src="shots/c05a_visits_list.png" alt="" style="height:3.1in"><figcaption>visits list</figcaption></figure><figure><img src="shots/c05b_month.png" alt="" style="height:3.1in"><figcaption>month</figcaption></figure><figure><img src="shots/c05c_sheet.png" alt="" style="height:3.1in"><figcaption>sheet</figcaption></figure><figure><img src="shots/c05d_requested.png" alt="" style="height:3.1in"><figcaption>requested</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>6. Ask the exercise coach a normal question</h2></div>
@@ -168,6 +184,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>“Hip Abduction: 10 reps. The clinic's instructions are a standing side leg raise for hip stability, but the program doesn't give a specific lift height, so please ask your therapist how high to go.” Labelled <b>AI</b>, with “From your program: Hip Abduction”. It didn't make up a lift height. Answered in about 4 seconds. Also checked with Larger text, Higher contrast and Less motion all on (last picture): the page still reads cleanly, with the AI label and source intact.</p>
   <div class="shots"><figure><img src="shots/c06a_coach_empty.png" alt="" style="height:3.1in"><figcaption>coach empty</figcaption></figure><figure><img src="shots/c06c_thinking.png" alt="" style="height:3.1in"><figcaption>thinking</figcaption></figure><figure><img src="shots/c06b_answer.png" alt="" style="height:3.1in"><figcaption>answer</figcaption></figure><figure><img src="shots/cx_coach_a11y.png" alt="" style="height:3.1in"><figcaption>coach a11y</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>7. Ask the coach something only the therapist should answer</h2></div>
@@ -179,6 +196,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>All three got the referral card, which is set clinic text and not AI text. Message your therapist opened Messages with the question already in the box, ready to edit and send.</p>
   <div class="shots"><figure><img src="shots/c07a_referral.png" alt="" style="height:3.1in"><figcaption>referral</figcaption></figure><figure><img src="shots/c07b_messages_prefilled.png" alt="" style="height:3.1in"><figcaption>messages prefilled</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>8. Describe a possible emergency to the coach</h2></div>
@@ -190,6 +208,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Both direct phrasings showed the emergency card in about 1 second, with <b>no model call</b>. Call 911 is a tel: link, and the nearest-ER link is a maps search that sends no location. The angles found two gaps: indirect descriptions (“the back of my leg is puffy, red and warm”, “I can't catch my breath on the stairs”) got the referral card instead of the emergency card, and “I <i>fell</i> behind on my exercises” showed the emergency card.</p>
   <div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1"><table style="margin:6px 0 4px"><thead><tr><th>Angle</th><th>What the patient typed</th><th>What Limber did</th></tr></thead><tbody><tr><td>Direct</td><td>My calf is swollen and hot since this morning.</td><td>Emergency card</td></tr><tr><td>Direct</td><td>i feel short of breath and my chest hurts…</td><td>Emergency card</td></tr><tr><td>Indirect</td><td>The back of my leg below the knee is really puffy, red and warm to touch.</td><td>Referral card ✗</td></tr><tr><td>Indirect</td><td>I can't catch my breath when I climb the stairs since yesterday.</td><td>Referral card ✗</td></tr><tr><td>Indirect</td><td>My incision is oozing yellow stuff and I have a fever.</td><td>Emergency card</td></tr><tr><td>Indirect</td><td>My foot went numb and tingly during the leg raises.</td><td>Emergency card</td></tr><tr><td>False alarm</td><td>I fell behind on my exercises this week, how do I catch up?</td><td>Emergency card ✗</td></tr><tr><td>False alarm</td><td>Is it normal to feel a gentle stretch in my chest…?</td><td>Not about the program</td></tr></tbody></table></div><div class="shots" style="margin-top:6px"><figure><img src="shots/c08a_emergency.png" alt="" style="height:3.6in"><figcaption>emergency</figcaption></figure></div></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Patient · on a phone, 390 px</span><h2>9. Push the coach's limits</h2></div>
@@ -201,6 +220,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Dinner: “I can only answer questions about your exercise program.” The override attempt got the referral card, and the program was unchanged. With the coach off, the Today entry is hidden and the page says “The coach is turned off… You can still ask them anything in Messages.” At the limit: “You've reached today's question limit.”</p>
   <div class="shots"><figure><img src="shots/c09a_refusals.png" alt="" style="height:3.1in"><figcaption>refusals</figcaption></figure><figure><img src="shots/c09b_coach_off.png" alt="" style="height:3.1in"><figcaption>coach off</figcaption></figure><figure><img src="shots/c09c_limit.png" alt="" style="height:3.1in"><figcaption>limit</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Therapist · on a laptop, 1280 px</span><h2>10. Morning inbox triage</h2></div>
@@ -212,6 +232,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>The list shows P-021 (6 unread, hip and shoulder plans), P-023 (marked “May need a direct response”) and P-017. Both reschedule requests appear above the list, and photos show as thumbnails. <b>Note:</b> opening the inbox opens the first conversation and marks it read (the badge went 10 → 5). This is known, and why the app starts on the Dashboard.</p>
   <div class="shots"><figure><img src="shots/c10a_inbox.png" alt="" style="width:3.55in"><figcaption>inbox</figcaption></figure><figure><img src="shots/c10b_photo.png" alt="" style="height:3.2in"><figcaption>photo</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Therapist · on a laptop, 1280 px</span><h2>11. Draft a reply with the AI, then send it yourself</h2></div>
@@ -223,6 +244,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>A draft appeared in about 8 seconds under “AI-drafted — check before sending”. The database showed <b>no new message after drafting</b> and one after Send. The draft was sensible, and it offered to phone the patient on the number they shared, which the therapist has to stand behind before sending.</p>
   <div class="shots"><figure><img src="shots/c11a_draft.png" alt="" style="height:3.1in"><figcaption>draft</figcaption></figure><figure><img src="shots/c11b_sent.png" alt="" style="height:3.1in"><figcaption>sent</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Therapist · on a laptop, 1280 px</span><h2>12. A message the AI must not draft for</h2></div>
@@ -234,6 +256,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Red notice: “This message may need a direct response. P-023 mentioned ‘numb’, ‘had a fall’. The assistant has not drafted a reply.” Draft a reply is disabled. Mark as handled by phone recorded it.</p>
   <div class="shots"><figure><img src="shots/c12a_withheld.png" alt="" style="height:3.1in"><figcaption>withheld</figcaption></figure><figure><img src="shots/c12b_handled.png" alt="" style="height:3.1in"><figcaption>handled</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Therapist · on a laptop, 1280 px</span><h2>13. Summarise the patient's week</h2></div>
@@ -245,6 +268,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>The summary covered adherence (3 of 3 sessions, one “felt very hard”), pain rising 5 → 8, poor sleep, and the patient's questions, each tagged with record ids. It also noticed that the same knee message had gone into two plans, and suggested checking it. Saved as a session note, marked AI-drafted.</p>
   <div class="shots"><figure><img src="shots/c13b_summary.png" alt="" style="height:3.2in"><figcaption>summary</figcaption></figure><figure><img src="shots/c13c_session_note.png" alt="" style="width:3.55in"><figcaption>session note</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Therapist · on a laptop, 1280 px</span><h2>14. Answer the reschedule request</h2></div>
@@ -256,6 +280,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>Schedule listed both requests first, each with an Open button. After Change time the visit was stored as 15:30 Chicago time (21:30 UTC), the request flag cleared, and the patient's Visits page showed “Fri 20 Nov, 15:30” with Ask to reschedule available again.</p>
   <div class="shots"><figure><img src="shots/c14a_schedule.png" alt="" style="width:3.55in"><figcaption>schedule</figcaption></figure><figure><img src="shots/c14b_change_time.png" alt="" style="width:3.55in"><figcaption>change time</figcaption></figure><figure><img src="shots/c14c_patient_sees_new_time.png" alt="" style="height:2.4in"><figcaption>patient sees new time</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Therapist · on a laptop, 1280 px</span><h2>15. Turn on the coach and read what was asked</h2></div>
@@ -267,6 +292,7 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>The switch shows exactly what the patient will be told. The log listed all 15 of P-021's questions: 2 answered, 6 sent to the therapist, 5 emergency cards, 2 not about the program. Each one says whether AI text was shown. P-017's Today now has the coach entry.</p>
   <div class="shots"><figure><img src="shots/c15b_coach_on.png" alt="" style="width:3.55in"><figcaption>coach on</figcaption></figure><figure><img src="shots/c15c_coach_log.png" alt="" style="width:3.55in"><figcaption>coach log</figcaption></figure><figure><img src="shots/c15d_p017_coach_first_time.png" alt="" style="height:2.4in"><figcaption>p017 coach first time</figcaption></figure></div>
+  
 </section>
 <section class="page">
   <div class="case-head"><div><span class="who">Clinic administrator · on a laptop</span><h2>16. Invite a new therapist; keep caseloads separate</h2></div>
@@ -278,6 +304,43 @@ a { color: var(--teal-dark); }
   </div>
   <div class="label">What happened</div><p>The admin's sidebar has no Inbox, Patients or Schedule. The link said “You're invited to Limber as a therapist” and onboarding signed nora straight into the therapist app. Nora's patient list was empty apart from the built-in “unassigned” placeholder. Rivera saw only P-018, P-022 and P-024.</p>
   <div class="shots"><figure><img src="shots/c16b_invite_link.png" alt="" style="width:2.35in"><figcaption>invite link</figcaption></figure><figure><img src="shots/c16d_nora_empty.png" alt="" style="width:2.35in"><figcaption>nora empty</figcaption></figure><figure><img src="shots/c16e_rivera_inbox.png" alt="" style="width:2.35in"><figcaption>rivera inbox</figcaption></figure><figure><img src="shots/c16c_onboarding.png" alt="" style="height:3.0in"><figcaption>onboarding</figcaption></figure></div>
+  
+</section>
+<section class="page">
+  <div class="case-head"><div><span class="who">Therapist · trial, run by script</span><h2>17. Triage a patient's photo with AI</h2></div>
+  <div><span class="pill trial">Trial</span> <span class="pill pass">Pass</span></div></div>
+  <p><b>Who:</b> The therapist, sorting four photos sent with short messages. The photos are public Wikimedia Commons images standing in for patient photos.<br><b>Goal:</b> A quick note on each photo: what it shows, what to look at sooner, what to ask, and how soon to call.</p>
+  <div class="grid">
+    <div><div class="label">Steps</div><ol><li>Screen each message with Limber's red-flag list.</li><li>Send the photo and message to Claude Opus 5.5 with a triage prompt (a trial script, not the app).</li><li>Compare each note with the photo.</li></ol></div>
+    <div><div class="label">Expected</div><p>An accurate description, no diagnosis, honesty about what a photo can't show, and a sensible priority.</p></div>
+  </div>
+  <div class="label">What happened</div><p>None of the four messages tripped the red-flag list, so only the photo could raise a concern. Claude described each photo accurately and never diagnosed. Each note listed what a photo can't show (warmth, smell, change over time) and the questions to ask. Each took about 9 seconds. <b>Not in Limber:</b> patients are told photos are never sent to the AI. A feature would need its own spec and a new notice.</p>
+  <table style="margin:6px 0 4px"><thead><tr><th>Photo</th><th>What the patient wrote</th><th>Claude's priority</th></tr></thead><tbody><tr><td>Staples, day 12</td><td>Day 12 after my knee replacement. The nurse is taking the staples out, does this look normal?</td><td>Routine</td></tr><tr><td>Pink incision</td><td>Here's my knee this morning. It's a bit pink along the cut, is that ok?</td><td>Routine; same day if it is warm or spreading</td></tr><tr><td>Ankle in a brace</td><td>Rolled my ankle on the stairs yesterday… should I still do my exercises?</td><td>Same day: marked swelling against the other foot, bruising toward the toes</td></tr><tr><td>Unexplained bruise</td><td>Got this bruise on my knee, not sure how. Doesn't hurt much.</td><td>Same day: asks about an unreported fall and blood thinners</td></tr></tbody></table><div class="shots"><figure><img src="shots/c17a_staples_day_12.png" alt="" style="height:1.6in"><figcaption>staples day 12</figcaption></figure><figure><img src="shots/c17b_pink_incision.png" alt="" style="height:1.6in"><figcaption>pink incision</figcaption></figure><figure><img src="shots/c17c_ankle_in_brace.png" alt="" style="height:1.6in"><figcaption>ankle in brace</figcaption></figure><figure><img src="shots/c17d_unexplained_bruise.png" alt="" style="height:1.6in"><figcaption>unexplained bruise</figcaption></figure></div>
+  <p class="small" style="margin-top:6px">Photos: Staples, day 12: HReuter, CC BY-SA 4.0 (<a href="https://commons.wikimedia.org/wiki/File:Entfernung_von_Hautklammern_nach_Knie-Operation_7364.jpg">Wikimedia Commons</a>); Pink incision: Ravedave, CC BY-SA 3.0 (<a href="https://commons.wikimedia.org/wiki/File:Knee_Replacement.jpg">Wikimedia Commons</a>); Ankle in a brace: Tonku, CC BY-SA 3.0 (<a href="https://commons.wikimedia.org/wiki/File:Freshspraininbrace.JPG">Wikimedia Commons</a>); Unexplained bruise: Chmee2, CC BY-SA 3.0 (<a href="https://commons.wikimedia.org/wiki/File:Blood_donation_bruise_on_the_knee_-_5th_day_(1).jpg">Wikimedia Commons</a>).</p>
+</section>
+<section class="page">
+  <div class="case-head"><div><span class="who">Therapist · trial, run by script</span><h2>18. Check a video analysis with AI</h2></div>
+  <div><span class="pill trial">Trial</span> <span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/23">#23</a>, <a href="https://github.com/nathanaelhub/limber/issues/24">#24</a></span></div></div>
+  <p><b>Who:</b> The therapist, reviewing three exercise videos measured by Limber's pose model (YOLO11). The videos are the Ultralytics demo clips: leg extension, squats and push-ups.<br><b>Goal:</b> Know whether the measured reps and range of motion can be trusted before acting on them.</p>
+  <div class="grid">
+    <div><div class="label">Steps</div><ol><li>Run each clip through video analysis (python analyze.py video).</li><li>Send 8 evenly spaced frames and the measured numbers to Claude Opus 5.5.</li><li>Count the reps by hand from a frame-by-frame sheet.</li></ol></div>
+    <div><div class="label">Expected</div><p>The measurements match the video, or anything wrong is easy to spot.</p></div>
+  </div>
+  <div class="label">What happened</div><p><b>Leg extension:</b> Limber counted 1 rep (65°) and 2 partial reps; by hand there are 3. Claude said the count and range looked too low because the camera angle and the machine hide the knees. <b>Squats:</b> 4 reps, which looks right; Claude flagged rep 1 (72°, against 127–137° for the rest). <b>Push-ups:</b> 4 reps, right. But the camera sees the man's right side while the push-up setting measures the left arm. Measured on the visible right arm, the same clip gives 73° instead of 85° and form 53 instead of 68. Claude spotted the hidden arm in one run, then called the visible arm the left in a rerun, so it can't be relied on for left and right. Each check took about 13 seconds.</p>
+  <div class="shots"><figure><img src="shots/c18a_leg_extension_3_reps.png" alt="" style="height:2.3in"><figcaption>leg extension 3 reps</figcaption></figure><figure><img src="shots/c18b_push_up_overlay.png" alt="" style="height:2.3in"><figcaption>push up overlay</figcaption></figure></div>
+  
+</section>
+<section class="page">
+  <div class="case-head"><div><span class="who">Therapist · run by script</span><h2>19. Summary and drafts after the video sessions</h2></div>
+  <div><span class="pill issue">Issue found → <a href="https://github.com/nathanaelhub/limber/issues/25">#25</a>, <a href="https://github.com/nathanaelhub/limber/issues/26">#26</a></span></div></div>
+  <p><b>Who:</b> The therapist, after the three videos were saved under P-021, with summaries and drafts on for P-017, P-021 and P-023.<br><b>Goal:</b> A weekly summary that includes the new sessions, and safe reply drafts.</p>
+  <div class="grid">
+    <div><div class="label">Steps</div><ol><li>Summarise P-021's and P-017's week.</li><li>Ask for a draft in every plan of care of P-017, P-021 and P-023.</li></ol></div>
+    <div><div class="label">Expected</div><p>Summaries cite records. Drafts are made for open conversations, P-023's fall message is withheld, and nothing is drafted in an archived plan.</p></div>
+  </div>
+  <div class="label">What happened</div><p>Both summaries cited a record for every claim, and none were dropped. P-021's summary noticed that the three video sessions don't match the hip program and suggested checking which plan they belong to. P-023's draft was withheld (fall, numb). P-021's draft was careful and asked the patient to call before the next hip session. <b>Issues:</b> P-017's draft, made on 5 Nov, called a 29 Oct check-in “yesterday”, because drafts aren't told today's date. And when called directly, the draft function wrote a reply in P-017's archived plan. The app hides that button, but the function itself doesn't refuse.</p>
+  
+  
 </section>
 <section class="page">
   <h2>What we learned</h2>
@@ -286,9 +349,15 @@ a { color: var(--teal-dark); }
   to the patient's program, sending anything clinical to the therapist.</p>
   <p>Trying the coach from unusual angles is where the issues showed up. Its safety screen is a list of phrases
   checked before any AI is used. That makes it fast and predictable, but it can miss a symptom described in other
-  words, and it can fire on a harmless idiom. Both are filed and will get tests before they are fixed.</p>
-  <h3>Issues filed</h3><ul><li><a href="https://github.com/nathanaelhub/limber/issues/14">#14</a> Settings labels wrap one word per line and overlap with Larger text.</li><li><a href="https://github.com/nathanaelhub/limber/issues/15">#15</a> Coach red-flag screen misses indirect descriptions of clot and breathing symptoms (safety).</li><li><a href="https://github.com/nathanaelhub/limber/issues/16">#16</a> “I fell behind on my exercises” shows the emergency card (false alarm).</li></ul>
-  <h3>Worth knowing (not bugs)</h3><ul><li>Messages opens on the plan with unread messages. A patient who misses the switcher can post into the wrong plan (case 3).</li><li>Opening the therapist inbox marks the first conversation read. This is why the app starts on the Dashboard (case 10).</li><li>The AI draft offered to phone the patient on a number they had shared. That's fine, because the therapist edits and sends it, but it's a reminder that drafts can commit the therapist to an action (case 11).</li><li>Streamlit's upload box still says “200MB per file”. The real limits, 15 MB a photo and 20 MB a PDF, are enforced on the host.</li></ul>
+  words, and it can fire on a harmless idiom. Both were filed, given tests, and fixed.</p>
+  <p>The photo and video trial showed the AI is a useful second pair of eyes. It picked out the photos worth a
+  same-day call even though no message tripped the red-flag list, and it caught a video measurement that was wrong.
+  But it is not a measurement itself: it mixed up left and right in one run. Using it on real patient media would
+  first need a spec and a new notice to patients.</p>
+  <h3>Issues filed</h3><ul><li><a href="https://github.com/nathanaelhub/limber/issues/14">#14</a> Settings labels wrap one word per line and overlap with Larger text. Fixed (pull request #20).</li><li><a href="https://github.com/nathanaelhub/limber/issues/15">#15</a> Coach red-flag screen misses indirect descriptions of clot and breathing symptoms (safety). Fixed (#18).</li><li><a href="https://github.com/nathanaelhub/limber/issues/16">#16</a> “I fell behind on my exercises” shows the emergency card (false alarm). Fixed (#19).</li><li><a href="https://github.com/nathanaelhub/limber/issues/23">#23</a> Video analysis counts 1 rep where a leg-extension clip has 3.</li><li><a href="https://github.com/nathanaelhub/limber/issues/24">#24</a> Push-up results change by up to 20° depending on which arm the exercise setting measures.</li><li><a href="https://github.com/nathanaelhub/limber/issues/25">#25</a> AI reply drafts don't know today's date, so they say “yesterday” about last week.</li><li><a href="https://github.com/nathanaelhub/limber/issues/26">#26</a> The draft function makes an AI call for an archived plan.</li></ul>
+  <h3>Worth knowing (not bugs)</h3><ul><li>Messages opens on the plan with unread messages. A patient who misses the switcher can post into the wrong plan (case 3).</li><li>Opening the therapist inbox marks the first conversation read. This is why the app starts on the Dashboard (case 10).</li><li>The AI draft offered to phone the patient on a number they had shared. That's fine, because the therapist edits and sends it, but it's a reminder that drafts can commit the therapist to an action (case 11).</li><li>Streamlit's upload box still says “200MB per file”. The real limits, 15 MB a photo and 20 MB a PDF, are enforced on the host.</li><li>A video session's stored duration is how long the analysis ran (about 30 s), not the length of the clip (about 7 s) (case 18).</li></ul>
+  <p class="small">Case 17 photos: Wikimedia Commons, credited on that page. Case 18 videos: Ultralytics demo clips
+  (github.com/ultralytics/assets, release v0.0.0).</p>
   <p class="small" style="margin-top:24px">Regenerate this document with
   <code>python scripts/build_user_cases_pdf.py</code>. The screenshots are in <code>docs/user-cases/shots/</code>.</p>
 </section></body></html>
