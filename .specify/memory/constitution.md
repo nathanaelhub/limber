@@ -1,14 +1,12 @@
 <!--
 Sync Impact Report (temporary; remove before the next amendment)
-Version change: 1.2.0 -> 1.3.0 (MINOR: materially expanded guidance, no principle removed)
-Rationale: the owner chose to use an Anthropic API key for a therapist assistant (weekly summaries,
-draft replies) and a patient exercise coach (feature 018). Principle III forbade third-party
-processing; it now allows one named AI processor for patient text records under stated guarantees.
-Audio, video, photos, and documents still never leave the host.
-Modified: Principle III (new bullet on one named AI processor).
+Version change: 1.3.0 -> 1.4.0 (MINOR: materially expanded guidance, no principle removed)
+Rationale: the owner chose to replace the Streamlit therapist app with a new web app (feature 019), because
+the framework's layout and widgets are the cause of the cluttered look. Both apps exist until cutover.
+Modified: Technical Constraints, User interface.
 Added sections: none. Removed sections: none.
-Follow-ups: specs/018 carries the Constitution Check; the processor's retention terms are stated
-there; real-clinic use still waits for the compliance review.
+Follow-ups: specs/019 carries the Constitution Check. At cutover, remove the transition wording here and the
+Streamlit mention in Principle V.
 -->
 
 # PT Assist Constitution
@@ -144,10 +142,12 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Canonical store**: the canonical session record MUST persist to a single local file.
   SQLite through the standard library `sqlite3` module is the default choice; a plan MAY choose
   otherwise only with a justification under Principle V.
-- **User interface**: the Streamlit app in `interfaces/app.py` and the CLI in
-  `interfaces/cli.py` remain the therapist's interface surfaces for this phase. The patient
-  portal in `interfaces/patient_portal.py` is the one patient-facing surface; it is a separate
-  launch that contains no therapist pages. Business logic MUST live in `src/` and be testable
+- **User interface**: the clinic app in `interfaces/clinic.py` (feature 019) and the CLI in
+  `interfaces/cli.py` are the therapist's interface surfaces. The Streamlit app in
+  `interfaces/app.py` remains in service only until the clinic app's cutover, then it is
+  removed. The patient portal in `interfaces/patient_portal.py` is the one patient-facing
+  surface; it is a separate launch that contains no therapist pages, and the clinic app
+  contains no patient pages. Business logic MUST live in `src/` and be testable
   without Streamlit or a running server; interface code only renders and dispatches. Browser
   JavaScript MUST stay free of clinical logic (rep counting, form wording, program order), so
   that behaviour is covered by the Python test suite.
@@ -191,4 +191,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.3.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-10-30
+**Version**: 1.4.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-05
