@@ -82,7 +82,7 @@ def probe(path: Path, kind: str = "clip", max_bytes: Optional[int] = None) -> Me
     if size > (max_bytes or limits["max_bytes"]):
         raise MediaRejected("too_large")
     try:
-        container = av.open(str(path), metadata_errors="strict")
+        container = av.open(str(path))   # PyAV 19 removed metadata_errors; "strict" was its default
     except Exception:  # noqa: BLE001 — anything PyAV cannot open is not media
         raise MediaRejected("not_media") from None
     try:
