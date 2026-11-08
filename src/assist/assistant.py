@@ -126,7 +126,7 @@ class SummaryResult:
 
 @dataclass
 class DraftResult:
-    state: str                                   # ok | withheld | nothing | off | cap | unavailable
+    state: str                                   # ok | withheld | nothing | archived | off | cap | unavailable
     text: str = ""
     flags: List[str] = field(default_factory=list)
     message_ids: List[int] = field(default_factory=list)   # the patient messages a withheld draft was about
@@ -306,6 +306,8 @@ def draft_reply(store: SessionStore, patient_id: str, plan_id: Optional[int] = N
     if not switches(store, patient_id)["summaries"]:
         return DraftResult("off")
     plan = store.plan_get(plan_id) if plan_id is not None else store.current_plan(patient_id)
+    if plan is not None and plan.read_only:
+        return DraftResult("archived")           # an archived plan accepts nothing new (spec 017, issue #26)
     waiting = _unanswered(store.message_thread(patient_id, plan_id=plan.id if plan else None))
     if not waiting:
         return DraftResult("nothing")
