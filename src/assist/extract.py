@@ -148,6 +148,8 @@ def build_for_reply(store: SessionStore, patient_id: str, plan_id: Optional[int]
     logs.sort(key=lambda r: (r["at"], r["id"]))
     data = {
         "patient": patient_id,
+        # The day the therapist will send the reply, so the model can date records (issue #25).
+        "today": datetime.fromisoformat(store._now()).strftime("%Y-%m-%d (%A)"),
         "plan": plan.title if plan else None,
         "program": _program(store, patient_id),
         "recent_logs": logs,
