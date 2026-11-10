@@ -171,8 +171,18 @@ therapist's computer.
 - **FR-001**: The record backend is chosen by settings. With `LIMBER_DB_URL` (a `libsql://` address) and
   `LIMBER_DB_TOKEN`, `SessionStore` opens the hosted database. Without them it opens the local file, as today.
 - **FR-002**: `SessionStore` remains the only code that opens the record. Every connection comes from one
-  function, which also gives rows that are read by column name on both backends (the libSQL client returns plain
-  tuples).
+  function. On libSQL that function wraps the connection so it behaves like `sqlite3` in the four ways the spike
+  (G1) found it doesn't: rows are read by column name (libSQL returns plain tuples); a statement's `lastrowid` is
+  kept per statement (libSQL's follows the connection's latest insert, which returned the wrong message once a
+  second insert followed); errors are raised as `sqlite3.IntegrityError` or `OperationalError` (libSQL raises
+  `ValueError` for both); and an open transaction is committed before a script runs (libSQL silently skips a
+  script containing its own `BEGIN … COMMIT` while a transaction is open, so migrations 9 and 10 created nothing).
+  Each of the four has a test.
+- **FR-003a**: On Vercel the record is an **embedded replica**: each instance keeps a copy in temporary storage,
+  reads it locally, sends writes to Turso, and syncs at the start of every request so it sees other instances'
+  writes. Fully remote mode was measured too slow (G1).
+- **FR-003b**: `/api/today` (253 statements) and `/api/progress` (495) load lists one row at a time. They are
+  rewritten to load each list in one query, so that no patient request runs more than 50 statements.
 - **FR-003**: The schema and migrations are the same on both backends. A migration that needs a SQLite feature the
   hosted database lacks is a test failure, not a silent difference.
 - **FR-004**: Files go through one storage interface in `src/media/` (put, get, delete, delete everything under
@@ -211,9 +221,24 @@ therapist's computer.
 - **FR-017**: Browser JavaScript holds no clinical logic. It finds body points and draws; counting and scoring stay
   in Python, covered by the test suite.
 
+## Gate G1 results (10 November 2026)
+
+**Passed, with the conditions in FR-002, FR-003a and FR-003b.** libSQL client 0.1.11, Turso database in
+`aws-us-east-1`, Vercel functions in `iad1`.
+
+- **The test suite through libSQL**, with every `sqlite3.connect` sent to the libSQL client against local files:
+  1,235 of 1,240 tests pass, about 193,000 statements. The 5 that fail use SQLite's file backup API, which a hosted
+  record replaces with Turso's own backups; local backups don't change.
+- **Over the network** (measured from a throwaway Vercel function in `iad1`, deleted afterwards): a read takes
+  6–10 ms, a write and commit 30–55 ms. A second connection sees a write at once; rollback works.
+- **Queries per request** (counted through the same adapter): sign-in 20, a page 13, `/api/today` 253,
+  `/api/progress` 495. Fully remote, Progress would take about 4 seconds, hence FR-003a and FR-003b.
+- **Embedded replica**: local reads under 1 ms; a sync about 140 ms from the owner's laptop (expected to be much
+  less from `iad1`); another replica sees a write only after its own sync, hence a sync at the start of each request.
+
 ## Decision Gates (owner)
 
-- **G1, spike**: before building, a short spike on a branch proves the libSQL client against a hosted database:
+- **G1, spike** (passed, see results above): before building, a short spike on a branch proves the libSQL client against a hosted database:
   the store's tests run through it, a write through one connection is read through a second one immediately, and
   the client handles the store's transactions. The client is at version 0.1.11 (pre-1.0), so this is the main risk.
   If it fails, the fallback is Postgres (Neon, also on the Vercel Marketplace), which means translating about 250
