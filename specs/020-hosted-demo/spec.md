@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-10
 
-**Status**: Draft, awaiting the owner's approval. Depends on 009 (hosting), 016 (accounts), 018 (AI). Needs
+**Status**: Draft, revised with the owner's decisions of 10 November 2026; awaiting approval. Depends on 009 (hosting), 016 (accounts), 018 (AI). Needs
 constitution amendment 1.5.0 (below). The therapist side on Vercel depends on 019 (gate G3).
 
 **Input**: The owner wants a link they can send to their professor: Limber running on Vercel. A first try
@@ -15,6 +15,13 @@ copy of the record on its temporary disk: 9 of 10 parallel signed-in requests re
 know the session. Vercel reports this as known beta behaviour, with no setting to change it. To run on Vercel,
 every piece of shared state has to live outside the container, so that any instance can serve any request.
 
+**Owner's decisions (10 November 2026)**: the record goes to **Turso** (libSQL); files go to a **Cloudflare R2**
+bucket on the owner's Cloudflare account; the therapist side on Vercel is the **019 clinic app**, not Streamlit;
+and video analysis on the hosted demo finds body points **in the therapist's browser**, as the patient portal
+already does, so the server needs no torch or YOLO. With no heavy model on the server, Limber runs as ordinary
+Vercel Python functions (the portal and the clinic app are Starlette apps), which serve many requests per
+instance, rather than on the container beta.
+
 ## Constitution Check (v1.4.0)
 
 | Rule | This feature |
@@ -22,7 +29,7 @@ every piece of shared state has to live outside the container, so that any insta
 | I. Engine is a dependency | No engine change. |
 | II. One canonical record | Kept. `SessionStore` stays the only writer; only where its file lives changes. The schema and its migrations are the same on both backends. |
 | III. Local-first and privacy | **Needs amendment 1.5.0.** A hosted demo stores the record with a database service and uploads with a file store, both third parties. The amendment allows that only for a record of simulated data, enforced by a guard (FR-009). Local storage stays the default and the only option for any real record. |
-| V. Simplicity | One new dependency, `libsql` (FR-001), justified in Complexity Tracking. Vercel Blob is called over HTTPS with `httpx`, which the `anthropic` SDK already installs. |
+| V. Simplicity | New dependencies: `libsql` (FR-001) and an S3 client for R2 (`boto3`, or a small request signer over `httpx`, chosen in the plan), justified in Complexity Tracking. The hosted install needs neither torch nor YOLO. |
 | Canonical store constraint | "MUST persist to a single local file" gains an exception for the hosted demo (amendment 1.5.0). |
 
 ### Proposed amendment 1.5.0 (MINOR)
@@ -115,16 +122,40 @@ After showing the demo, the owner resets it to a fresh simulated clinic with one
 
 ---
 
-### User Story 5 - The Therapist Side Online (Priority: P2, see gate G3)
+### User Story 5 - The Therapist Side Online (Priority: P2, delivered by 019)
 
 The professor also signs in as the therapist and sees the inbox, a patient's page, an AI draft, and video
 analysis.
 
-**Why this priority and the gate**: Streamlit keeps each therapist's session in one server process and sends
-file uploads over a separate request. On Vercel that upload can reach a different instance from the one holding
-the session, so uploads (video analysis, photos in a reply) fail, and every connection is cut at the function's
-time limit (5 minutes on Hobby). The 019 clinic app has none of these problems. Gate G3 decides what the
-therapist door does on Vercel until 019 ships.
+**Why it comes through 019**: Streamlit keeps each therapist's session in one server process and sends file
+uploads over a separate request. On Vercel that upload can reach a different instance from the one holding the
+session, and every connection is cut at the function's time limit. The owner chose the 019 clinic app, which is
+stateless, as the therapist side on Vercel. Each clinic slice goes online as it is merged; Streamlit is never
+deployed to Vercel and stays the local therapist app until 019's cutover.
+
+**Acceptance Scenarios**:
+
+1. **Given** the hosted demo, **When** the therapist door is used before the clinic app has the page needed,
+   **Then** it says plainly which pages are online so far, and that the full therapist app runs locally.
+2. **Given** a clinic slice is merged, **Then** its pages work on the hosted demo with the same tests as locally.
+
+---
+
+### User Story 6 - Video Analysis Without Uploading the Video (Priority: P2)
+
+On the hosted demo, the therapist picks a video file. Their browser finds the body points frame by frame and
+sends only those to Limber, which counts reps, measures range of motion, and scores form with the engine's own
+rules. The result shows the same numbers and a skeleton drawn over the video in the browser.
+
+**Why this priority**: it removes the only reason Limber needed a heavy server, and the video never leaves the
+therapist's computer.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Squats demo clip, **When** it is analysed in the browser, **Then** the rep count, range of motion,
+   and form score are within the tolerances agreed at gate G5, compared with YOLO on the same clip.
+2. **Given** a video of any length, **Then** nothing but body points and the result is sent to Limber.
+3. **Given** the local install, **Then** YOLO video analysis is unchanged.
 
 ### Edge Cases
 
@@ -145,14 +176,17 @@ therapist door does on Vercel until 019 ships.
 - **FR-003**: The schema and migrations are the same on both backends. A migration that needs a SQLite feature the
   hosted database lacks is a test failure, not a silent difference.
 - **FR-004**: Files go through one storage interface in `src/media/` (put, get, delete, delete everything under
-  a patient ID). It writes to `data/media/` by default and to Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set.
-  Nothing else writes uploaded files.
-- **FR-005**: Files are only ever served through Limber's existing signed-in routes. A file store address never
-  reaches a browser, a log, or the record.
+  a patient ID). It writes to `data/media/` by default and to the Cloudflare R2 bucket when the `LIMBER_R2_*`
+  settings (account, bucket, access key, secret) are set. Nothing else writes uploaded files. The R2 key is scoped
+  to that one bucket.
+- **FR-005**: Limber decides who may read or write a file, as today. A browser gets only a short-lived signed R2
+  link for one file (minutes, not hours), issued after the same checks as the existing routes. The bucket is never
+  public, and signed links are never logged or stored in the record.
 - **FR-006**: Upload parts are kept in the storage interface, not on an instance's disk, so consecutive parts may
   land on different instances. Clips and voice notes already go in 4 MB parts. Message attachments (up to four
-  15 MB photos or one 20 MB PDF) are sent today in one request, over Vercel's 4.5 MB limit, so they move to the
-  same parted upload path.
+  15 MB photos or one 20 MB PDF) are sent today in one request, over Vercel's 4.5 MB limit. On the hosted demo
+  every upload goes from the browser straight to R2 with a signed link (FR-005), and Limber then checks the
+  stored file (size, type, the media probe) before accepting it.
 - **FR-007**: The sign-in limiter's counts are kept in the record, not in memory.
 - **FR-008**: On a hosted install the server key comes from `PTASSIST_PORTAL_KEY`. A hosted install without it
   refuses to start.
@@ -169,6 +203,13 @@ therapist door does on Vercel until 019 ships.
   machine, never in CI.
 - **FR-014**: The deploy groundwork from the first attempt is kept: `.dockerignore` and `.vercelignore` keep
   `.env` and records out of images and uploads; Caddy on one port; the port opens only when both apps answer.
+- **FR-015**: On Vercel, the patient portal and the clinic app run as Python functions (ASGI), with their static
+  files served by Vercel. The hosted install doesn't install torch, YOLO, OpenCV, or Streamlit.
+- **FR-016**: Hosted video analysis runs the pose model in the therapist's browser and sends body points only.
+  The server runs the engine's own rep counting and form rules on them (the path `src/portal/live.py` already uses
+  for patients), with no change to the engine (Principle I). The pose model is named on the session record.
+- **FR-017**: Browser JavaScript holds no clinical logic. It finds body points and draws; counting and scoring stay
+  in Python, covered by the test suite.
 
 ## Decision Gates (owner)
 
@@ -178,11 +219,13 @@ therapist door does on Vercel until 019 ships.
   If it fails, the fallback is Postgres (Neon, also on the Vercel Marketplace), which means translating about 250
   SQL statements written for SQLite. That would be its own spec.
 - **G2, amendment**: the owner approves constitution amendment 1.5.0.
-- **G3, therapist side on Vercel until 019**: either (a) deploy Streamlit anyway, with a notice that video
-  analysis and photo attachments don't work online; or (b) the Therapist door on the hosted demo says the
-  therapist app is shown locally, until the 019 clinic app replaces Streamlit.
-- **G4, accounts**: the owner adds Turso (libSQL) and Blob to the Vercel project from the Marketplace. Both have
-  free tiers that cover a demo; the owner confirms before anything is billed.
+- **G3, therapist side on Vercel**: decided 10 November 2026. The 019 clinic app; Streamlit is not deployed.
+- **G4, accounts**: the owner adds Turso to the Vercel project from the Marketplace and creates an R2 bucket and a
+  bucket-scoped API token on their Cloudflare account. Both have free tiers that cover a demo; the owner confirms
+  before anything is billed.
+- **G5, browser pose accuracy**: the same comparison as 019's gate G2. MoveNet in the browser and YOLO11 on the
+  server are run on the same clips (the three Ultralytics demo clips, including the ones behind issues #23 and #24).
+  The owner sets the tolerances and decides from the numbers.
 
 ## Success Criteria
 
@@ -201,7 +244,9 @@ therapist door does on Vercel until 019 ships.
   opened to the professor with a share link or by turning protection off for the meeting.
 - Vercel's container runtime keeps its current limits: about one request per instance, scale to zero after 5
   minutes, a 4.5 MB request body, and 5 minutes per request on Hobby.
-- Video analysis (about 40 seconds for the demo clip) fits in one request and 2 GB of memory.
+- Vercel's container runtime is not used. Python functions get several requests per instance, 2 GB of memory,
+  and 5 minutes per request on Hobby.
+- The therapist's computer can run MoveNet in the browser, as patients' phones already do.
 - The patient-side screens don't change.
 
 ## Complexity Tracking
@@ -209,6 +254,7 @@ therapist door does on Vercel until 019 ships.
 | Addition | Why | Simpler alternative rejected because |
 |----------|-----|--------------------------------------|
 | `libsql` dependency and a second backend | Vercel instances share nothing; the record must live outside them | Keeping SQLite on the container disk: each instance has its own copy (measured: 9 of 10 parallel requests signed out) |
-| A storage interface for files | Uploads must survive instances and scale-to-zero | Writing to `/tmp`: lost when the instance stops, and invisible to other instances |
+| A storage interface for files, with an S3 client for R2 | Uploads must survive instances and scale-to-zero, and large ones must bypass the 4.5 MB request limit | Writing to `/tmp`: lost when the instance stops, and invisible to other instances |
+| Browser pose for hosted video analysis | No torch on the server, so ordinary Python functions instead of a 2 GB container beta | YOLO on Vercel's container runtime: one request per instance, slow cold starts, and every video uploaded through a 4.5 MB limit |
 | A demo guard | Principle III: third-party storage only for simulated data | Trusting the operator to remember: one wrong setting would put real patients in a third-party database |
 | Hosting on a single long-lived server instead (Railway, Fly, Render) | Would need none of this: the 009 container runs there as built | The owner chose Vercel. The single-server route stays documented in `docs/DEPLOYMENT.md` |
