@@ -76,8 +76,12 @@ def test_entrypoint_demo_mode_seeds_once_and_still_checks_first():
     text = (DEPLOY / "entrypoint.sh").read_text()
     assert 'LIMBER_DEMO:-' in text and "seed_demo.py --db" in text and "/data/demo.db" in text
     order = [text.index(m) for m in ("deploy init", "seed_demo.py --db", "deploy preflight", "streamlit run",
-                                     "caddy run", "portal serve")]
+                                     "portal serve", "caddy run")]
     assert order == sorted(order)
+    # A one-port host sends traffic once it can connect, so the port opens only after both apps answer.
+    wait = text.index("until curl -fsS")
+    assert text.index("portal serve") < wait < text.index("exec caddy run")
+    assert "127.0.0.1:8600/api/health" in text and "127.0.0.1:8501/therapist/_stcore/health" in text
     assert '[ ! -f "$PTASSIST_DB" ]' in text                                    # never reseeds over the demo record
     assert 'if [ -n "${PORT:-}" ]' in text                                      # one-port mode only when asked
 

@@ -33,12 +33,23 @@ python interfaces/cli.py deploy preflight --public-origin "$LIMBER_PUBLIC_ORIGIN
 streamlit run interfaces/app.py --server.port 8501 --server.address 0.0.0.0 --server.baseUrlPath therapist \
     --server.headless true --browser.gatherUsageStats false --server.enableXsrfProtection true &
 
-# One-port hosting (Railway and similar): Caddy on $PORT routes /therapist to 8501 and the rest to 8600.
+# The patient service and front page. Exactly one instance may write the record.
+set -- --host 0.0.0.0 --port 8600 --insecure-http \
+    --public-origin "$LIMBER_PUBLIC_ORIGIN" --trust-proxy --therapist-url "$THERAPIST_URL"
+
+# One-port hosting (Vercel, Railway and similar): Caddy on $PORT routes /therapist to 8501 and the rest to 8600.
+# The platform sends traffic as soon as it can connect, so the port opens only once both apps answer.
 if [ -n "${PORT:-}" ]; then
     case "$PORT" in 8600|8501) echo "PORT must not be 8600 or 8501, which Limber uses inside the container." >&2; exit 1;; esac
-    caddy run --config /app/deploy/Caddyfile.single --adapter caddyfile &
+    python interfaces/cli.py portal serve "$@" &
+    tries=0
+    until curl -fsS -o /dev/null http://127.0.0.1:8600/api/health \
+            && curl -fsS -o /dev/null http://127.0.0.1:8501/therapist/_stcore/health; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 120 ]; then echo "Limber did not start within two minutes." >&2; exit 1; fi
+        sleep 1
+    done
+    exec caddy run --config /app/deploy/Caddyfile.single --adapter caddyfile
 fi
 
-# The patient service and front page. Exactly one instance may write the record.
-exec python interfaces/cli.py portal serve --host 0.0.0.0 --port 8600 --insecure-http \
-    --public-origin "$LIMBER_PUBLIC_ORIGIN" --trust-proxy --therapist-url "$THERAPIST_URL"
+exec python interfaces/cli.py portal serve "$@"
