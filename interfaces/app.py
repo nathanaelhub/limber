@@ -663,15 +663,19 @@ def page_video_analysis():
                     st.markdown("---")
                     st.markdown("### Analysis Results")
 
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Total Reps", f"{session.total_reps}/{session.target_reps}")
-                    with col2:
-                        st.metric("Avg Form Score", f"{session.avg_form_score:.1f}%")
-                    with col3:
-                        st.metric("Avg ROM", f"{session.avg_rom:.1f}°")
-                    with col4:
-                        st.metric("Max ROM", f"{session.max_rom:.1f}°")
+                    # Two by two: this column is too narrow for four cards in a row (issue #35)
+                    col1, col2 = st.columns(2)
+                    col1.metric("Total Reps", f"{session.total_reps}/{session.target_reps}")
+                    col2.metric("Avg Form Score", f"{session.avg_form_score:.1f}%")
+                    col3, col4 = st.columns(2)
+                    col3.metric("Avg ROM", f"{session.avg_rom:.1f}°")
+                    col4.metric("Max ROM", f"{session.max_rom:.1f}°")
+
+                    # The engine writes mp4v, which browsers do not play; re-encode as H.264 (issue #35)
+                    from src.media import playable
+                    if annotated_path and Path(annotated_path).exists():
+                        with st.spinner("Preparing the annotated video..."):
+                            annotated_path = str(playable.browser_video(annotated_path))
 
                     # Annotated video playback
                     if annotated_path and Path(annotated_path).exists():
@@ -710,7 +714,7 @@ def page_video_analysis():
                         with dl_col1:
                             st.download_button(
                                 "📄 Download Report (JSON)",
-                                json.dumps(report_data, indent=2),
+                                playable.report_json(report_data),   # numpy numbers as plain ones (issue #35)
                                 file_name="analysis_report.json",
                                 mime="application/json"
                             )
