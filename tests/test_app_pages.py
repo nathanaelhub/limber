@@ -52,6 +52,29 @@ def test_page_renders_without_exception(seeded_env, page):
     assert not at.exception, [e.value for e in at.exception]
 
 
+def test_dashboard_lists_real_recent_sessions(seeded_env):
+    """The dashboard showed three hard-coded sessions from January 2024; it now reads the record."""
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "home"
+    at.run()
+    assert not at.exception
+    text = " ".join(m.value for m in at.markdown)
+    assert "2024-01-15" not in text and "Shoulder Flexion" not in text
+    day = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    assert day in text and "P-017" in text and "Knee Extension" in text and "3 reps" in text
+
+
+def test_dashboard_says_when_there_are_no_sessions(tmp_db, monkeypatch):
+    monkeypatch.setenv("PTASSIST_DB", str(tmp_db))
+    with SessionStore(tmp_db).open() as store:
+        store.add_patient("P-017")
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.session_state["current_page"] = "home"
+    at.run()
+    assert not at.exception
+    assert any("No sessions recorded yet" in c.value for c in at.caption)
+
+
 def test_sessions_page_shows_event_log_and_exports(seeded_env):
     at = AppTest.from_file(str(APP), default_timeout=180)
     at.session_state["current_page"] = "sessions"

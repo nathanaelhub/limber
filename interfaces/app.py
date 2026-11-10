@@ -425,25 +425,26 @@ def page_home():
     # Recent activity
     st.markdown("### Recent Sessions")
 
-    # Recent sessions from the canonical record
-    recent_sessions = [
-        {"date": "2024-01-15", "exercise": "Knee Extension", "reps": 10, "form": 85},
-        {"date": "2024-01-14", "exercise": "Shoulder Flexion", "reps": 12, "form": 78},
-        {"date": "2024-01-13", "exercise": "Squats", "reps": 8, "form": 82},
-    ]
-
-    for session in recent_sessions:
-        col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
+    # The newest finished sessions in the record, limited to the signed-in therapist's caseload
+    with _open_store() as store:
+        recent = [r for r in store.list_sessions() if r.status != "running"][:5]
+    if not recent:
+        st.caption("No sessions recorded yet. They appear here once a patient or therapist records one.")
+    for session in recent:
+        col1, col2, col3, col4 = st.columns([2, 3, 1, 1])
         with col1:
-            st.write(f"📅 {session['date']}")
+            st.write(f"📅 {session.start_time[:10]} · {session.patient_id}")
         with col2:
-            st.write(f"🏋️ {session['exercise']}")
+            st.write(f"🏋️ {', '.join(session.exercises) or 'Session'} ({session.origin})")
         with col3:
-            st.write(f"🔄 {session['reps']} reps")
+            st.write(f"🔄 {session.total_reps or 0} reps")
         with col4:
-            form_class = "form-good" if session['form'] >= 80 else ("form-warning" if session['form'] >= 60 else "form-poor")
-            st.markdown(f'<span class="{form_class}">✓ {session["form"]}%</span>',
-                       unsafe_allow_html=True)
+            if session.avg_form_score is None:
+                st.write("—")
+            else:
+                form = round(session.avg_form_score)
+                form_class = "form-good" if form >= 80 else ("form-warning" if form >= 60 else "form-poor")
+                st.markdown(f'<span class="{form_class}">✓ {form}%</span>', unsafe_allow_html=True)
 
 
 # =============================================================================
