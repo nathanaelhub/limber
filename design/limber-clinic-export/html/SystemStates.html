@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · First-run setup and signed out</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb sheet" style="width: 1280px; min-height: 820px">
+<div class="cols" style="gap: 40px">
+
+<div class="state-box">
+<p class="cap">First run, no staff password set</p>
+<form class="card stack loose" style="padding: 36px">
+<p class="brand"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</p>
+<div class="stack tight">
+<h1>Set up the clinic side</h1>
+<p class="dim">No staff password has been set yet. Make the first admin account to begin. You can invite therapists after this.</p>
+</div>
+<label class="field"><span>Name shown to colleagues</span><input class="input" type="text" autocomplete="name"></label>
+<label class="field"><span>Password</span><input class="input" type="password" autocomplete="new-password"><span class="hint">At least 12 characters.</span></label>
+<label class="field"><span>Password again</span><input class="input" type="password" autocomplete="new-password"></label>
+<div><button class="btn" type="button">Make admin account</button></div>
+<p class="hint">Until this is done, the clinic side is open to anyone who can reach this address. Do it now.</p>
+</form>
+</div>
+
+<div class="state-box">
+<p class="cap">Signed out, typed reply kept</p>
+<form class="card stack loose" style="padding: 36px">
+<p class="brand"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</p>
+<div class="stack tight">
+<h1>Your sign-in has ended</h1>
+<p class="dim">For safety, Limber signs you out after a while. Sign in to carry on where you were.</p>
+</div>
+<div class="notice info">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+<div class="stack tight" style="flex: 1; min-width: 0">
+<h3>Your reply to P-021 is kept</h3>
+<p>It has not been sent. It will be back in the reply box after you sign in.</p>
+<blockquote class="quote small" style="margin-top: 6px">“Thanks for the photos. Please skip the straight-leg raises until…”</blockquote>
+</div>
+</div>
+<label class="field"><span>Name</span><input class="input" type="text" value="Therapist" autocomplete="username"></label>
+<label class="field"><span>Password</span><input class="input" type="password" autocomplete="current-password"></label>
+<div class="rowflex"><button class="btn" type="button">Sign in</button><a href="#">Sign in as someone else</a></div>
+<p class="hint">If someone else signs in here, the kept reply is deleted.</p>
+</form>
+</div>
+
+</div>
+</div>
+</body>
+</html>

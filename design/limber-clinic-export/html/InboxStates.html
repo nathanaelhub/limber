@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Inbox empty, loading and error</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb sheet" style="width: 1280px; min-height: 1080px">
+
+<div class="state-box">
+<p class="cap">Empty</p>
+<div class="split" style="min-height: 280px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden">
+<nav class="side" aria-label="Needs you">
+<div class="side-head"><h2>Needs you</h2><span class="tag ghost">0</span></div>
+<p class="small dim" style="padding: 0 8px">All clear.</p>
+<p class="small" style="padding: 12px 8px 0"><a href="#">Show handled today (8)</a></p>
+</nav>
+<main class="pane">
+<div class="empty">
+<svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#E3EFED"/><path d="m15 24 6 6 12-13" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<h2>Nothing needs you right now</h2>
+<p>New messages, reschedule requests and urgent items will show here.</p>
+</div>
+</main>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Loading</p>
+<div class="split" style="min-height: 280px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden" aria-busy="true">
+<nav class="side" aria-label="Needs you">
+<div class="side-head"><h2>Needs you</h2></div>
+<div class="stack" style="padding: 8px; gap: 22px">
+<div class="stack" style="gap: 8px"><div class="sk" style="width: 46%"></div><div class="sk" style="width: 84%"></div></div>
+<div class="stack" style="gap: 8px"><div class="sk" style="width: 38%"></div><div class="sk" style="width: 72%"></div></div>
+<div class="stack" style="gap: 8px"><div class="sk" style="width: 50%"></div><div class="sk" style="width: 78%"></div></div>
+</div>
+</nav>
+<main class="pane">
+<div class="pane-head"><div class="stack" style="width: 100%"><div class="sk" style="width: 300px; height: 20px"></div><div class="sk" style="width: 240px"></div></div></div>
+<div class="pane-body">
+<p class="rowflex dim" role="status"><span class="spin" aria-hidden="true"></span>Loading your inbox</p>
+<div class="sk" style="width: 52%; height: 40px"></div>
+<div class="sk" style="width: 38%; height: 40px; align-self: flex-end"></div>
+</div>
+</main>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Error</p>
+<div class="split" style="min-height: 280px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden">
+<nav class="side" aria-label="Needs you">
+<div class="side-head"><h2>Needs you</h2></div>
+<p class="small dim" style="padding: 0 8px">Not loaded.</p>
+</nav>
+<main class="pane">
+<div class="empty" role="alert">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px; color: var(--ink)"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+<h2>The inbox didn't load</h2>
+<p>Check your connection and try again. Nothing has been lost.</p>
+<button class="btn" type="button" style="margin-top: 8px">Try again</button>
+</div>
+</main>
+</div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Weekly summary states</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb pane-only sheet" style="width: 880px; min-height: 780px">
+
+<div class="state-box">
+<p class="cap">Idle</p>
+<section class="sec">
+<div class="sec-head"><h2>Weekly summary</h2><button class="btn quiet sp" type="button"><span class="ai-tag" aria-hidden="true">AI</span>Summarise the last 7 days</button></div>
+<p class="dim">Reads this week's check-ins, exercise diary and messages, and suggests 1 to 3 next steps. Nothing is saved or sent until you choose.</p>
+</section>
+</div>
+
+<div class="state-box">
+<p class="cap">Loading</p>
+<section class="sec">
+<div class="sec-head"><h2>Weekly summary</h2></div>
+<div class="ai-block" aria-busy="true">
+<span class="ai-label" role="status"><span class="spin" aria-hidden="true"></span><span class="ai-tag" aria-hidden="true">AI</span>Summarising the last 7 days</span>
+<div class="sk" style="width: 88%"></div><div class="sk" style="width: 70%"></div><div class="sk" style="width: 44%"></div>
+<div><button class="btn plain small" type="button">Cancel</button></div>
+</div>
+</section>
+</div>
+
+<div class="state-box">
+<p class="cap">No records this week</p>
+<section class="sec">
+<div class="sec-head"><h2>Weekly summary</h2></div>
+<div class="notice plain">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+<div class="stack tight"><h3>No records this week</h3><p>P-021 has not logged anything in the last 7 days, so there is nothing to summarise.</p></div>
+</div>
+</section>
+</div>
+
+<div class="state-box">
+<p class="cap">Assistant unavailable</p>
+<section class="sec">
+<div class="sec-head"><h2>Weekly summary</h2></div>
+<div class="notice plain" role="alert">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+<div class="stack" style="flex: 1"><div class="stack tight"><h3>The assistant isn't available right now</h3><p>The records are still in Review. You can try again in a minute.</p></div>
+<div class="rowflex"><button class="btn quiet" type="button">Try again</button><a href="Review.html">Open Review</a></div></div>
+</div>
+</section>
+</div>
+
+</div>
+</body>
+</html>

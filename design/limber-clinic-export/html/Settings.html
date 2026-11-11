@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · My settings</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 760px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="People.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="People.html">People</a><a href="Settings.html" aria-current="page">My settings</a></nav>
+<details class="drop sp" open><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Sam Patel</b> · Admin</p><a href="Settings.html" aria-current="page">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<main class="page" style="max-width: 640px">
+<div class="stack tight">
+<h1>My settings</h1>
+<p class="dim">These follow you to every device you sign in on.</p>
+</div>
+
+<ul class="lines">
+<li style="align-items: flex-start; padding: 18px 0">
+<div class="stack tight" style="flex: 1; min-width: 220px"><h3 id="s-lt">Larger text</h3><p class="dim">Makes all text about one fifth bigger. Pages get longer, nothing is cut off.</p></div>
+<label class="switch"><input type="checkbox" role="switch" aria-labelledby="s-lt" checked><span class="track"></span><span class="state"></span></label>
+</li>
+<li style="align-items: flex-start; padding: 18px 0">
+<div class="stack tight" style="flex: 1; min-width: 220px"><h3 id="s-hc">Higher contrast</h3><p class="dim">Darker text, stronger lines and darker buttons.</p></div>
+<label class="switch"><input type="checkbox" role="switch" aria-labelledby="s-hc"><span class="track"></span><span class="state"></span></label>
+</li>
+<li style="align-items: flex-start; padding: 18px 0">
+<div class="stack tight" style="flex: 1; min-width: 220px"><h3 id="s-lm">Less motion</h3><p class="dim">Stops loading shimmer and spinning. Progress is shown as text instead.</p></div>
+<label class="switch"><input type="checkbox" role="switch" aria-labelledby="s-lm"><span class="track"></span><span class="state"></span></label>
+</li>
+</ul>
+
+<p class="rowflex small" role="status"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Saved. Larger text is on.</p>
+
+<section class="sec" style="padding-top: 12px">
+<h2>Account</h2>
+<dl class="kv">
+<dt>Name shown</dt><dd>Sam Patel</dd>
+<dt>Role</dt><dd>Admin. You manage people and see no patient records.</dd>
+</dl>
+<div class="rowflex"><button class="btn quiet" type="button">Change password</button><a class="btn plain" href="SystemStates.html">Sign out</a></div>
+</section>
+</main>
+</div>
+</body>
+</html>
