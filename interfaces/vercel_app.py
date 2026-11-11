@@ -27,6 +27,15 @@ clinic's own computer, and its new version is being built to work here too.</p>
 </main></body></html>"""
 
 
+def use_clinic_time(env: Mapping[str, str]) -> None:
+    """The record stores clinic-local times (datetime.now()). Vercel's clock is UTC and it reserves the TZ setting,
+    so the zone comes from LIMBER_TIME_ZONE, defaulting to the clinic default."""
+    import time
+    from src.portal.plans import DEFAULT_TIME_ZONE
+    os.environ["TZ"] = (env.get("LIMBER_TIME_ZONE") or "").strip() or DEFAULT_TIME_ZONE
+    time.tzset()
+
+
 def check_settings(env: Mapping[str, str]) -> None:
     missing = [k for k in REQUIRED if not (env.get(k) or "").strip()]
     if missing:
@@ -51,6 +60,7 @@ def build(db_path: Path, origin: str, key: Optional[bytes] = None):
 
 def _app_from_environment():
     check_settings(os.environ)
+    use_clinic_time(os.environ)
     db = Path(os.environ.get("PTASSIST_DB", "/tmp/limber/replica.db"))
     db.parent.mkdir(parents=True, exist_ok=True)
     return build(db, os.environ["LIMBER_PUBLIC_ORIGIN"])

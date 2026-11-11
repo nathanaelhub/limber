@@ -78,3 +78,21 @@ def test_the_vercel_bundle_is_light():
     for needed in ("starlette", "python-multipart", "numpy", "opencv-python-headless", "pillow", "pyyaml", "av",
                    "anthropic", "libsql", "boto3"):
         assert needed in names, needed
+
+
+def test_the_hosted_app_keeps_clinic_time(monkeypatch):
+    """Vercel's clock is UTC and it reserves TZ, so the app sets the clinic's zone itself: the record stores local
+    times, and the demo was seeded in clinic time (a message showed 02:20 for 20:20 in the live check)."""
+    import time
+    from datetime import datetime
+    from interfaces import vercel_app
+    monkeypatch.setenv("TZ", "UTC")
+    time.tzset()
+    try:
+        vercel_app.use_clinic_time({"LIMBER_TIME_ZONE": "America/Chicago"})
+        assert time.tzname[0] in ("CST", "CDT") and datetime.now().astimezone().utcoffset().total_seconds() < 0
+        vercel_app.use_clinic_time({})                                   # the default is the clinic default
+        assert time.tzname[0] in ("CST", "CDT")
+    finally:
+        monkeypatch.undo()
+        time.tzset()
