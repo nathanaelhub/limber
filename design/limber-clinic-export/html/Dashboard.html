@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Dashboard</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 900px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary class="on">Tools</summary><div class="menu"><a href="Dashboard.html" aria-current="page">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<main class="page">
+<div class="page-head">
+<h1>Dashboard</h1>
+<label class="field sp" style="flex-direction: row; align-items: center"><span>Period</span><select class="input" style="width: 170px"><option>Last 30 days</option><option>Last 7 days</option><option>Last 90 days</option></select></label>
+</div>
+
+<p style="font-size: var(--fs-h1); line-height: 1.5; letter-spacing: -0.01em; max-width: 30em">
+In the last 30 days you ran <b>38 observation sessions</b> with <b>1,412 reps</b>.
+Average <span class="def-wrap"><button class="def" type="button" aria-describedby="d-form">form score</button><span class="tip" id="d-form" role="tooltip">Form score runs from 0 to 100. It is the share of each rep done inside the target path and pace. Higher is better.</span></span> was <b>78 of 100</b>, up 4.
+Average <span class="def-wrap"><button class="def" type="button" aria-describedby="d-rom">range of motion</button><span class="tip" id="d-rom" role="tooltip">Range of motion is the largest joint angle reached in a rep, in degrees.</span></span> was <b>96°</b>, up 7°.
+</p>
+
+<div class="cols">
+<figure class="chart">
+<h3>Average form score by week, 0 to 100</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Line chart. Average form score rose from 72 to 80 over four weeks.">
+<path class="grid" d="M40 20H460M40 60H460M40 100H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">90</text><text x="32" y="64" text-anchor="end">80</text><text x="32" y="104" text-anchor="end">70</text><text x="32" y="144" text-anchor="end">60</text>
+<path class="s1" d="M70 92 190 80 310 72 430 60"/>
+<circle class="pt" cx="70" cy="92" r="4"/><circle class="pt" cx="190" cy="80" r="4"/><circle class="pt" cx="310" cy="72" r="4"/><circle class="pt" cx="430" cy="60" r="4"/>
+<text x="70" y="162" text-anchor="middle">6 Oct</text><text x="190" y="162" text-anchor="middle">13 Oct</text><text x="310" y="162" text-anchor="middle">20 Oct</text><text x="430" y="162" text-anchor="middle">27 Oct</text>
+</svg>
+<details class="astable"><summary>Show as table</summary>
+<table class="table"><thead><tr><th scope="col">Week of</th><th scope="col" class="r">Form score, 0 to 100</th></tr></thead><tbody><tr><td>6 Oct</td><td class="r">72</td></tr><tr><td>13 Oct</td><td class="r">75</td></tr><tr><td>20 Oct</td><td class="r">77</td></tr><tr><td>27 Oct</td><td class="r">80</td></tr></tbody></table>
+</details>
+</figure>
+
+<figure class="chart">
+<h3>Average range of motion by week, degrees</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Line chart. Average range of motion rose from 88 to 103 degrees over four weeks.">
+<path class="grid" d="M40 20H460M40 60H460M40 100H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">110°</text><text x="32" y="64" text-anchor="end">100°</text><text x="32" y="104" text-anchor="end">90°</text><text x="32" y="144" text-anchor="end">80°</text>
+<path class="s1" d="M70 108 190 92 310 72 430 48"/>
+<circle class="pt" cx="70" cy="108" r="4"/><circle class="pt" cx="190" cy="92" r="4"/><circle class="pt" cx="310" cy="72" r="4"/><circle class="pt" cx="430" cy="48" r="4"/>
+<text x="70" y="162" text-anchor="middle">6 Oct</text><text x="190" y="162" text-anchor="middle">13 Oct</text><text x="310" y="162" text-anchor="middle">20 Oct</text><text x="430" y="162" text-anchor="middle">27 Oct</text>
+</svg>
+<details class="astable"><summary>Show as table</summary>
+<table class="table"><thead><tr><th scope="col">Week of</th><th scope="col" class="r">Range of motion, degrees</th></tr></thead><tbody><tr><td>6 Oct</td><td class="r">88</td></tr><tr><td>13 Oct</td><td class="r">92</td></tr><tr><td>20 Oct</td><td class="r">97</td></tr><tr><td>27 Oct</td><td class="r">103</td></tr></tbody></table>
+</details>
+</figure>
+</div>
+
+<section class="sec">
+<div class="sec-head"><h2>Recent sessions</h2><a class="sp" href="Sessions.html">All sessions</a></div>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">When</th><th scope="col">Patient</th><th scope="col">Exercise</th><th scope="col" class="r">Reps</th><th scope="col" class="r">Form score, 0 to 100</th><th scope="col" class="r">Range of motion, degrees</th><th scope="col"><span class="vh">Open</span></th></tr></thead>
+<tbody>
+<tr><td>Mon 3 Nov, 9:10</td><td class="code">P-030</td><td>Calf raises</td><td class="r">30</td><td class="r">84</td><td class="r">41</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Fri 31 Oct, 15:20</td><td class="code">P-017</td><td>Heel slides</td><td class="r">30</td><td class="r">81</td><td class="r">118</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 28 Oct, 9:15</td><td class="code">P-021</td><td>Straight-leg raises</td><td class="r">20</td><td class="r">68</td><td class="r">52</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 28 Oct, 9:05</td><td class="code">P-021</td><td>Heel slides</td><td class="r">30</td><td class="r">79</td><td class="r">85</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+</tbody>
+</table>
+</div>
+<p class="hint">Form score: 0 to 100, higher is better. Range of motion: the largest joint angle reached in a rep, in degrees. <a href="HowItWorks.html">How these are measured</a></p>
+</section>
+</main>
+</div>
+</body>
+</html>

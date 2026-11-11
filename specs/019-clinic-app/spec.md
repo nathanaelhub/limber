@@ -135,7 +135,9 @@ rebuilt and reached from the Tools menu.
 ## Decision Gates (owner)
 
 - **G1, design**: the owner runs the Claude Design prompt and approves the export in
-  `design/limber-clinic-export/` before Foundation starts.
+  `design/limber-clinic-export/` before Foundation starts. **Done 10 November 2026**: the owner ran the prompt and supplied the
+  export (33 screens and states at 1280px, `limber.css`, self-hosted Sora, and the on-screen copy). It has no
+  scripts and no outside links, so it fits the clinic app's content security policy as it is.
 - **G2, live session**: before cutover, MoveNet and YOLO11 are compared on the same recorded clips (rep count,
   range of motion, form score). The owner decides from those numbers whether browser pose is good enough, or
   whether Live session needs another route.

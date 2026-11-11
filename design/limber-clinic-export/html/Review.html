@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Review · P-021</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 2500px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary class="on">Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html" aria-current="page">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<div class="split" style="grid-template-columns: 240px minmax(0,1fr)">
+<nav class="side" aria-label="Review sections">
+<div class="side-head"><h2>Review</h2></div>
+<label class="field" style="padding: 0 8px 14px"><span class="vh">Patient</span><select class="input"><option>P-021 · Right hip replacement</option><option>P-021 · Left shoulder</option><option>P-017 · Post-op knee</option></select></label>
+<div class="sidelist">
+<a href="#first" aria-current="true">First to latest</a>
+<a href="#measures">Measures</a>
+<a href="#sessions">Sessions</a>
+<a href="#thresholds">Attention thresholds <span class="tag urgent sp">1 met</span></a>
+<a href="#goals">Goals</a>
+<a href="#videos">Patient videos</a>
+<a href="#diary">Exercise diary</a>
+<a href="#meds">Medication taken <span class="small dim sp">No data</span></a>
+<a href="#sleep">Sleep</a>
+<a href="#forms">Questionnaires</a>
+<a href="#pain">Pain and symptoms</a>
+<a href="#downloads">Downloads</a>
+</div>
+</nav>
+
+<main class="pane">
+<div class="pane-head ruled">
+<div class="stack tight"><h1>P-021 · Right hip replacement</h1><p class="dim">14 Oct to 3 Nov · 3 weeks · 9 sessions</p></div>
+<a class="btn quiet small sp" href="Patients.html">Open patient</a>
+<a class="btn quiet small" href="Sessions.html">Sessions</a>
+</div>
+
+<div class="pane-body" style="gap: 44px">
+
+<section class="sec" id="first">
+<h2>First to latest</h2>
+<div>
+<table class="table">
+<thead><tr><th scope="col">Measure</th><th scope="col" class="r">First, 14 Oct</th><th scope="col" class="r">Latest, 28 Oct</th><th scope="col">Change</th></tr></thead>
+<tbody>
+<tr><td><span class="def-wrap"><button class="def" type="button" aria-describedby="r-rom">Range of motion</button><span class="tip show" id="r-rom" role="tooltip">The largest joint angle reached in a rep, in degrees. Shown on hover and on keyboard focus.</span></span>, heel slides</td><td class="r">70°</td><td class="r">85°</td><td>↑ 15° better</td></tr>
+<tr><td>Form score, heel slides, 0 to 100</td><td class="r">71</td><td class="r">79</td><td>↑ 8 better</td></tr>
+<tr><td>Pain at check-in, 0 to 10</td><td class="r">4</td><td class="r">6</td><td class="strong" style="color: var(--warning)">↑ 2 worse</td></tr>
+<tr><td>Days done per week, of 7</td><td class="r">6</td><td class="r">4</td><td>↓ 2 fewer</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="sec" id="measures">
+<h2>Measures</h2>
+<div class="cols">
+<figure class="chart">
+<h3>Range of motion, heel slides, degrees</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Line chart. Range of motion rose from 70 to 78 to 85 degrees over three sessions. The goal is 110 degrees.">
+<path class="grid" d="M40 20H460M40 60H460M40 100H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">120°</text><text x="32" y="64" text-anchor="end">100°</text><text x="32" y="104" text-anchor="end">80°</text><text x="32" y="144" text-anchor="end">60°</text>
+<path class="goal" d="M40 40H460"/><text x="456" y="34" text-anchor="end">Goal 110°</text>
+<path class="s1" d="M90 120 250 104 410 90"/>
+<circle class="pt" cx="90" cy="120" r="4"/><circle class="pt" cx="250" cy="104" r="4"/><circle class="pt" cx="410" cy="90" r="4"/>
+<text x="90" y="162" text-anchor="middle">14 Oct</text><text x="250" y="162" text-anchor="middle">21 Oct</text><text x="410" y="162" text-anchor="middle">28 Oct</text>
+</svg>
+<details class="astable" open><summary>Show as table</summary>
+<table class="table"><thead><tr><th scope="col">Session</th><th scope="col" class="r">Range of motion, degrees</th></tr></thead><tbody><tr><td>14 Oct</td><td class="r">70</td></tr><tr><td>21 Oct</td><td class="r">78</td></tr><tr><td>28 Oct</td><td class="r">85</td></tr><tr><td>Goal</td><td class="r">110</td></tr></tbody></table>
+</details>
+</figure>
+<figure class="chart">
+<h3>Form score, heel slides, 0 to 100</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Line chart. Form score rose from 71 to 76 to 79 over three sessions. The attention line is 60.">
+<path class="grid" d="M40 20H460M40 68H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">100</text><text x="32" y="72" text-anchor="end">80</text><text x="32" y="144" text-anchor="end">50</text>
+<path class="goal" d="M40 116H460"/><text x="456" y="132" text-anchor="end">Attention below 60</text>
+<path class="s1" d="M90 90 250 78 410 70"/>
+<circle class="pt" cx="90" cy="90" r="4"/><circle class="pt" cx="250" cy="78" r="4"/><circle class="pt" cx="410" cy="70" r="4"/>
+<text x="90" y="162" text-anchor="middle">14 Oct</text><text x="250" y="162" text-anchor="middle">21 Oct</text><text x="410" y="162" text-anchor="middle">28 Oct</text>
+</svg>
+<details class="astable" open><summary>Show as table</summary>
+<table class="table"><thead><tr><th scope="col">Session</th><th scope="col" class="r">Form score, 0 to 100</th></tr></thead><tbody><tr><td>14 Oct</td><td class="r">71</td></tr><tr><td>21 Oct</td><td class="r">76</td></tr><tr><td>28 Oct</td><td class="r">79</td></tr><tr><td>Attention line</td><td class="r">60</td></tr></tbody></table>
+</details>
+</figure>
+</div>
+</section>
+
+<section class="sec" id="sessions">
+<h2>Sessions</h2>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">When</th><th scope="col">Exercises</th><th scope="col" class="r">Reps</th><th scope="col" class="r">Form score, 0 to 100</th><th scope="col">Summary</th><th scope="col"><span class="vh">Open</span></th></tr></thead>
+<tbody>
+<tr><td>Tue 28 Oct</td><td>Heel slides, straight-leg raises</td><td class="r">50</td><td class="r">75</td><td>Straight-leg raises slower after rep 12</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 21 Oct</td><td>Heel slides, quad sets</td><td class="r">75</td><td class="r">79</td><td>Steady pace throughout</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 14 Oct</td><td>Heel slides</td><td class="r">20</td><td class="r">71</td><td>First session</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="sec" id="thresholds">
+<h2>Attention thresholds</h2>
+<ul class="lines">
+<li><span class="tag urgent"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Met</span><span>Pain rises by 2 or more in 7 days</span><span class="small dim sp">Rose by 3, from 3/10 to 6/10</span></li>
+<li><span class="tag ghost">Not met</span><span>No records for 10 days</span><span class="small dim sp">Last record today</span></li>
+<li><span class="tag ghost">Not met</span><span>Average form score below 60 of 100</span><span class="small dim sp">Now 75</span></li>
+</ul>
+<p class="hint">Thresholds are set for the whole clinic in <a href="Tracker.html">Tracker</a>.</p>
+</section>
+
+<section class="sec" id="goals">
+<div class="sec-head"><h2>Goals</h2><button class="btn quiet small sp" type="button">Add a goal</button></div>
+<ul class="lines">
+<li><div class="stack tight" style="flex: 1; min-width: 220px"><span class="strong">110° of hip flexion by week 8</span><div class="track-bar" role="img" aria-label="85 of 110 degrees"><span style="width: 77%"></span></div></div><span class="small">85° of 110° · Week 3</span></li>
+<li><div class="stack tight" style="flex: 1; min-width: 220px"><span class="strong">Stairs without a rail by week 8</span><span class="small dim">Not yet reached</span></div><button class="btn plain small" type="button">Mark as reached</button></li>
+</ul>
+</section>
+
+<section class="sec" id="videos">
+<h2>Patient videos</h2>
+<div class="thumbs">
+<a class="ph" href="VideoAnalysis.html" style="width: 150px; height: 96px; text-decoration: none"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Hip abduction · 25 Oct</a>
+<a class="ph" href="VideoAnalysis.html" style="width: 150px; height: 96px; text-decoration: none"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Heel slides · 19 Oct</a>
+</div>
+<p class="hint">Sent by P-021 from the app. Open one to see its analysis.</p>
+</section>
+
+<section class="sec" id="diary">
+<h2>Exercise diary, as reported by P-021</h2>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">Exercise</th><th scope="col">Tue</th><th scope="col">Wed</th><th scope="col">Thu</th><th scope="col">Fri</th><th scope="col">Sat</th><th scope="col">Sun</th><th scope="col">Mon</th></tr></thead>
+<tbody>
+<tr><td>Heel slides</td><td>Done</td><td class="dim">Missed</td><td>Done</td><td>Done</td><td>Done</td><td class="dim">Missed</td><td class="dim">Missed</td></tr>
+<tr><td>Quad sets</td><td>Done</td><td class="dim">Missed</td><td>Done</td><td>Done</td><td>Done</td><td class="dim">Missed</td><td class="dim">Missed</td></tr>
+<tr><td>Straight-leg raises</td><td>Done</td><td class="dim">Missed</td><td>Done</td><td>Part</td><td>Part</td><td class="dim">Missed</td><td class="dim">Missed</td></tr>
+<tr><td>Hip abduction</td><td>Done</td><td class="dim">Rest day</td><td>Done</td><td class="dim">Rest day</td><td class="dim">Missed</td><td class="dim">Rest day</td><td class="dim">Missed</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="sec" id="meds">
+<h2>Medication taken</h2>
+<div class="notice plain">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+<div class="stack tight"><h3>No data</h3><p>P-021 is not asked to log medication. You can turn it on under <a href="PatientDetails.html">Details, What P-021 can log</a>.</p></div>
+</div>
+</section>
+
+<section class="sec" id="sleep">
+<h2>Sleep</h2>
+<p>Logged on 5 of the last 7 nights. Average 6 hours 10 minutes. Rated poor on 2 nights, Fri 31 Oct and Sat 1 Nov.</p>
+</section>
+
+<section class="sec" id="forms">
+<h2>Questionnaires</h2>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">Questionnaire</th><th scope="col">Filled</th><th scope="col" class="r">Score, 0 to 100, higher is better</th><th scope="col"><span class="vh">Open</span></th></tr></thead>
+<tbody>
+<tr><td>Hip function</td><td>27 Oct</td><td class="r">54</td><td><a href="#">Answers</a></td></tr>
+<tr><td>Hip function</td><td>14 Oct</td><td class="r">41</td><td><a href="#">Answers</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="sec" id="pain">
+<h2>Pain and symptom check-ins</h2>
+<div class="cols">
+<figure class="chart">
+<h3>Pain at check-in, 0 to 10</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Bar chart. Pain rose from 3 on Tuesday to 6 on Monday. No check-in on Sunday.">
+<path class="grid" d="M40 20H460M40 80H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">10</text><text x="32" y="84" text-anchor="end">5</text><text x="32" y="144" text-anchor="end">0</text>
+<rect class="bar" x="58" y="104" width="30" height="36"/><rect class="bar" x="116" y="104" width="30" height="36"/><rect class="bar" x="174" y="92" width="30" height="48"/><rect class="bar" x="232" y="92" width="30" height="48"/><rect class="bar" x="290" y="80" width="30" height="60"/><rect class="bar" x="406" y="68" width="30" height="72"/>
+<text x="73" y="98" text-anchor="middle">3</text><text x="131" y="98" text-anchor="middle">3</text><text x="189" y="86" text-anchor="middle">4</text><text x="247" y="86" text-anchor="middle">4</text><text x="305" y="74" text-anchor="middle">5</text><text x="363" y="134" text-anchor="middle">none</text><text x="421" y="62" text-anchor="middle">6</text>
+<text x="73" y="162" text-anchor="middle">Tue</text><text x="131" y="162" text-anchor="middle">Wed</text><text x="189" y="162" text-anchor="middle">Thu</text><text x="247" y="162" text-anchor="middle">Fri</text><text x="305" y="162" text-anchor="middle">Sat</text><text x="363" y="162" text-anchor="middle">Sun</text><text x="421" y="162" text-anchor="middle">Mon</text>
+</svg>
+<figcaption class="small dim">Each bar carries its number, so the chart reads without a table.</figcaption>
+</figure>
+<div class="stack tight">
+<h3>Symptoms P-021 reported</h3>
+<ul class="lines small">
+<li><span class="strong" style="width: 80px">Mon 3 Nov</span><span>Straight-leg raises hurt</span></li>
+<li><span class="strong" style="width: 80px">Sat 1 Nov</span><span>Slept badly, hip stiff in the morning</span></li>
+<li><span class="strong" style="width: 80px">Thu 30 Oct</span><span>Swelling around the scar, gone by evening</span></li>
+</ul>
+</div>
+</div>
+</section>
+
+<section class="sec" id="downloads">
+<h2>Downloads</h2>
+<div class="rowflex">
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Review report · PDF</a>
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>All measures · CSV</a>
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Check-ins and diary · CSV</a>
+</div>
+<p class="hint">Files name the patient by code only.</p>
+</section>
+
+</div>
+</main>
+</div>
+</div>
+</body>
+</html>

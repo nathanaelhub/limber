@@ -1,0 +1,1496 @@
+# Limber clinic side: on-screen copy
+
+Every piece of text shown on each screen, in reading order. The top bar is listed once.
+
+
+# Daily work
+
+## Inbox · 1280
+
+- Limber
+- Inbox 5 need you Patients Schedule
+- Find a patient
+- [Placeholder: Find a patient]
+- Tools
+- Dashboard Live session Video analysis Sessions Observation logs Review Tracker How it works
+- Me
+- Signed in as Therapist
+- My settings People Sign out
+- Needs you
+- 5
+- P-023 Urgent 8:12
+- Shoulder · May need a direct response
+- P-021 1 new 8:40
+- Right hip replacement · Voice note, 0:42
+- P-021 Reschedule 7:55
+- Asks for Fri 6 Nov, 09:00
+- P-017 3 new Yesterday
+- Post-op knee · Is some swelling normal after…
+- P-021 1 new Yesterday
+- Left shoulder · The band feels too easy now
+- Show handled today (3)
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Next visit Tue 4 Nov, 9:00
+- Open patient
+- More
+- Mark as handled
+- Turn messaging off for P-021
+- Change plan of care
+- Yesterday
+- Good work on the heel slides. Keep each quad set to a 5-second hold.
+- Therapist · 17:05
+- Today
+- Here is the scar this morning, and the sheet from my surgeon.
+- Photo 1
+- Photo 2
+- Surgeon-notes.pdf · 2 pages
+- P-021 · 8:38
+- [Button, read aloud as: Play voice note]
+- 0:42
+- Automatic transcript — may contain mistakes
+- The heel slides feel fine, but the straight-leg raises hurt more than last week. About a six out of ten.
+- P-021 · 8:40 New
+- Reply to P-021
+- [Placeholder: Reply to P-021]
+- Attach
+- Up to 4 photos or 1 PDF
+- AI Draft a reply
+- Send
+
+## Inbox · Reply box states
+
+- Photos attached
+- Reply to P-021
+- Here are the two positions for the hip abduction. Stop if the pain goes above 4 out of 10.
+- [Button, read aloud as: Remove photo 1]
+- [Button, read aloud as: Remove photo 2]
+- Attach
+- 2 of 4 photos
+- AI Draft a reply
+- Send
+- PDF attached. Photos are off once a PDF is added.
+- Reply to P-021
+- Your updated exercise sheet is attached.
+- Hip-program-week-4.pdf
+- [Button, read aloud as: Remove PDF]
+- Attach
+- 1 PDF attached. Remove it to add photos.
+- Send
+- Drafting, a few seconds
+- AI Drafting a reply. This takes a few seconds.
+- Cancel
+- Nothing is sent until you press Send.
+- Send
+- Draft in the box. Editable, never sent automatically.
+- AI AI-drafted — check before sending
+- Discard draft
+- Reply to P-021, AI-drafted, editable
+- Thanks for the photos and the voice note. Some soreness with straight-leg raises can happen, but a 6 out of 10 is more than I'd like. Please skip them until Tuesday and keep going with the heel slides and quad sets. We'll look at it together at your visit.
+- Attach
+- Edit it freely. Nothing is sent until you press Send.
+- Send
+- Looks like a phone number or a name
+- Reply to P-021
+- If it gets worse tonight, call me on 615 555 0142. Sam
+- Check before you send
+- This reply looks like it holds a phone number and a name. Messages here should not carry personal details.
+- Not sent yet.
+- Send anyway
+- Edit reply
+
+## Inbox · Withheld message
+
+- P-023 · Shoulder
+- Started 6 weeks ago · Next visit Wed 5 Nov, 14:30
+- Urgent
+- Open patient
+- Today
+- This message may need a direct response
+- P-023 used words that can point to an injury: “had a fall” and “foot is numb” . No reply was drafted and the coach did not answer.
+- “I had a fall and now my foot is numb”
+- Sent today at 8:12. P-023 was shown the emergency card.
+- Mark as handled by phone
+- Write a reply
+- Nice progress with the pendulum swings. Same again this week.
+- Therapist · Mon 16:20
+- Draft a reply is off for this message. After you mark it as handled, it leaves Needs you and a note is added to the thread with your name and the time.
+
+## Inbox · Reschedule request
+
+- P-021 · Reschedule request
+- Right hip replacement · Booked for Tue 4 Nov, 9:00, 45 minutes · Re-check range of motion
+- Open schedule
+- P-021 asks to move the visit to
+- Fri 6 Nov, 09:00
+- “Afternoons are better for me this week.”
+- Your answer
+- Accept Fri 6 Nov, 09:00
+- Offer another time
+- Day
+- [Sample entry: Fri 6 Nov]
+- Time
+- [Sample entry: 14:30]
+- You are free 14:00 to 16:00 that day.
+- Keep Tue 4 Nov, 9:00
+- Note to P-021 (optional)
+- [Sample entry: An afternoon slot works. See you Friday.]
+- Send answer
+- P-021 sees the new time in the app as soon as you send.
+
+## Inbox · Messaging on or off
+
+- More menu, messaging on
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Next visit Tue 4 Nov, 9:00
+- Mark as handled
+- Change plan of care
+- Messaging for P-021:
+- When off, P-021 can read past messages but cannot send new ones.
+- Messaging off, in place of the reply box
+- Messaging is off for P-021
+- P-021 can read past messages but cannot send new ones. You turned it off on Mon 3 Nov.
+- Turn messaging on
+- Confirmation after switching off
+- Messaging is off for P-021. Undo
+
+## Inbox · Archived plan
+
+- P-017 · Left ankle sprain
+- Archived 12 Sep · Ran 8 weeks
+- Archived · Read-only
+- Post-op knee 3 new
+- Left ankle sprain
+- 10 Sep
+- No pain on stairs now. Thank you for all the help.
+- P-017 · 10:14
+- Great result. I'll close this plan. Keep up the balance work twice a week.
+- Therapist · 11:02
+- 12 Sep · Plan archived by Therapist
+- This plan is archived
+- You can read it but not reply. To write to P-017, open Post-op knee .
+
+## Inbox · Empty, loading, error
+
+- Empty
+- Needs you
+- 0
+- All clear.
+- Show handled today (8)
+- Nothing needs you right now
+- New messages, reschedule requests and urgent items will show here.
+- Loading
+- Needs you
+- Loading your inbox
+- Error
+- Needs you
+- Not loaded.
+- The inbox didn't load
+- Check your connection and try again. Nothing has been lost.
+- Try again
+
+## Patients · Overview · 1280
+
+- Patients
+- 12 on caseload
+- Register a patient
+- P-021 Right hip replacement
+- ↑ Pain rising
+- P-023 Shoulder
+- ! Urgent message
+- P-017 Post-op knee
+- Steady · 5-week streak
+- P-009 Lower back
+- Inactive 2 weeks
+- P-030 Ankle sprain
+- On track · Visit tomorrow
+- P-014 Rotator cuff
+- New · No records yet
+- Show discharged (4)
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Also has a plan for Left shoulder
+- Review
+- Sessions
+- Overview
+- Exercises
+- Messages 1 new
+- Session notes
+- AI settings
+- Details
+- Days done this week
+- 4 of 7 days
+- 5 of 7 last week
+- Pain
+- Pain is the patient's own rating at check-in, from 0 (none) to 10 (worst).
+- 6 /10
+- ↑ Up from 3/10 this week
+- Next visit
+- Tue 4 Nov, 9:00
+- 45 minutes · Re-check range of motion
+- Weekly summary
+- Last 7 days · 28 Oct to 3 Nov
+- AI AI-drafted — check before acting
+- P-021 did exercises on 4 of 7 days, down from 5. Pain at check-in rose from 3/10 to 6/10, mostly on days with straight-leg raises. Sleep was logged as poor on two nights.
+- Suggested next steps
+- 1. Look at straight-leg raises. Pain of 6/10 was logged after them on 3 days. Pain check-ins
+- 2. Ask about sleep at Tuesday's visit. Sleep log
+- 3. Answer today's voice note. Messages
+- Save as session note
+- Edit
+- Discard
+- Only you can see this. It is not sent to P-021.
+- This week
+- Day
+- Exercises
+- Pain, 0 to 10
+- Note from P-021
+- Mon 3 Nov
+- Done
+- 6
+- Straight-leg raises hurt
+- Sun 2 Nov
+- Not done
+- No check-in
+- None
+- Sat 1 Nov
+- Done
+- 5
+- Slept badly
+- Fri 31 Oct
+- Done
+- 4
+- None
+- See all 7 days in Review
+
+## Patient · Weekly summary states
+
+- Idle
+- Weekly summary
+- AI Summarise the last 7 days
+- Reads this week's check-ins, exercise diary and messages, and suggests 1 to 3 next steps. Nothing is saved or sent until you choose.
+- Loading
+- Weekly summary
+- AI Summarising the last 7 days
+- Cancel
+- No records this week
+- Weekly summary
+- No records this week
+- P-021 has not logged anything in the last 7 days, so there is nothing to summarise.
+- Assistant unavailable
+- Weekly summary
+- The assistant isn't available right now
+- The records are still in Review. You can try again in a minute.
+- Try again
+- Open Review
+
+## Patient · Exercises
+
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Also has a plan for Left shoulder
+- Overview Exercises Messages 1 new Session notes AI settings Details
+- Assigned program
+- 4 exercises · Changed 27 Oct
+- Add an exercise
+- Heel slides 3 sets of 10 · Every day
+- Done 4 of 7 days
+- Change
+- Quad sets 3 sets of 15 · 5-second hold · Every day
+- Done 4 of 7 days
+- Change
+- Straight-leg raises 2 sets of 10 · Every day
+- ↑ Pain logged after, 3 days
+- Change
+- Hip abduction 10 reps · Every other day
+- Done 2 of 4 days
+- Change
+- Changing an exercise, opens in place
+- Change Straight-leg raises
+- Sets
+- [Sample entry: 2]
+- Reps
+- [Sample entry: 8]
+- Hold, seconds
+- [Sample entry: 0]
+- How often
+- Every other day
+- Every day
+- Note P-021 sees with this exercise (optional)
+- [Sample entry: Stop if pain goes above 4 out of 10.]
+- Save change
+- Cancel
+- Remove from program
+- P-021 sees the change the next time they open the app. Past records are kept.
+- Adding an exercise
+- Exercise
+- [Sample entry: brid]
+- Bridges
+- Bridges, single leg
+
+## Patient · Session notes
+
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Also has a plan for Left shoulder
+- Overview Exercises Messages 1 new Session notes AI settings Details
+- Session notes
+- Only staff can see these
+- New note
+- [Placeholder: What happened, and what comes next]
+- Add note
+- Mon 27 Oct Therapist AI AI-drafted, then edited by Therapist
+- Did exercises on 5 of 7 days. Pain steady at 3/10. Added hip abduction, 10 reps every other day.
+- Edit
+- Tue 21 Oct Therapist · After visit
+- Hip flexion 85 degrees, up from 70. Walking with one stick. Scar healing well. Keep heel slides and quad sets daily.
+- Edit
+- Tue 14 Oct Therapist · First visit
+- Plan opened. Goals: 110 degrees of hip flexion and stairs without a rail by week 8.
+- Edit
+
+## Patient · AI settings
+
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Also has a plan for Left shoulder
+- Overview Exercises Messages 1 new Session notes AI settings Details
+- Both are off until you turn them on, and they apply to P-021 only. Everything the assistant writes is labelled AI AI-drafted .
+- Weekly summaries and drafts
+- [Switch: Weekly summaries and drafts]
+- Lets you ask for a summary of the last 7 days and for a drafted reply. You read and edit each one. Nothing is sent unless you press Send.
+- What P-021 is told
+- “Your therapist may use an AI assistant to help summarise your records and draft replies. Your therapist checks everything before it reaches you.”
+- Patient exercise coach
+- [Switch: Patient exercise coach]
+- Lets P-021 ask the assistant how to do their assigned exercises. This is the only AI writing that reaches a patient without you pressing Send. It does not give medical advice. Questions it should not answer are sent to you.
+- What P-021 is told
+- “This coach is an AI assistant, not your therapist. It can explain your exercises. It can't give medical advice. If something feels wrong, message your therapist. In an emergency, call your local emergency number.”
+- Turned on by Therapist, 20 Oct.
+- Coach conversations
+- Read-only
+- When
+- P-021 asked
+- What happened
+- Open
+- Mon 3 Nov, 8:05
+- “Sharp pain in my hip when I lift the leg”
+- Emergency card shown
+- Read
+- Sat 1 Nov, 19:40
+- “Can I do these twice a day?”
+- Sent to you
+- Read
+- Thu 30 Oct, 7:15
+- “How long do I hold a quad set?”
+- Answered
+- Read
+- Tue 28 Oct, 18:02
+- “Should my heel leave the bed?”
+- Answered
+- Read
+- Answered: the coach replied about an assigned exercise. Sent to you: the coach did not answer and put the question in your Inbox. Emergency card shown: the coach stopped and showed emergency contact steps.
+
+## Patient · Details
+
+- P-021 · Right hip replacement
+- Started 3 weeks ago · Also has a plan for Left shoulder
+- Overview Exercises Messages 1 new Session notes AI settings Details
+- Plans of care
+- Open a new plan
+- Right hip replacement Open Since 14 Oct
+- Diagnosis: Total hip replacement, right side
+- Show this diagnosis to P-021
+- Mark complete
+- Archive
+- Left shoulder Open Since 27 Oct
+- Diagnosis: Rotator cuff tendinopathy
+- Show this diagnosis to P-021
+- Mark complete
+- Archive
+- Complete means the goals were met. Archive closes a plan and makes its messages read-only. Neither deletes records.
+- Visits
+- Add a visit
+- Tue 4 Nov, 9:00 45 minutes · Re-check range of motion
+- Reschedule asked
+- Change
+- Cancel visit
+- Tue 18 Nov, 9:00 30 minutes · Progress check
+- Change
+- Cancel visit
+- Tue 28 Oct, 9:00 Cancelled by P-021
+- Cancelled
+- Tue 21 Oct, 9:00 45 minutes · Hip flexion measured
+- Past
+- Questionnaires
+- Send a questionnaire
+- Hip function Every 2 weeks · Last filled 27 Oct · Score 54 of 100, higher is better
+- Answers
+- Stop
+- What P-021 can log
+- Pain and symptom check-ins
+- Exercise diary
+- Sleep
+- Medication taken
+- Videos of exercises
+- Home access
+- Access code in use Issued 14 Oct by Therapist · Last used today, 8:40
+- Issue a new code
+- Revoke code
+- A code is shown once, when you issue it. Issuing a new code stops the old one. Revoking signs P-021 out of the app.
+- Caseload status
+- On your caseload Since 14 Oct
+- Discharge
+- After discharge
+- Discharged On 12 Dec by Therapist · Records are kept, the app is read-only for P-021
+- Reactivate
+- Label and notes
+- Label
+- [Sample entry: Hip · Tuesday mornings]
+- A short reminder for staff. Do not use a name, email or birth date.
+- Notes
+- Prefers afternoon visits. Uses one walking stick.
+- Save
+- Delete P-021
+- This removes P-021 and every record: plans, messages, sessions and videos. It cannot be undone. To keep the records, discharge instead.
+- Delete P-021…
+
+## Patient · Dialogs
+
+- Register a patient
+- Register a patient
+- The next free code is P-031 . Limber never stores a name, email or birth date.
+- First plan of care
+- [Placeholder: For example, Post-op knee]
+- Label (optional)
+- A short reminder for staff. No names.
+- Therapist
+- Therapist
+- Cancel
+- Register P-031
+- Access code, shown once
+- Access code for P-021
+- Give this code to P-021 now. It is shown once and cannot be looked up later.
+- 7KQ4-M2XD
+- Copy code
+- Print
+- I have given the code to P-021
+- Done
+- Delete, strong confirmation
+- Delete P-021?
+- This removes P-021 and every record: 2 plans of care, 46 messages, 9 sessions and 3 videos. It cannot be undone.
+- To keep the records, discharge P-021 instead.
+- Type P-021 to confirm
+- Keep P-021
+- Delete for good
+
+## Schedule
+
+- Schedule
+- Add a visit
+- Reschedule requests
+- 1
+- P-021 · Right hip replacement
+- Booked Tue 4 Nov, 9:00 · Asks for Fri 6 Nov, 09:00
+- “Afternoons are better for me this week.”
+- Accept Fri 6 Nov, 09:00
+- Offer another time
+- Keep Tue 4 Nov, 9:00
+- This week
+- 5 visits · 1 request
+- [Button, read aloud as: Previous week]
+- ‹ Earlier
+- [Button, read aloud as: Next week]
+- Later ›
+- Mon
+- 9:00 P-030
+- Ankle sprain · past
+- 11:30 P-009
+- Lower back · past
+- Tue 4 Nov
+- 9:00 P-021
+- Hip · asks to move
+- Wed
+- 14:30 P-023
+- Shoulder
+- Thu
+- No visits
+- Fri
+- 9:00 P-021
+- Requested time
+- 15:00 P-017
+- Post-op knee
+- Upcoming
+- Tue 4 Nov, 9:00
+- P-021 · Right hip replacement 45 minutes · Re-check range of motion
+- Reschedule asked
+- Change
+- Cancel visit
+- Wed 5 Nov, 14:30
+- P-023 · Shoulder 30 minutes · Progress check
+- Change
+- Cancel visit
+- Thu, 10:00
+- P-014 · Rotator cuff Cancelled by P-014 on Mon
+- Cancelled
+- Book again
+- Fri, 15:00
+- P-017 · Post-op knee 30 minutes · Stairs and balance
+- Change
+- Cancel visit
+- Past
+- Mon 3 Nov, 11:30
+- P-009 · Lower back 30 minutes · Did not attend
+- Past Add note
+- Mon 3 Nov, 9:00
+- P-030 · Ankle sprain 30 minutes · Note saved
+- Past Open note
+- Show earlier visits
+
+
+# Tools
+
+## Dashboard
+
+- Dashboard
+- Period
+- Last 30 days
+- Last 7 days
+- Last 90 days
+- In the last 30 days you ran 38 observation sessions with 1,412 reps .
+- Average
+- form score
+- Form score runs from 0 to 100. It is the share of each rep done inside the target path and pace. Higher is better. was 78 of 100 , up 4.
+- Average
+- range of motion
+- Range of motion is the largest joint angle reached in a rep, in degrees. was 96° , up 7°.
+- Average form score by week, 0 to 100
+- [Chart or picture, described as: Line chart. Average form score rose from 72 to 80 over four weeks.]
+- Show as table
+- Week of
+- Form score, 0 to 100
+- 6 Oct
+- 72
+- 13 Oct
+- 75
+- 20 Oct
+- 77
+- 27 Oct
+- 80
+- Average range of motion by week, degrees
+- [Chart or picture, described as: Line chart. Average range of motion rose from 88 to 103 degrees over four weeks.]
+- Show as table
+- Week of
+- Range of motion, degrees
+- 6 Oct
+- 88
+- 13 Oct
+- 92
+- 20 Oct
+- 97
+- 27 Oct
+- 103
+- Recent sessions
+- All sessions
+- When
+- Patient
+- Exercise
+- Reps
+- Form score, 0 to 100
+- Range of motion, degrees
+- Open
+- Mon 3 Nov, 9:10
+- P-030
+- Calf raises
+- 30
+- 84
+- 41
+- Log
+- Fri 31 Oct, 15:20
+- P-017
+- Heel slides
+- 30
+- 81
+- 118
+- Log
+- Tue 28 Oct, 9:15
+- P-021
+- Straight-leg raises
+- 20
+- 68
+- 52
+- Log
+- Tue 28 Oct, 9:05
+- P-021
+- Heel slides
+- 30
+- 79
+- 85
+- Log
+- Form score: 0 to 100, higher is better. Range of motion: the largest joint angle reached in a rep, in degrees. How these are measured
+
+## Sessions
+
+- Sessions
+- 9 sessions for P-021 · 28 Sep to 3 Nov
+- Export
+- Export 9 sessions as
+- CSV · opens in any spreadsheet
+- Excel · .xlsx
+- PDF · one page per session
+- Uses the filters on this page. Patients appear by code only.
+- Download
+- Patient
+- P-021
+- All patients
+- Exercise
+- All exercises
+- Heel slides
+- Straight-leg raises
+- From
+- [Sample entry: 28 Sep]
+- To
+- [Sample entry: 3 Nov]
+- Type
+- Live and video
+- Live session
+- Video analysis
+- Clear filters
+- When
+- Patient
+- Exercise
+- Type
+- Reps
+- Form score, 0 to 100
+- Range of motion, degrees
+- Open
+- Tue 28 Oct, 9:15
+- P-021
+- Straight-leg raises
+- Live session
+- 20
+- 68
+- 52
+- Log
+- Tue 28 Oct, 9:05
+- P-021
+- Heel slides
+- Live session
+- 30
+- 79
+- 85
+- Log
+- Sat 25 Oct, 18:40
+- P-021
+- Hip abduction
+- Video analysis
+- 10
+- 74
+- 28
+- Results
+- Tue 21 Oct, 9:20
+- P-021
+- Heel slides
+- Live session
+- 30
+- 76
+- 78
+- Log
+- Tue 21 Oct, 9:08
+- P-021
+- Quad sets
+- Live session
+- 45
+- 82
+- Not measured
+- Log
+- Tue 14 Oct, 9:30
+- P-021
+- Heel slides
+- Live session
+- 20
+- 71
+- 70
+- Log
+- Showing 6 of 9 Show 3 more Form score: 0 to 100, higher is better. Range of motion: largest joint angle in a rep, in degrees.
+
+## Tracker
+
+- Tracker
+- 12 on your caseload · 3 need attention
+- Export roster
+- Needs attention
+- P-023
+- Shoulder ! Message may need a direct response: “had a fall”
+- Open message
+- P-021
+- Right hip replacement ↑ Pain rose from 3/10 to 6/10 this week
+- Open patient
+- P-009
+- Lower back Inactive 2 weeks · Missed Monday's visit
+- Open patient
+- On track
+- 9 patients
+- Patient
+- Plan
+- Days done, of 7
+- Pain, 0 to 10
+- Last active
+- Next visit
+- P-017
+- Post-op knee
+- 7
+- 2
+- Today
+- Fri, 15:00
+- P-030
+- Ankle sprain
+- 5
+- 1
+- Today
+- Mon 10 Nov
+- P-014
+- Rotator cuff
+- No records
+- No records
+- Registered Fri
+- None booked
+- P-026
+- Tennis elbow
+- 6
+- 3
+- Yesterday
+- Wed 12 Nov
+- Show 5 more
+- Attention thresholds
+- Set for the whole clinic. A patient is listed under Needs attention when any one is met.
+- Pain
+- Rises by 2 or more in 7 days
+- Inactive
+- No records for 10 days
+- Form score
+- Average below 60 of 100
+- Range of motion
+- Drops by 10 degrees or more
+- Days done
+- Fewer than 3 of 7
+- Change thresholds
+- Only admins can change these.
+
+## Live session · Running
+
+- Live session
+- P-021 · Heel slides · Set 2 of 3 · Exercise 1 of 4
+- Running · 3:12
+- [Chart or picture, described as: Camera view with 17 body points drawn over a person lying down, left knee bent to 92 degrees]
+- Body points on · 17 of 17 seen
+- Video stays in this browser. Only 17 body points are sent to Limber. No picture or sound is stored.
+- Reps this set
+- 7 of 10
+- Range of motion
+- The largest knee angle reached in a rep, in degrees. , this rep
+- 92°
+- Best this set 96° · Goal 110°
+- Form score
+- 0 to 100. The share of the rep done inside the target path and pace. Higher is better. , this set
+- 81 of 100
+- Form feedback
+- Heel lifted off the bed on rep 6.
+- Pace is steady. About 4 seconds per rep.
+- Next set
+- Next exercise
+- Stop
+- Start is replaced by Next set while a set is running. Stop ends the session and shows the summary.
+
+## Live session · States
+
+- Before you start
+- Start a live session
+- Patient
+- P-021 · Right hip replacement
+- P-017 · Post-op knee
+- Exercise
+- Heel slides · 3 sets of 10
+- Quad sets · 3 sets of 15
+- Straight-leg raises · 2 sets of 10
+- Hip abduction · 10 reps
+- Video stays in this browser. Only 17 body points are sent to Limber.
+- Start
+- Your browser will ask to use the camera.
+- Model loading
+- Getting the body-point model ready
+- About 10 seconds the first time. It runs on this computer.
+- Camera blocked
+- Limber can't use the camera
+- Allow the camera for this site in your browser's address bar, then try again. No video leaves this computer.
+- Try again
+- Finished summary
+- Session finished
+- P-021 · Tue 4 Nov, 9:22 · 11 minutes
+- Exercise
+- Reps
+- Form score, 0 to 100
+- Best range of motion, degrees
+- Heel slides
+- 30 of 30
+- 81
+- 96
+- Quad sets
+- 45 of 45
+- 84
+- Not measured
+- Straight-leg raises
+- 14 of 20
+- 66
+- 48
+- Straight-leg raises stopped early at rep 14.
+- Open the log Add a session note
+- Start another
+
+## Video analysis · Results
+
+- Video analysis
+- P-021 · Hip abduction · Uploaded Sat 25 Oct, 18:40 · 1 minute 12 seconds
+- Analyse another video
+- 10 reps found. Form score 74 of 100 . Best range of motion 28° , falling to 21° by the last rep.
+- [Button, read aloud as: Play original video]
+- Original
+- As uploaded by P-021
+- [Button, read aloud as: Play annotated video]
+- Annotated
+- Body points and hip angle drawn on each frame
+- Per-rep measures
+- Range of motion per rep, degrees
+- [Chart or picture, described as: Bar chart. Range of motion rises from 24 to 28 degrees by rep 4, then falls to 21 degrees at rep 10.]
+- The table beside this chart holds the same numbers.
+- Rep
+- Range of motion, degrees
+- Form score, 0 to 100
+- Duration, seconds
+- 1
+- 24
+- 78
+- 3.8
+- 2
+- 26
+- 80
+- 3.9
+- 3
+- 27
+- 79
+- 4.0
+- 4
+- 28
+- 77
+- 4.1
+- 5
+- 28
+- 76
+- 4.0
+- 6 to 10
+- 27 to 21
+- 74 to 62
+- 4.2 to 5.1
+- Show every rep
+- Downloads
+- Annotated video · MP4, 14 MB
+- Detailed report · PDF, 3 pages
+- Per-rep data · CSV
+
+## Video analysis · Upload and progress
+
+- Upload and options
+- Analyse a video
+- Drop a video here , or
+- Choose a file
+- MP4 or MOV, up to 500 MB. One person in view, whole body visible.
+- Patient
+- P-021 · Right hip replacement
+- Exercise
+- Hip abduction
+- Heel slides
+- Straight-leg raises
+- Also make
+- Annotated video · body points drawn on each frame, adds about 2 minutes
+- Detailed report · PDF with per-rep measures
+- Start analysis
+- Choose a video first.
+- In progress, takes minutes
+- Analysing hip-abduction-25-oct.mov
+- P-021 · Hip abduction
+- Uploaded · 86 MB
+- Finding body points · frame 980 of 2,160
+- Counting reps and measuring
+- Making the annotated video and report
+- About 4 minutes left. You can leave this page. It will show in Needs you when it is ready.
+- Cancel analysis
+- Could not analyse
+- No full body in view
+- Limber could not see the hips and knees for most of this video. Ask P-021 to film from the side with the whole body in frame.
+- Try another video
+
+## Review
+
+- Review
+- Patient
+- P-021 · Right hip replacement
+- P-021 · Left shoulder
+- P-017 · Post-op knee
+- First to latest
+- Measures
+- Sessions
+- Attention thresholds 1 met
+- Goals
+- Patient videos
+- Exercise diary
+- Medication taken No data
+- Sleep
+- Questionnaires
+- Pain and symptoms
+- Downloads
+- P-021 · Right hip replacement
+- 14 Oct to 3 Nov · 3 weeks · 9 sessions
+- Open patient
+- Sessions
+- First to latest
+- Measure
+- First, 14 Oct
+- Latest, 28 Oct
+- Change
+- Range of motion
+- The largest joint angle reached in a rep, in degrees. Shown on hover and on keyboard focus. , heel slides
+- 70°
+- 85°
+- ↑ 15° better
+- Form score, heel slides, 0 to 100
+- 71
+- 79
+- ↑ 8 better
+- Pain at check-in, 0 to 10
+- 4
+- 6
+- ↑ 2 worse
+- Days done per week, of 7
+- 6
+- 4
+- ↓ 2 fewer
+- Measures
+- Range of motion, heel slides, degrees
+- [Chart or picture, described as: Line chart. Range of motion rose from 70 to 78 to 85 degrees over three sessions. The goal is 110 degrees.]
+- Show as table
+- Session
+- Range of motion, degrees
+- 14 Oct
+- 70
+- 21 Oct
+- 78
+- 28 Oct
+- 85
+- Goal
+- 110
+- Form score, heel slides, 0 to 100
+- [Chart or picture, described as: Line chart. Form score rose from 71 to 76 to 79 over three sessions. The attention line is 60.]
+- Show as table
+- Session
+- Form score, 0 to 100
+- 14 Oct
+- 71
+- 21 Oct
+- 76
+- 28 Oct
+- 79
+- Attention line
+- 60
+- Sessions
+- When
+- Exercises
+- Reps
+- Form score, 0 to 100
+- Summary
+- Open
+- Tue 28 Oct
+- Heel slides, straight-leg raises
+- 50
+- 75
+- Straight-leg raises slower after rep 12
+- Log
+- Tue 21 Oct
+- Heel slides, quad sets
+- 75
+- 79
+- Steady pace throughout
+- Log
+- Tue 14 Oct
+- Heel slides
+- 20
+- 71
+- First session
+- Log
+- Attention thresholds
+- Met Pain rises by 2 or more in 7 days Rose by 3, from 3/10 to 6/10
+- Not met No records for 10 days Last record today
+- Not met Average form score below 60 of 100 Now 75
+- Thresholds are set for the whole clinic in Tracker .
+- Goals
+- Add a goal
+- 110° of hip flexion by week 8
+- 85° of 110° · Week 3
+- Stairs without a rail by week 8 Not yet reached
+- Mark as reached
+- Patient videos
+- Hip abduction · 25 Oct
+- Heel slides · 19 Oct
+- Sent by P-021 from the app. Open one to see its analysis.
+- Exercise diary, as reported by P-021
+- Exercise
+- Tue
+- Wed
+- Thu
+- Fri
+- Sat
+- Sun
+- Mon
+- Heel slides
+- Done
+- Missed
+- Done
+- Done
+- Done
+- Missed
+- Missed
+- Quad sets
+- Done
+- Missed
+- Done
+- Done
+- Done
+- Missed
+- Missed
+- Straight-leg raises
+- Done
+- Missed
+- Done
+- Part
+- Part
+- Missed
+- Missed
+- Hip abduction
+- Done
+- Rest day
+- Done
+- Rest day
+- Missed
+- Rest day
+- Missed
+- Medication taken
+- No data
+- P-021 is not asked to log medication. You can turn it on under Details, What P-021 can log .
+- Sleep
+- Logged on 5 of the last 7 nights. Average 6 hours 10 minutes. Rated poor on 2 nights, Fri 31 Oct and Sat 1 Nov.
+- Questionnaires
+- Questionnaire
+- Filled
+- Score, 0 to 100, higher is better
+- Open
+- Hip function
+- 27 Oct
+- 54
+- Answers
+- Hip function
+- 14 Oct
+- 41
+- Answers
+- Pain and symptom check-ins
+- Pain at check-in, 0 to 10
+- [Chart or picture, described as: Bar chart. Pain rose from 3 on Tuesday to 6 on Monday. No check-in on Sunday.]
+- Each bar carries its number, so the chart reads without a table.
+- Symptoms P-021 reported
+- Mon 3 Nov Straight-leg raises hurt
+- Sat 1 Nov Slept badly, hip stiff in the morning
+- Thu 30 Oct Swelling around the scar, gone by evening
+- Downloads
+- Review report · PDF
+- All measures · CSV
+- Check-ins and diary · CSV
+- Files name the patient by code only.
+
+## Observation logs
+
+- Observation logs
+- Patient
+- P-021
+- All patients
+- P-021 Straight-leg raises Tue 28 Oct, 9:15 · 10 reps · ! 2 warnings
+- P-021 Heel slides Tue 28 Oct, 9:05 · 30 reps
+- P-021 Heel slides Tue 21 Oct, 9:20 · 30 reps
+- P-021 Quad sets Tue 21 Oct, 9:08 · 45 reps
+- P-021 Heel slides Tue 14 Oct, 9:30 · 20 reps
+- P-021 · Straight-leg raises
+- Live session · Tue 28 Oct, 9:15 · Set 2 · 10 reps in 41 seconds
+- Review
+- Warnings
+- Form Form score fell below 60 on rep 10.
+- Range Range of motion dropped 12° across the set, from 52° to 40°.
+- Tracking Left ankle point was lost for 2 seconds at 0:18. Reps 5 and 6 are estimates.
+- Charts
+- All four charts share the rep-by-rep table below.
+- Form score per rep, 0 to 100
+- [Chart or picture, described as: Line chart. Form score falls from 80 on rep 1 to 58 on rep 10, crossing the attention line of 60 at rep 10.]
+- Range of motion per rep, degrees
+- [Chart or picture, described as: Line chart. Range of motion falls from 52 degrees on rep 1 to 40 degrees on rep 10.]
+- Rep duration, seconds
+- [Chart or picture, described as: Bar chart. Reps slow from 3.2 seconds on rep 1 to 5.6 seconds on rep 10.]
+- Joint angle range per rep, lowest to highest, degrees
+- [Chart or picture, described as: Range chart. The hip angle ran from 4 to 56 degrees on rep 1 and from 9 to 49 degrees on rep 10.]
+- Rep by rep
+- Rep
+- Form score, 0 to 100
+- Range of motion, degrees
+- Duration, seconds
+- Joint angle, lowest to highest
+- Note
+- 1
+- 80
+- 52
+- 3.2
+- 4° to 56°
+- 2
+- 79
+- 52
+- 3.3
+- 4° to 56°
+- 3
+- 78
+- 51
+- 3.3
+- 5° to 56°
+- 4
+- 76
+- 50
+- 3.5
+- 5° to 55°
+- 5
+- 74
+- 50
+- 3.6
+- 5° to 55°
+- Estimate
+- 6
+- 72
+- 48
+- 3.9
+- 6° to 54°
+- Estimate
+- 7
+- 69
+- 47
+- 4.2
+- 6° to 53°
+- 8
+- 66
+- 45
+- 4.6
+- 7° to 52°
+- 9
+- 62
+- 43
+- 5.0
+- 8° to 51°
+- 10
+- 58
+- 40
+- 5.6
+- 9° to 49°
+- ! Below 60
+- Event timeline
+- 0:00 Set 2 started
+- 0:18 Left ankle point lost for 2 seconds
+- 0:24 Feedback shown: “Keep the knee straight”
+- 0:36 Rep 10 form score 58, below 60
+- 0:41 Set stopped by Therapist
+- Downloads
+- Rep-by-rep data · CSV
+- Body points · JSON
+- Session report · PDF
+
+## How it works
+
+- How it works
+- Limber watches 17 points on the body and turns their movement into three numbers: reps, range of motion and a form score.
+- What the camera sees
+- The browser finds 17 body points in each frame: nose, eyes, ears, shoulders, elbows, wrists, hips, knees and ankles. Video stays in the browser. Only the 17 points are sent to Limber, about 30 times a second.
+- [Chart or picture, described as: A stick figure made of 17 dots joined by lines]
+- Reps
+- A rep is one full move out and back. Limber counts a rep when the joint angle passes the start line, reaches the turn point, and returns past the start line. Half moves are not counted.
+- Range of motion
+- Range of motion is the largest joint angle reached in a rep, in degrees. For heel slides it is the bend at the knee. A straight leg is 0°.
+- [Chart or picture, described as: A bent knee with the angle between thigh and shin marked as 92 degrees]
+- Form score
+- The form score runs from 0 to 100. Higher is better. It blends three things for each rep, then averages the reps in a set.
+- Part
+- What it means
+- Share of the score
+- Path
+- How much of the rep stayed on the target line of movement
+- 50%
+- Pace
+- How much of the rep was inside the target speed
+- 30%
+- Range
+- How close the rep came to the target range of motion
+- 20%
+- Form score calculator
+- Move the three sliders to see how the score changes.
+- Path: 80% on the target line
+- Pace: 70% inside the target speed
+- Range: 90% of the target range of motion
+- Form score
+- 79 of 100
+- 80 × 0.5 + 70 × 0.3 + 90 × 0.2 = 79
+- At or above the attention line of 60
+- These numbers support your judgement. They do not replace it. Loose clothing, poor light or a camera angle that hides a joint can make them less exact.
+
+
+# Admin and system
+
+## People
+
+- People
+- 4 staff accounts · 2 invites waiting
+- Invite someone
+- Staff
+- Name
+- Role
+- Status
+- Patients
+- Actions
+- Therapist You
+- Therapist and admin
+- Active
+- 12
+- You can't disable yourself
+- Dana Reyes
+- Therapist
+- Active
+- 9
+- Reassign patients
+- Disable
+- Sam Patel
+- Admin
+- Active
+- None
+- Disable
+- Jo Lindqvist
+- Therapist
+- Disabled 20 Oct
+- 4
+- Reassign 4 patients
+- Re-enable
+- A disabled account can't sign in. Its records stay. Its patients need a therapist: reassign them.
+- Invites waiting
+- Therapist Made 2 Nov by Therapist · Not used · Ends in 5 days
+- Copy link
+- Revoke
+- Patient P-031, assigned to Dana Reyes Made today by Therapist · Not used · Ends in 7 days
+- Copy link
+- Revoke
+- Admin Revoked 30 Oct by Therapist
+- Revoked
+
+## People · Invite and reassign
+
+- Invite someone
+- Invite someone
+- Who is it for?
+- Therapist · sees their own patients
+- Admin · manages people, sees no patients
+- Patient · gets the next free code, P-031
+- Assign to therapist
+- Dana Reyes · 9 patients
+- Therapist · 12 patients
+- You get a link to pass on. Limber sends no email and stores no address.
+- Cancel
+- Make invite link
+- Link to copy
+- Invite link for P-031
+- Pass this link to the patient. It works once and ends in 7 days.
+- Invite link
+- [Sample entry: https://limber.example/join/9f3k-22ad-x7]
+- Copy link
+- Copied
+- Until it is used, you can revoke it under Invites waiting.
+- Done
+- Reassign patients
+- Reassign Jo Lindqvist's patients
+- 4 patients have no active therapist.
+- P-004 · Hamstring strain
+- P-011 · Frozen shoulder
+- P-019 · Post-op knee
+- P-027 · Lower back
+- Move to
+- Dana Reyes · 9 patients
+- Therapist · 12 patients
+- Plans, messages and records move with each patient. Patients are not told.
+- Cancel
+- Move 4 patients
+- Disable, confirmation
+- Disable Dana Reyes?
+- Dana Reyes will be signed out and can't sign in again until re-enabled. Their 9 patients will need another therapist.
+- Cancel
+- Disable account
+
+## My settings · Admin-only account
+
+- My settings
+- These follow you to every device you sign in on.
+- Larger text
+- Makes all text about one fifth bigger. Pages get longer, nothing is cut off.
+- Higher contrast
+- Darker text, stronger lines and darker buttons.
+- Less motion
+- Stops loading shimmer and spinning. Progress is shown as text instead.
+- Saved. Larger text is on.
+- Account
+- Name shown
+- Sam Patel
+- Role
+- Admin. You manage people and see no patient records.
+- Change password
+- Sign out
+
+## First-run setup and signed out
+
+- First run, no staff password set
+- Limber
+- Set up the clinic side
+- No staff password has been set yet. Make the first admin account to begin. You can invite therapists after this.
+- Name shown to colleagues
+- Password
+- At least 12 characters.
+- Password again
+- Make admin account
+- Until this is done, the clinic side is open to anyone who can reach this address. Do it now.
+- Signed out, typed reply kept
+- Limber
+- Your sign-in has ended
+- For safety, Limber signs you out after a while. Sign in to carry on where you were.
+- Your reply to P-021 is kept
+- It has not been sent. It will be back in the reply box after you sign in.
+- “Thanks for the photos. Please skip the straight-leg raises until…”
+- Name
+- [Sample entry: Therapist]
+- Password
+- Sign in
+- Sign in as someone else
+- If someone else signs in here, the kept reply is deleted.
+
+
+# Components
+
+## Components and states
+
+- Colour tokens. Brand names kept, new ones marked.
+- --teal #0E6B64
+- --teal-dark #0A544E
+- --coral #F2684A
+- --ink #16302C
+- --muted #728280
+- --muted-text #5E6E6C
+- --warning #B4432B
+- --background #FAF8F4
+- --card #FFFFFF
+- --line #EDEAE2
+- --line-strong #D6D1C5
+- --teal-tint #E3EFED
+- --coral-tint #FDEBE5
+- --warn-tint #FBECE8
+- --control-border New · = muted
+- --focus New · = ink
+- --badge-bg New · = coral
+- --scrim New · ink 32%
+- Type. Sora, tighter than the patient side.
+- Heading 1 · 22px, 800, -0.02em
+- Heading 2 · 17px, 800, -0.02em
+- Heading 3 · 15px, 700
+- Body · 14px, 400. Plain words and short sentences.
+- Small · 13px, muted-text
+- Micro · 12px, the smallest size used
+- 26px figure with unit
+- Buttons: main 44px, small 32px. Default, quiet, plain, danger, disabled, focus.
+- Send
+- Edit
+- Discard
+- Stop
+- Delete for good
+- Send
+- Focused
+- Small
+- Small quiet
+- Change
+- [Button, read aloud as: More]
+- [Switch: Example switch, off]
+- [Switch: Example switch, on]
+- 5
+- 1 new
+- Urgent
+- Open
+- Past
+- Neutral
+- Top bar: therapist, with Tools, Me and Find a patient open
+- P-021 Right hip replacement
+- P-023 Shoulder
+- P-026 Tennis elbow
+- Type a code or a plan. Enter opens the first match.
+- Dashboard Live session Video analysis Sessions Observation logs Review Tracker How it works
+- Signed in as Therapist
+- My settings People Admins only Sign out
+- Needs-you row: read, unread, selected, urgent, reschedule, hover, focus
+- P-017 Mon Post-op knee · Read, nothing new
+- P-017 3 new Yesterday Post-op knee · Unread: dot, bold and a count
+- P-021 1 new 8:40 Right hip replacement · Selected
+- P-023 Urgent 8:12 Shoulder · Icon, word and outline
+- P-021 Reschedule 7:55 Asks for Fri 6 Nov, 09:00
+- P-030 Fri Ankle sprain · Hover
+- P-009 Thu Lower back · Keyboard focus
+- AI label: one form everywhere
+- AI AI-drafted — check before sending
+- AI AI-drafted — check before acting
+- AI AI-drafted — check before acting
+- Anything the assistant wrote sits inside a dashed teal edge with this label. Buttons that start the assistant carry the same AI mark.
+- AI Draft a reply
+- Metric definition: on hover, on focus, and in text below tables
+- Form score
+- Form score runs from 0 to 100. It is the share of each rep done inside the target path and pace. Higher is better. 78 of 100
+- Notices: safety (withheld), plain, good news
+- This message may need a direct response
+- Warning colours are kept for safety only.
+- The assistant isn't available right now
+- Errors and empty states stay neutral.
+- Your reply to P-021 is kept
+- Reassurance uses the teal tint.
+- Chart with its table, and loading
+- Range of motion, degrees
+- [Chart or picture, described as: Line chart. Range of motion rose from 70 to 85 degrees. Goal 110 degrees.]
+- Show as table
+- Session
+- Range of motion, degrees
+- 14 Oct
+- 70
+- 21 Oct
+- 78
+- 28 Oct
+- 85
+- Loading
+- Confirm dialog: everyday and destructive
+- Discharge P-021?
+- Records are kept. You can reactivate later.
+- Cancel
+- Discharge
+- Delete P-021?
+- This cannot be undone.
+- Type P-021 to confirm
+- Keep
+- Delete for good
+- Fields and section tabs
+- Overview Exercises Messages 1 Details
+- Label
+- [Sample entry: Default field]
+- Label
+- [Sample entry: Focused field]
+- Hint text sits under the field.
+- Checkbox, 18px box in a 28px row

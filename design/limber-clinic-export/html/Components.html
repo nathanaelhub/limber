@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Components and states</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb sheet" style="width: 1280px; min-height: 1900px">
+
+<div class="state-box">
+<p class="cap">Colour tokens. Brand names kept, new ones marked.</p>
+<div class="rowflex" style="align-items: flex-start; gap: 12px">
+<span class="sw"><i style="background: var(--teal)"></i><b>--teal</b>#0E6B64</span>
+<span class="sw"><i style="background: var(--teal-dark)"></i><b>--teal-dark</b>#0A544E</span>
+<span class="sw"><i style="background: var(--coral)"></i><b>--coral</b>#F2684A</span>
+<span class="sw"><i style="background: var(--ink)"></i><b>--ink</b>#16302C</span>
+<span class="sw"><i style="background: var(--muted)"></i><b>--muted</b>#728280</span>
+<span class="sw"><i style="background: var(--muted-text)"></i><b>--muted-text</b>#5E6E6C</span>
+<span class="sw"><i style="background: var(--warning)"></i><b>--warning</b>#B4432B</span>
+<span class="sw"><i style="background: var(--background)"></i><b>--background</b>#FAF8F4</span>
+<span class="sw"><i style="background: var(--card)"></i><b>--card</b>#FFFFFF</span>
+<span class="sw"><i style="background: var(--line)"></i><b>--line</b>#EDEAE2</span>
+<span class="sw"><i style="background: var(--line-strong)"></i><b>--line-strong</b>#D6D1C5</span>
+<span class="sw"><i style="background: var(--teal-tint)"></i><b>--teal-tint</b>#E3EFED</span>
+<span class="sw"><i style="background: var(--coral-tint)"></i><b>--coral-tint</b>#FDEBE5</span>
+<span class="sw"><i style="background: var(--warn-tint)"></i><b>--warn-tint</b>#FBECE8</span>
+<span class="sw"><i style="background: var(--control-border)"></i><b>--control-border</b>New · = muted</span>
+<span class="sw"><i style="background: var(--focus)"></i><b>--focus</b>New · = ink</span>
+<span class="sw"><i style="background: var(--badge-bg)"></i><b>--badge-bg</b>New · = coral</span>
+<span class="sw"><i style="background: var(--scrim)"></i><b>--scrim</b>New · ink 32%</span>
+</div>
+</div>
+
+<div class="cols">
+<div class="state-box">
+<p class="cap">Type. Sora, tighter than the patient side.</p>
+<div class="stack">
+<h1>Heading 1 · 22px, 800, -0.02em</h1>
+<h2>Heading 2 · 17px, 800, -0.02em</h2>
+<h3>Heading 3 · 15px, 700</h3>
+<p>Body · 14px, 400. Plain words and short sentences.</p>
+<p class="small dim">Small · 13px, muted-text</p>
+<p class="micro dim">Micro · 12px, the smallest size used</p>
+<p class="fact"><span class="val">26px figure <small>with unit</small></span></p>
+</div>
+</div>
+<div class="state-box">
+<p class="cap">Buttons: main 44px, small 32px. Default, quiet, plain, danger, disabled, focus.</p>
+<div class="rowflex">
+<button class="btn" type="button">Send</button>
+<button class="btn quiet" type="button">Edit</button>
+<button class="btn plain" type="button">Discard</button>
+<button class="btn danger" type="button">Stop</button>
+<button class="btn danger solid" type="button">Delete for good</button>
+<button class="btn" type="button" disabled>Send</button>
+<button class="btn is-focus" type="button">Focused</button>
+</div>
+<div class="rowflex">
+<button class="btn small" type="button">Small</button>
+<button class="btn quiet small" type="button">Small quiet</button>
+<button class="btn plain small" type="button">Change</button>
+<button class="icon-btn" type="button" aria-label="More"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+<label class="switch"><input type="checkbox" role="switch" aria-label="Example switch, off"><span class="track"></span><span class="state"></span></label>
+<label class="switch"><input type="checkbox" role="switch" aria-label="Example switch, on" checked><span class="track"></span><span class="state"></span></label>
+</div>
+<div class="rowflex">
+<span class="count">5</span>
+<span class="tag new">1 new</span>
+<span class="tag urgent"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Urgent</span>
+<span class="tag teal">Open</span>
+<span class="tag ghost">Past</span>
+<span class="tag">Neutral</span>
+</div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Top bar: therapist, with Tools, Me and Find a patient open</p>
+<header class="top" style="border: 1px solid var(--line); border-radius: 14px 14px 0 0">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html" aria-current="page">Inbox <span class="count">5</span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find is-focus"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" value="02"></label>
+<details class="drop"><summary>Tools</summary></details>
+<details class="drop"><summary>Me</summary></details>
+</header>
+<div class="rowflex" style="align-items: flex-start; justify-content: flex-end; gap: 16px">
+<div class="menu static" style="width: 300px" role="listbox" aria-label="Patients matching 02">
+<a href="Patients.html" class="is-hover" role="option" aria-selected="true"><span class="code">P-021</span> Right hip replacement</a>
+<a href="Patients.html" role="option"><span class="code">P-023</span> Shoulder</a>
+<a href="Patients.html" role="option"><span class="code">P-026</span> Tennis elbow</a>
+<p class="who" style="border: 0; margin: 0">Type a code or a plan. Enter opens the first match.</p>
+</div>
+<div class="menu static"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div>
+<div class="menu static"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People <span class="small dim sp">Admins only</span></a><a href="SystemStates.html">Sign out</a></div>
+</div>
+</div>
+
+<div class="cols">
+<div class="state-box">
+<p class="cap">Needs-you row: read, unread, selected, urgent, reschedule, hover, focus</p>
+<div class="stack tight" style="width: 320px">
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-017</span><span class="micro dim sp">Mon</span></span><span class="l2">Post-op knee · Read, nothing new</span></span></a>
+<a class="row unread" href="#"><span class="dot"></span><span><span class="l1"><span class="code">P-017</span><span class="tag new">3 new</span><span class="micro dim sp">Yesterday</span></span><span class="l2">Post-op knee · Unread: dot, bold and a count</span></span></a>
+<a class="row unread" href="#" aria-current="true"><span class="dot"></span><span><span class="l1"><span class="code">P-021</span><span class="tag new">1 new</span><span class="micro dim sp">8:40</span></span><span class="l2">Right hip replacement · Selected</span></span></a>
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-023</span><span class="tag urgent"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Urgent</span><span class="micro dim sp">8:12</span></span><span class="l2">Shoulder · Icon, word and outline</span></span></a>
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-021</span><span class="tag ghost"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Reschedule</span><span class="micro dim sp">7:55</span></span><span class="l2">Asks for Fri 6 Nov, 09:00</span></span></a>
+<a class="row" href="#" style="background: var(--line)"><span></span><span><span class="l1"><span class="code">P-030</span><span class="micro dim sp">Fri</span></span><span class="l2">Ankle sprain · Hover</span></span></a>
+<a class="row is-focus" href="#"><span></span><span><span class="l1"><span class="code">P-009</span><span class="micro dim sp">Thu</span></span><span class="l2">Lower back · Keyboard focus</span></span></a>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">AI label: one form everywhere</p>
+<div class="stack">
+<p><span class="ai-label"><span class="ai-tag" aria-hidden="true">AI</span>AI-drafted — check before sending</span></p>
+<p><span class="ai-label"><span class="ai-tag" aria-hidden="true">AI</span>AI-drafted — check before acting</span></p>
+<div class="ai-block"><span class="ai-label"><span class="ai-tag" aria-hidden="true">AI</span>AI-drafted — check before acting</span><p>Anything the assistant wrote sits inside a dashed teal edge with this label. Buttons that start the assistant carry the same AI mark.</p><div><button class="btn quiet" type="button"><span class="ai-tag" aria-hidden="true">AI</span>Draft a reply</button></div></div>
+</div>
+<p class="cap" style="padding-top: 16px">Metric definition: on hover, on focus, and in text below tables</p>
+<div style="min-height: 110px"><span class="def-wrap"><button class="def is-focus" type="button" aria-describedby="c-def">Form score</button><span class="tip show" id="c-def" role="tooltip">Form score runs from 0 to 100. It is the share of each rep done inside the target path and pace. Higher is better.</span></span> <b>78 of 100</b></div>
+</div>
+</div>
+
+<div class="cols">
+<div class="state-box">
+<p class="cap">Notices: safety (withheld), plain, good news</p>
+<div class="notice" role="alert"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg><div class="stack tight"><h3>This message may need a direct response</h3><p>Warning colours are kept for safety only.</p></div></div>
+<div class="notice plain"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><div class="stack tight"><h3>The assistant isn't available right now</h3><p>Errors and empty states stay neutral.</p></div></div>
+<div class="notice info"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><div class="stack tight"><h3>Your reply to P-021 is kept</h3><p>Reassurance uses the teal tint.</p></div></div>
+</div>
+
+<div class="state-box">
+<p class="cap">Chart with its table, and loading</p>
+<figure class="chart">
+<h3>Range of motion, degrees</h3>
+<svg viewBox="0 0 480 120" role="img" aria-label="Line chart. Range of motion rose from 70 to 85 degrees. Goal 110 degrees.">
+<path class="grid" d="M40 50H460"/><path class="axis" d="M40 96H460"/><path class="goal" d="M40 20H460"/>
+<text x="456" y="14" text-anchor="end">Goal 110°</text><text x="32" y="100" text-anchor="end">60°</text>
+<path class="s1" d="M90 80 250 66 410 54"/><circle class="pt" cx="90" cy="80" r="4"/><circle class="pt" cx="250" cy="66" r="4"/><circle class="pt" cx="410" cy="54" r="4"/>
+<text x="90" y="114" text-anchor="middle">14 Oct</text><text x="250" y="114" text-anchor="middle">21 Oct</text><text x="410" y="114" text-anchor="middle">28 Oct</text>
+</svg>
+<details class="astable" open><summary>Show as table</summary>
+<table class="table"><thead><tr><th scope="col">Session</th><th scope="col" class="r">Range of motion, degrees</th></tr></thead><tbody><tr><td>14 Oct</td><td class="r">70</td></tr><tr><td>21 Oct</td><td class="r">78</td></tr><tr><td>28 Oct</td><td class="r">85</td></tr></tbody></table>
+</details>
+</figure>
+<div class="stack" aria-busy="true"><div class="sk" style="width: 70%"></div><div class="sk" style="width: 45%"></div><p class="rowflex small dim" role="status"><span class="spin" aria-hidden="true"></span>Loading</p></div>
+</div>
+</div>
+
+<div class="cols">
+<div class="state-box">
+<p class="cap">Confirm dialog: everyday and destructive</p>
+<div class="rowflex" style="align-items: flex-start">
+<div class="dialog" style="width: 270px"><h2>Discharge P-021?</h2><p>Records are kept. You can reactivate later.</p><div class="dialog-actions"><button class="btn quiet" type="button">Cancel</button><button class="btn" type="button">Discharge</button></div></div>
+<div class="dialog" style="width: 270px"><h2>Delete P-021?</h2><p>This cannot be undone.</p><label class="field"><span>Type P-021 to confirm</span><input class="input" type="text"></label><div class="dialog-actions"><button class="btn quiet" type="button">Keep</button><button class="btn danger solid" type="button" disabled>Delete for good</button></div></div>
+</div>
+</div>
+<div class="state-box">
+<p class="cap">Fields and section tabs</p>
+<nav class="tabs" aria-label="Example sections"><a href="#" aria-current="page">Overview</a><a href="#">Exercises</a><a href="#">Messages <span class="count">1</span></a><a href="#" class="is-focus">Details</a></nav>
+<label class="field"><span>Label</span><input class="input" type="text" value="Default field"></label>
+<label class="field"><span>Label</span><input class="input is-focus" type="text" value="Focused field"><span class="hint">Hint text sits under the field.</span></label>
+<label class="check"><input type="checkbox" checked> <span>Checkbox, 18px box in a 28px row</span></label>
+</div>
+</div>
+
+</div>
+</body>
+</html>
