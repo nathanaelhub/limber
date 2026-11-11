@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Observation logs</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 2100px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary class="on">Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html" aria-current="page">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<div class="split">
+<nav class="side" aria-label="Observation sessions">
+<div class="side-head"><h2>Observation logs</h2></div>
+<label class="field" style="padding: 0 8px 12px"><span class="vh">Patient</span><select class="input"><option>P-021</option><option>All patients</option></select></label>
+<a class="row" href="#" aria-current="true"><span></span><span><span class="l1"><span class="code">P-021</span><span class="small">Straight-leg raises</span></span><span class="l2">Tue 28 Oct, 9:15 · 10 reps · ! 2 warnings</span></span></a>
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-021</span><span class="small">Heel slides</span></span><span class="l2">Tue 28 Oct, 9:05 · 30 reps</span></span></a>
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-021</span><span class="small">Heel slides</span></span><span class="l2">Tue 21 Oct, 9:20 · 30 reps</span></span></a>
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-021</span><span class="small">Quad sets</span></span><span class="l2">Tue 21 Oct, 9:08 · 45 reps</span></span></a>
+<a class="row" href="#"><span></span><span><span class="l1"><span class="code">P-021</span><span class="small">Heel slides</span></span><span class="l2">Tue 14 Oct, 9:30 · 20 reps</span></span></a>
+</nav>
+
+<main class="pane">
+<div class="pane-head ruled">
+<div class="stack tight"><h1>P-021 · Straight-leg raises</h1><p class="dim">Live session · Tue 28 Oct, 9:15 · Set 2 · 10 reps in 41 seconds</p></div>
+<a class="btn quiet small sp" href="Review.html">Review</a>
+</div>
+
+<div class="pane-body" style="gap: 40px">
+
+<section class="sec">
+<h2>Warnings</h2>
+<ul class="lines">
+<li><span class="tag urgent"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Form</span><span>Form score fell below 60 on rep 10.</span></li>
+<li><span class="tag urgent"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Range</span><span>Range of motion dropped 12° across the set, from 52° to 40°.</span></li>
+<li><span class="tag ghost">Tracking</span><span>Left ankle point was lost for 2 seconds at 0:18. Reps 5 and 6 are estimates.</span></li>
+</ul>
+</section>
+
+<section class="sec">
+<div class="sec-head"><h2>Charts</h2><span class="small dim">All four charts share the rep-by-rep table below.</span></div>
+<div class="cols">
+<figure class="chart">
+<h3>Form score per rep, 0 to 100</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Line chart. Form score falls from 80 on rep 1 to 58 on rep 10, crossing the attention line of 60 at rep 10.">
+<path class="grid" d="M40 20H460M40 60H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">100</text><text x="32" y="64" text-anchor="end">80</text><text x="32" y="144" text-anchor="end">40</text>
+<path class="goal" d="M40 100H460"/><text x="44" y="116">Attention below 60</text>
+<path class="s1" d="M60 60 102 62 144 64 186 68 228 72 270 76 312 82 354 88 396 96 438 104"/>
+<circle class="pt" cx="60" cy="60" r="4"/><circle class="pt" cx="438" cy="104" r="4"/>
+<text x="60" y="162" text-anchor="middle">1</text><text x="228" y="162" text-anchor="middle">5</text><text x="438" y="162" text-anchor="middle">10</text>
+</svg>
+</figure>
+<figure class="chart">
+<h3>Range of motion per rep, degrees</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Line chart. Range of motion falls from 52 degrees on rep 1 to 40 degrees on rep 10.">
+<path class="grid" d="M40 20H460M40 60H460M40 100H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">60°</text><text x="32" y="64" text-anchor="end">50°</text><text x="32" y="104" text-anchor="end">40°</text><text x="32" y="144" text-anchor="end">30°</text>
+<path class="s1" d="M60 52 102 52 144 56 186 60 228 60 270 68 312 72 354 80 396 88 438 100"/>
+<circle class="pt" cx="60" cy="52" r="4"/><circle class="pt" cx="438" cy="100" r="4"/>
+<text x="60" y="162" text-anchor="middle">1</text><text x="228" y="162" text-anchor="middle">5</text><text x="438" y="162" text-anchor="middle">10</text>
+</svg>
+</figure>
+<figure class="chart">
+<h3>Rep duration, seconds</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Bar chart. Reps slow from 3.2 seconds on rep 1 to 5.6 seconds on rep 10.">
+<path class="grid" d="M40 20H460M40 80H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">6 s</text><text x="32" y="84" text-anchor="end">3 s</text><text x="32" y="144" text-anchor="end">0 s</text>
+<rect class="bar" x="49" y="76" width="22" height="64"/><rect class="bar" x="91" y="74" width="22" height="66"/><rect class="bar" x="133" y="74" width="22" height="66"/><rect class="bar" x="175" y="70" width="22" height="70"/><rect class="bar" x="217" y="68" width="22" height="72"/><rect class="bar" x="259" y="62" width="22" height="78"/><rect class="bar" x="301" y="56" width="22" height="84"/><rect class="bar" x="343" y="48" width="22" height="92"/><rect class="bar" x="385" y="40" width="22" height="100"/><rect class="bar" x="427" y="28" width="22" height="112"/>
+<text x="60" y="162" text-anchor="middle">1</text><text x="228" y="162" text-anchor="middle">5</text><text x="438" y="162" text-anchor="middle">10</text>
+</svg>
+</figure>
+<figure class="chart">
+<h3>Joint angle range per rep, lowest to highest, degrees</h3>
+<svg viewBox="0 0 480 170" role="img" aria-label="Range chart. The hip angle ran from 4 to 56 degrees on rep 1 and from 9 to 49 degrees on rep 10.">
+<path class="grid" d="M40 20H460M40 80H460"/><path class="axis" d="M40 140H460"/>
+<text x="32" y="24" text-anchor="end">60°</text><text x="32" y="84" text-anchor="end">30°</text><text x="32" y="144" text-anchor="end">0°</text>
+<rect class="bar" x="55" y="28" width="10" height="104" rx="5"/><rect class="bar" x="97" y="28" width="10" height="104" rx="5"/><rect class="bar" x="139" y="28" width="10" height="102" rx="5"/><rect class="bar" x="181" y="30" width="10" height="100" rx="5"/><rect class="bar" x="223" y="30" width="10" height="100" rx="5"/><rect class="bar" x="265" y="32" width="10" height="96" rx="5"/><rect class="bar" x="307" y="34" width="10" height="94" rx="5"/><rect class="bar" x="349" y="36" width="10" height="90" rx="5"/><rect class="bar" x="391" y="38" width="10" height="86" rx="5"/><rect class="bar" x="433" y="42" width="10" height="80" rx="5"/>
+<text x="60" y="162" text-anchor="middle">1</text><text x="228" y="162" text-anchor="middle">5</text><text x="438" y="162" text-anchor="middle">10</text>
+</svg>
+</figure>
+</div>
+</section>
+
+<section class="sec">
+<h2>Rep by rep</h2>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">Rep</th><th scope="col" class="r">Form score, 0 to 100</th><th scope="col" class="r">Range of motion, degrees</th><th scope="col" class="r">Duration, seconds</th><th scope="col" class="r">Joint angle, lowest to highest</th><th scope="col">Note</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="r">80</td><td class="r">52</td><td class="r">3.2</td><td class="r">4° to 56°</td><td></td></tr>
+<tr><td>2</td><td class="r">79</td><td class="r">52</td><td class="r">3.3</td><td class="r">4° to 56°</td><td></td></tr>
+<tr><td>3</td><td class="r">78</td><td class="r">51</td><td class="r">3.3</td><td class="r">5° to 56°</td><td></td></tr>
+<tr><td>4</td><td class="r">76</td><td class="r">50</td><td class="r">3.5</td><td class="r">5° to 55°</td><td></td></tr>
+<tr><td>5</td><td class="r">74</td><td class="r">50</td><td class="r">3.6</td><td class="r">5° to 55°</td><td class="dim">Estimate</td></tr>
+<tr><td>6</td><td class="r">72</td><td class="r">48</td><td class="r">3.9</td><td class="r">6° to 54°</td><td class="dim">Estimate</td></tr>
+<tr><td>7</td><td class="r">69</td><td class="r">47</td><td class="r">4.2</td><td class="r">6° to 53°</td><td></td></tr>
+<tr><td>8</td><td class="r">66</td><td class="r">45</td><td class="r">4.6</td><td class="r">7° to 52°</td><td></td></tr>
+<tr><td>9</td><td class="r">62</td><td class="r">43</td><td class="r">5.0</td><td class="r">8° to 51°</td><td></td></tr>
+<tr><td>10</td><td class="r strong">58</td><td class="r">40</td><td class="r">5.6</td><td class="r">9° to 49°</td><td class="strong" style="color: var(--warning)">! Below 60</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="sec">
+<h2>Event timeline</h2>
+<ol class="lines">
+<li><span class="num strong" style="width: 48px">0:00</span><span>Set 2 started</span></li>
+<li><span class="num strong" style="width: 48px">0:18</span><span>Left ankle point lost for 2 seconds</span></li>
+<li><span class="num strong" style="width: 48px">0:24</span><span>Feedback shown: “Keep the knee straight”</span></li>
+<li><span class="num strong" style="width: 48px">0:36</span><span>Rep 10 form score 58, below 60</span></li>
+<li><span class="num strong" style="width: 48px">0:41</span><span>Set stopped by Therapist</span></li>
+</ol>
+</section>
+
+<section class="sec">
+<h2>Downloads</h2>
+<div class="rowflex">
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Rep-by-rep data · CSV</a>
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Body points · JSON</a>
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Session report · PDF</a>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</div>
+</body>
+</html>

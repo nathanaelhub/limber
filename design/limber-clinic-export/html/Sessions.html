@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Sessions</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 860px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary class="on">Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html" aria-current="page">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<main class="page">
+<div class="page-head">
+<div class="stack tight"><h1>Sessions</h1><p class="dim">9 sessions for P-021 · 28 Sep to 3 Nov</p></div>
+<details class="drop inline sp" open>
+<summary>Export</summary>
+<form class="menu" style="width: 280px; padding: 14px">
+<fieldset class="stack" style="border: 0; padding: 0; margin: 0; gap: 8px">
+<legend class="strong" style="padding: 0 0 8px">Export 9 sessions as</legend>
+<label class="check"><input type="radio" name="fmt" checked> <span>CSV <span class="dim small">· opens in any spreadsheet</span></span></label>
+<label class="check"><input type="radio" name="fmt"> <span>Excel <span class="dim small">· .xlsx</span></span></label>
+<label class="check"><input type="radio" name="fmt"> <span>PDF <span class="dim small">· one page per session</span></span></label>
+</fieldset>
+<p class="hint" style="padding: 10px 0">Uses the filters on this page. Patients appear by code only.</p>
+<button class="btn" type="button" style="width: 100%">Download</button>
+</form>
+</details>
+</div>
+
+<form class="rowflex" style="align-items: flex-end" aria-label="Filters">
+<label class="field" style="width: 160px"><span>Patient</span><select class="input"><option>P-021</option><option>All patients</option></select></label>
+<label class="field" style="width: 200px"><span>Exercise</span><select class="input"><option>All exercises</option><option>Heel slides</option><option>Straight-leg raises</option></select></label>
+<label class="field" style="width: 150px"><span>From</span><input class="input" type="text" value="28 Sep"></label>
+<label class="field" style="width: 150px"><span>To</span><input class="input" type="text" value="3 Nov"></label>
+<label class="field" style="width: 160px"><span>Type</span><select class="input"><option>Live and video</option><option>Live session</option><option>Video analysis</option></select></label>
+<button class="btn plain" type="button">Clear filters</button>
+</form>
+
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">When</th><th scope="col">Patient</th><th scope="col">Exercise</th><th scope="col">Type</th><th scope="col" class="r">Reps</th><th scope="col" class="r">Form score, 0 to 100</th><th scope="col" class="r">Range of motion, degrees</th><th scope="col"><span class="vh">Open</span></th></tr></thead>
+<tbody>
+<tr><td>Tue 28 Oct, 9:15</td><td class="code">P-021</td><td>Straight-leg raises</td><td>Live session</td><td class="r">20</td><td class="r">68</td><td class="r">52</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 28 Oct, 9:05</td><td class="code">P-021</td><td>Heel slides</td><td>Live session</td><td class="r">30</td><td class="r">79</td><td class="r">85</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Sat 25 Oct, 18:40</td><td class="code">P-021</td><td>Hip abduction</td><td>Video analysis</td><td class="r">10</td><td class="r">74</td><td class="r">28</td><td><a href="VideoAnalysis.html">Results</a></td></tr>
+<tr><td>Tue 21 Oct, 9:20</td><td class="code">P-021</td><td>Heel slides</td><td>Live session</td><td class="r">30</td><td class="r">76</td><td class="r">78</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 21 Oct, 9:08</td><td class="code">P-021</td><td>Quad sets</td><td>Live session</td><td class="r">45</td><td class="r">82</td><td class="r dim">Not measured</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+<tr><td>Tue 14 Oct, 9:30</td><td class="code">P-021</td><td>Heel slides</td><td>Live session</td><td class="r">20</td><td class="r">71</td><td class="r">70</td><td><a href="ObservationLogs.html">Log</a></td></tr>
+</tbody>
+</table>
+</div>
+<p class="rowflex small dim"><span>Showing 6 of 9</span><a href="#">Show 3 more</a><span class="sp">Form score: 0 to 100, higher is better. Range of motion: largest joint angle in a rep, in degrees.</span></p>
+</main>
+</div>
+</body>
+</html>

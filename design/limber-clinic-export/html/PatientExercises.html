@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · P-021 exercises</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb pane-only" style="width: 880px; min-height: 900px">
+<div class="pane-head">
+<div class="stack tight"><h1>P-021 · Right hip replacement</h1><p class="dim">Started 3 weeks ago · Also has a plan for Left shoulder</p></div>
+</div>
+<nav class="tabs" aria-label="P-021">
+<a href="Patients.html">Overview</a><a href="PatientExercises.html" aria-current="page">Exercises</a><a href="Main.html">Messages <span class="count">1<span class="vh"> new</span></span></a><a href="PatientNotes.html">Session notes</a><a href="PatientAI.html">AI settings</a><a href="PatientDetails.html">Details</a>
+</nav>
+
+<div class="pane-body" style="gap: 28px">
+<section class="sec">
+<div class="sec-head"><h2>Assigned program</h2><span class="small dim">4 exercises · Changed 27 Oct</span><button class="btn sp" type="button">Add an exercise</button></div>
+<ul class="lines">
+<li><div class="stack tight"><span class="strong">Heel slides</span><span class="small dim">3 sets of 10 · Every day</span></div><span class="small dim sp">Done 4 of 7 days</span><button class="btn plain small" type="button">Change</button></li>
+<li><div class="stack tight"><span class="strong">Quad sets</span><span class="small dim">3 sets of 15 · 5-second hold · Every day</span></div><span class="small dim sp">Done 4 of 7 days</span><button class="btn plain small" type="button">Change</button></li>
+<li><div class="stack tight"><span class="strong">Straight-leg raises</span><span class="small dim">2 sets of 10 · Every day</span></div><span class="small strong sp" style="color: var(--warning)">↑ Pain logged after, 3 days</span><button class="btn plain small" type="button">Change</button></li>
+<li><div class="stack tight"><span class="strong">Hip abduction</span><span class="small dim">10 reps · Every other day</span></div><span class="small dim sp">Done 2 of 4 days</span><button class="btn plain small" type="button">Change</button></li>
+</ul>
+</section>
+
+<section class="sec">
+<p class="cap">Changing an exercise, opens in place</p>
+<div class="card stack">
+<h3>Change Straight-leg raises</h3>
+<div class="rowflex" style="align-items: flex-end">
+<label class="field" style="width: 96px"><span>Sets</span><input class="input" type="number" value="2"></label>
+<label class="field" style="width: 96px"><span>Reps</span><input class="input" type="number" value="8"></label>
+<label class="field" style="width: 140px"><span>Hold, seconds</span><input class="input" type="number" value="0"></label>
+<label class="field" style="width: 200px"><span>How often</span><select class="input"><option>Every other day</option><option>Every day</option></select></label>
+</div>
+<label class="field"><span>Note P-021 sees with this exercise (optional)</span><input class="input" type="text" value="Stop if pain goes above 4 out of 10."></label>
+<div class="rowflex">
+<button class="btn" type="button">Save change</button>
+<button class="btn quiet" type="button">Cancel</button>
+<button class="btn plain sp" type="button" style="color: var(--warning)">Remove from program</button>
+</div>
+<p class="hint">P-021 sees the change the next time they open the app. Past records are kept.</p>
+</div>
+</section>
+
+<section class="sec">
+<p class="cap">Adding an exercise</p>
+<div class="card stack">
+<label class="field"><span>Exercise</span><input class="input" type="search" value="brid" aria-expanded="true"></label>
+<ul class="menu static" role="listbox" aria-label="Matching exercises">
+<li><button type="button" class="is-hover" role="option" aria-selected="true">Bridges</button></li>
+<li><button type="button" role="option">Bridges, single leg</button></li>
+</ul>
+</div>
+</section>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Schedule</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 1180px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html" aria-current="page">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary>Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<main class="page" style="max-width: 960px">
+<div class="page-head">
+<h1>Schedule</h1>
+<button class="btn sp" type="button">Add a visit</button>
+</div>
+
+<section class="sec">
+<div class="sec-head"><h2>Reschedule requests</h2><span class="count">1</span></div>
+<div class="card stack">
+<div class="rowflex" style="align-items: flex-start">
+<div class="stack tight" style="flex: 1; min-width: 240px">
+<p><span class="code">P-021</span> · Right hip replacement</p>
+<p class="dim">Booked Tue 4 Nov, 9:00 · Asks for <b style="color: var(--ink)">Fri 6 Nov, 09:00</b></p>
+</div>
+<blockquote class="bubble">“Afternoons are better for me this week.”</blockquote>
+</div>
+<div class="rowflex">
+<button class="btn" type="button">Accept Fri 6 Nov, 09:00</button>
+<button class="btn quiet" type="button">Offer another time</button>
+<button class="btn plain" type="button">Keep Tue 4 Nov, 9:00</button>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<div class="sec-head"><h2>This week</h2><span class="small dim">5 visits · 1 request</span>
+<span class="rowflex sp"><button class="btn plain small" type="button" aria-label="Previous week">‹ Earlier</button><button class="btn plain small" type="button" aria-label="Next week">Later ›</button></span></div>
+<div class="week">
+<div><p class="small strong">Mon</p><p class="visit"><b class="num">9:00</b> P-030<br><span class="dim">Ankle sprain · past</span></p><p class="visit"><b class="num">11:30</b> P-009<br><span class="dim">Lower back · past</span></p></div>
+<div><p class="small strong">Tue 4 Nov</p><p class="visit"><b class="num">9:00</b> P-021<br><span class="dim">Hip · asks to move</span></p></div>
+<div><p class="small strong">Wed</p><p class="visit"><b class="num">14:30</b> P-023<br><span class="dim">Shoulder</span></p></div>
+<div><p class="small strong">Thu</p><p class="small dim">No visits</p></div>
+<div><p class="small strong">Fri</p><p class="visit ask"><b class="num">9:00</b> P-021<br><span class="dim">Requested time</span></p><p class="visit"><b class="num">15:00</b> P-017<br><span class="dim">Post-op knee</span></p></div>
+</div>
+</section>
+
+<section class="sec">
+<div class="sec-head"><h2>Upcoming</h2></div>
+<ul class="lines">
+<li><span class="strong num" style="width: 150px">Tue 4 Nov, 9:00</span><div class="stack tight" style="flex: 1; min-width: 200px"><span><span class="code">P-021</span> · Right hip replacement</span><span class="small dim">45 minutes · Re-check range of motion</span></div><span class="tag ghost">Reschedule asked</span><button class="btn plain small" type="button">Change</button><button class="btn plain small" type="button">Cancel visit</button></li>
+<li><span class="strong num" style="width: 150px">Wed 5 Nov, 14:30</span><div class="stack tight" style="flex: 1; min-width: 200px"><span><span class="code">P-023</span> · Shoulder</span><span class="small dim">30 minutes · Progress check</span></div><button class="btn plain small" type="button">Change</button><button class="btn plain small" type="button">Cancel visit</button></li>
+<li><span class="strike num" style="width: 150px">Thu, 10:00</span><div class="stack tight" style="flex: 1; min-width: 200px"><span class="strike"><span class="code">P-014</span> · Rotator cuff</span><span class="small dim">Cancelled by P-014 on Mon</span></div><span class="tag ghost">Cancelled</span><button class="btn plain small" type="button">Book again</button></li>
+<li><span class="strong num" style="width: 150px">Fri, 15:00</span><div class="stack tight" style="flex: 1; min-width: 200px"><span><span class="code">P-017</span> · Post-op knee</span><span class="small dim">30 minutes · Stairs and balance</span></div><button class="btn plain small" type="button">Change</button><button class="btn plain small" type="button">Cancel visit</button></li>
+</ul>
+</section>
+
+<section class="sec">
+<div class="sec-head"><h2>Past</h2></div>
+<ul class="lines">
+<li><span class="num dim" style="width: 150px">Mon 3 Nov, 11:30</span><div class="stack tight" style="flex: 1; min-width: 200px"><span><span class="code">P-009</span> · Lower back</span><span class="small dim">30 minutes · Did not attend</span></div><span class="tag ghost">Past</span><a href="PatientNotes.html">Add note</a></li>
+<li><span class="num dim" style="width: 150px">Mon 3 Nov, 9:00</span><div class="stack tight" style="flex: 1; min-width: 200px"><span><span class="code">P-030</span> · Ankle sprain</span><span class="small dim">30 minutes · Note saved</span></div><span class="tag ghost">Past</span><a href="PatientNotes.html">Open note</a></li>
+</ul>
+<p class="small"><a href="#">Show earlier visits</a></p>
+</section>
+</main>
+</div>
+</body>
+</html>

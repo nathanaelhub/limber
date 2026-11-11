@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Invite and reassign</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb sheet across" style="width: 1280px; min-height: 720px">
+
+<div class="state-box">
+<p class="cap">Invite someone</p>
+<form class="dialog" style="width: 370px" role="dialog" aria-labelledby="dlg-inv">
+<h2 id="dlg-inv">Invite someone</h2>
+<fieldset class="stack" style="border: 0; padding: 0; margin: 0; gap: 8px">
+<legend class="small strong" style="padding: 0 0 8px">Who is it for?</legend>
+<label class="check"><input type="radio" name="role"> <span>Therapist <span class="small dim">· sees their own patients</span></span></label>
+<label class="check"><input type="radio" name="role"> <span>Admin <span class="small dim">· manages people, sees no patients</span></span></label>
+<label class="check"><input type="radio" name="role" checked> <span>Patient <span class="small dim">· gets the next free code, P-031</span></span></label>
+</fieldset>
+<label class="field"><span>Assign to therapist</span><select class="input"><option>Dana Reyes · 9 patients</option><option>Therapist · 12 patients</option></select></label>
+<p class="hint">You get a link to pass on. Limber sends no email and stores no address.</p>
+<div class="dialog-actions"><button class="btn quiet" type="button">Cancel</button><button class="btn" type="button">Make invite link</button></div>
+</form>
+</div>
+
+<div class="state-box">
+<p class="cap">Link to copy</p>
+<div class="dialog" style="width: 370px" role="dialog" aria-labelledby="dlg-link">
+<h2 id="dlg-link">Invite link for P-031</h2>
+<p>Pass this link to the patient. It works once and ends in 7 days.</p>
+<label class="field"><span>Invite link</span><input class="input" type="text" readonly value="https://limber.example/join/9f3k-22ad-x7"></label>
+<div class="rowflex"><button class="btn" type="button">Copy link</button><span class="rowflex small" role="status"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Copied</span></div>
+<p class="hint">Until it is used, you can revoke it under Invites waiting.</p>
+<div class="dialog-actions"><button class="btn quiet" type="button">Done</button></div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Reassign patients</p>
+<form class="dialog" style="width: 370px" role="dialog" aria-labelledby="dlg-re">
+<h2 id="dlg-re">Reassign Jo Lindqvist's patients</h2>
+<p class="dim">4 patients have no active therapist.</p>
+<ul class="stack" style="gap: 8px">
+<li><label class="check"><input type="checkbox" checked> <span><span class="code">P-004</span> · Hamstring strain</span></label></li>
+<li><label class="check"><input type="checkbox" checked> <span><span class="code">P-011</span> · Frozen shoulder</span></label></li>
+<li><label class="check"><input type="checkbox" checked> <span><span class="code">P-019</span> · Post-op knee</span></label></li>
+<li><label class="check"><input type="checkbox" checked> <span><span class="code">P-027</span> · Lower back</span></label></li>
+</ul>
+<label class="field"><span>Move to</span><select class="input"><option>Dana Reyes · 9 patients</option><option>Therapist · 12 patients</option></select></label>
+<p class="hint">Plans, messages and records move with each patient. Patients are not told.</p>
+<div class="dialog-actions"><button class="btn quiet" type="button">Cancel</button><button class="btn" type="button">Move 4 patients</button></div>
+</form>
+</div>
+
+<div class="state-box">
+<p class="cap">Disable, confirmation</p>
+<div class="dialog" style="width: 370px" role="alertdialog" aria-labelledby="dlg-dis">
+<h2 id="dlg-dis">Disable Dana Reyes?</h2>
+<p>Dana Reyes will be signed out and can't sign in again until re-enabled. Their 9 patients will need another therapist.</p>
+<div class="dialog-actions"><button class="btn quiet" type="button">Cancel</button><button class="btn danger" type="button">Disable account</button></div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

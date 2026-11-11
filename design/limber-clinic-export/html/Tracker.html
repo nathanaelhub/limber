@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Tracker</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 940px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary class="on">Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html" aria-current="page">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<main class="page">
+<div class="page-head">
+<div class="stack tight"><h1>Tracker</h1><p class="dim">12 on your caseload · 3 need attention</p></div>
+<button class="btn quiet sp" type="button">Export roster</button>
+</div>
+
+<div class="cols wide-left">
+<div class="stack loose">
+<section class="sec">
+<div class="sec-head"><h2>Needs attention</h2></div>
+<ul class="lines">
+<li><a class="code" href="Patients.html">P-023</a><div class="stack tight" style="flex: 1; min-width: 200px"><span>Shoulder</span><span class="small strong" style="color: var(--warning)">! Message may need a direct response: “had a fall”</span></div><a href="Main.html">Open message</a></li>
+<li><a class="code" href="Patients.html">P-021</a><div class="stack tight" style="flex: 1; min-width: 200px"><span>Right hip replacement</span><span class="small strong" style="color: var(--warning)">↑ Pain rose from 3/10 to 6/10 this week</span></div><a href="Patients.html">Open patient</a></li>
+<li><a class="code" href="Patients.html">P-009</a><div class="stack tight" style="flex: 1; min-width: 200px"><span>Lower back</span><span class="small strong">Inactive 2 weeks · Missed Monday's visit</span></div><a href="Patients.html">Open patient</a></li>
+</ul>
+</section>
+
+<section class="sec">
+<div class="sec-head"><h2>On track</h2><span class="small dim">9 patients</span></div>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">Patient</th><th scope="col">Plan</th><th scope="col" class="r">Days done, of 7</th><th scope="col" class="r">Pain, 0 to 10</th><th scope="col">Last active</th><th scope="col">Next visit</th></tr></thead>
+<tbody>
+<tr><td><a class="code" href="Patients.html">P-017</a></td><td>Post-op knee</td><td class="r">7</td><td class="r">2</td><td>Today</td><td>Fri, 15:00</td></tr>
+<tr><td><a class="code" href="Patients.html">P-030</a></td><td>Ankle sprain</td><td class="r">5</td><td class="r">1</td><td>Today</td><td>Mon 10 Nov</td></tr>
+<tr><td><a class="code" href="Patients.html">P-014</a></td><td>Rotator cuff</td><td class="r dim">No records</td><td class="r dim">No records</td><td>Registered Fri</td><td class="dim">None booked</td></tr>
+<tr><td><a class="code" href="Patients.html">P-026</a></td><td>Tennis elbow</td><td class="r">6</td><td class="r">3</td><td>Yesterday</td><td>Wed 12 Nov</td></tr>
+</tbody>
+</table>
+</div>
+<p class="small"><a href="#">Show 5 more</a></p>
+</section>
+</div>
+
+<aside class="card stack" style="align-self: flex-start">
+<h2>Attention thresholds</h2>
+<p class="small dim">Set for the whole clinic. A patient is listed under Needs attention when any one is met.</p>
+<dl class="kv small">
+<dt>Pain</dt><dd>Rises by 2 or more in 7 days</dd>
+<dt>Inactive</dt><dd>No records for 10 days</dd>
+<dt>Form score</dt><dd>Average below 60 of 100</dd>
+<dt>Range of motion</dt><dd>Drops by 10 degrees or more</dd>
+<dt>Days done</dt><dd>Fewer than 3 of 7</dd>
+</dl>
+<div><button class="btn quiet small" type="button">Change thresholds</button></div>
+<p class="hint">Only admins can change these.</p>
+</aside>
+</div>
+</main>
+</div>
+</body>
+</html>

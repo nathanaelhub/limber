@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Live session</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 900px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary class="on">Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html" aria-current="page">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<main class="page">
+<div class="page-head">
+<div class="stack tight"><h1>Live session</h1><p class="dim"><span class="code" style="color: var(--ink)">P-021</span> · Heel slides · Set 2 of 3 · Exercise 1 of 4</p></div>
+<span class="tag teal sp"><span class="spin" aria-hidden="true" style="width: 10px; height: 10px"></span>Running · 3:12</span>
+</div>
+
+<div class="cols wide-left">
+<div class="stack">
+<div class="cam">
+<svg viewBox="0 0 640 400" role="img" aria-label="Camera view with 17 body points drawn over a person lying down, left knee bent to 92 degrees">
+<path d="M40 300H600" stroke="#FFFFFF" stroke-opacity=".25" stroke-width="2"/>
+<g fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+<path d="M160 236 300 240 400 160 460 250"/>
+<path d="M164 246 304 248 410 244 520 250"/>
+<path d="M160 236 220 262 280 270M164 246 226 272 284 278"/>
+<path d="M110 230 160 236"/>
+</g>
+<path d="M372 182A36 36 0 0 1 424 196" fill="none" stroke="#F2684A" stroke-width="3"/>
+<g fill="#16302C" stroke="#FFFFFF" stroke-width="3">
+<circle cx="110" cy="230" r="6"/><circle cx="104" cy="220" r="4"/><circle cx="114" cy="218" r="4"/><circle cx="94" cy="228" r="4"/><circle cx="98" cy="238" r="4"/>
+<circle cx="160" cy="236" r="6"/><circle cx="164" cy="246" r="6"/><circle cx="220" cy="262" r="6"/><circle cx="226" cy="272" r="6"/><circle cx="280" cy="270" r="6"/><circle cx="284" cy="278" r="6"/>
+<circle cx="300" cy="240" r="6"/><circle cx="304" cy="248" r="6"/><circle cx="400" cy="160" r="6"/><circle cx="410" cy="244" r="6"/><circle cx="460" cy="250" r="6"/><circle cx="520" cy="250" r="6"/>
+</g>
+<text x="412" y="150" fill="#FFFFFF" font-size="18" font-weight="800">92°</text>
+</svg>
+<span class="over">Body points on · 17 of 17 seen</span>
+</div>
+<p class="rowflex small"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span><b>Video stays in this browser.</b> Only 17 body points are sent to Limber. No picture or sound is stored.</span></p>
+</div>
+
+<div class="stack loose">
+<div class="fact">
+<span class="lbl">Reps this set</span>
+<span class="val" aria-live="polite">7 <small>of 10</small></span>
+<div class="track-bar" role="img" aria-label="7 of 10 reps"><span style="width: 70%"></span></div>
+</div>
+<div class="fact">
+<span class="lbl"><span class="def-wrap"><button class="def" type="button" aria-describedby="l-rom">Range of motion</button><span class="tip" id="l-rom" role="tooltip">The largest knee angle reached in a rep, in degrees.</span></span>, this rep</span>
+<span class="val">92°</span>
+<span class="small dim">Best this set 96° · Goal 110°</span>
+</div>
+<div class="fact">
+<span class="lbl"><span class="def-wrap"><button class="def" type="button" aria-describedby="l-form">Form score</button><span class="tip" id="l-form" role="tooltip">0 to 100. The share of the rep done inside the target path and pace. Higher is better.</span></span>, this set</span>
+<span class="val">81 <small>of 100</small></span>
+</div>
+<div class="stack tight">
+<h3>Form feedback</h3>
+<ul class="lines small">
+<li>Heel lifted off the bed on rep 6.</li>
+<li>Pace is steady. About 4 seconds per rep.</li>
+</ul>
+</div>
+<div class="rowflex">
+<button class="btn" type="button">Next set</button>
+<button class="btn quiet" type="button">Next exercise</button>
+<button class="btn danger" type="button">Stop</button>
+</div>
+<p class="hint">Start is replaced by Next set while a set is running. Stop ends the session and shows the summary.</p>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>
