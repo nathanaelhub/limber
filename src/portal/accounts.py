@@ -116,17 +116,17 @@ def authenticate(store: SessionStore, username: Optional[str], password: Optiona
     client and per username, so one username cannot be guessed at from many places."""
     user = (username or "").strip().lower() if isinstance(username, str) else ""
     keyed = "user:" + user
-    wait = max(limiter.retry_after(client), limiter.retry_after(keyed))
+    wait = max(limiter.retry_after(client, store), limiter.retry_after(keyed, store))
     if wait:
         raise LockedOut(wait)
     account = store.account_by_username(user) if user else None
     if (account is None or account.status != "active" or account.role not in roles
             or not password_matches(store, account.id, password)):
-        limiter.failure(client)
-        limiter.failure(keyed)
+        limiter.failure(client, store)
+        limiter.failure(keyed, store)
         raise AccessDenied(DENIED)
-    limiter.success(client)
-    limiter.success(keyed)
+    limiter.success(client, store)
+    limiter.success(keyed, store)
     return account
 
 

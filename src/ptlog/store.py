@@ -71,7 +71,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -749,6 +749,21 @@ CREATE TABLE IF NOT EXISTS message_handled (
 ALTER TABLE messages ADD COLUMN from_draft INTEGER NOT NULL DEFAULT 0;
 """
 
+# v18 (feature 020): the sign-in limiter's counts, so every hosted instance sees the same failures. Clients are
+# stored only as a hash, so no address or username is kept.
+SCHEMA_V18_SQL = """
+CREATE TABLE IF NOT EXISTS login_failures (
+    client  TEXT NOT NULL,
+    at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS login_failures_client ON login_failures (client, at);
+CREATE INDEX IF NOT EXISTS login_failures_at ON login_failures (at);
+CREATE TABLE IF NOT EXISTS login_lockouts (
+    client  TEXT PRIMARY KEY,
+    until   TEXT NOT NULL
+);
+"""
+
 SCHEMA_V17_SQL = """
 CREATE TABLE IF NOT EXISTS coach_turns (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -783,6 +798,7 @@ MIGRATIONS: List[tuple] = [
     (15, SCHEMA_V15_SQL),
     (16, SCHEMA_V16_SQL),
     (17, SCHEMA_V17_SQL),
+    (18, SCHEMA_V18_SQL),
 ]
 
 

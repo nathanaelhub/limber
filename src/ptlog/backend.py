@@ -60,6 +60,15 @@ def connect(path: Path | str, timeout: float = 5.0, check_same_thread: bool = Tr
     return Connection(libsql.connect(str(path)))     # tests: the same client against a local file
 
 
+def connect_primary():
+    """A direct connection to the hosted database itself (no local copy), for resetting the demo."""
+    turso = _turso()
+    if not turso:
+        raise HostedRecordRefused("Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN to reset the hosted demo.")
+    import libsql
+    return Connection(libsql.connect(turso[0], auth_token=turso[1]))
+
+
 # ---------------------------------------------------------------- the hosted-demo guard (FR-009)
 
 def mark_simulated(store) -> None:

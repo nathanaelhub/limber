@@ -30,4 +30,4 @@ jobs:
         env:
           LIMBER_ANTHROPIC_API_KEY: ""
           LIMBER_DB_BACKEND: libsql
-        run: python -m pytest -q tests/test_ptlog*.py tests/test_portal*.py tests/test_assist.py tests/test_deploy*.py
+        run: python -m pytest -q tests/test_ptlog*.py tests/test_portal*.py tests/test_assist.py tests/test_deploy*.py tests/test_hosted_settings.py tests/test_media_files.py

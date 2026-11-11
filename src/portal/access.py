@@ -89,6 +89,12 @@ def load_key(path: Path) -> bytes:
     """The 32-byte server key: PTASSIST_PORTAL_KEY (64 hex characters) or a private file created on
     first use. It lives outside the database, so a leaked database does not expose usable hashes."""
     env = os.environ.get("PTASSIST_PORTAL_KEY")
+    if not env:
+        from src.ptlog import backend
+        if backend.hosted():
+            # Each hosted instance would make its own key on its temporary disk, and a sign-in or code made on one
+            # could not be checked on another (feature 020, FR-008).
+            raise PortalError("A hosted install needs PTASSIST_PORTAL_KEY (64 hexadecimal characters) in its settings.")
     if env:
         try:
             key = bytes.fromhex(env.strip())
@@ -136,8 +142,8 @@ class LoginLimiter:
             self._failures.pop(client, None)
         return kept
 
-    def retry_after(self, client: str) -> int:
-        """Seconds the client must wait; 0 when an attempt may be made."""
+    def retry_after(self, client: str, store: Optional[SessionStore] = None) -> int:
+        """Seconds the client must wait; 0 when an attempt may be made. (`store` is used by RecordLoginLimiter.)"""
         now = self.clock()
         self._all = [t for t in self._all if (now - t).total_seconds() < 60]
         waits = [0]
@@ -151,7 +157,7 @@ class LoginLimiter:
                 self._locked_until.pop(client, None)
         return max(waits)
 
-    def failure(self, client: str) -> None:
+    def failure(self, client: str, store: Optional[SessionStore] = None) -> None:
         now = self.clock()
         self._all.append(now)
         recent = self._recent(client, now) + [now]
@@ -160,9 +166,62 @@ class LoginLimiter:
         if over >= 0:
             self._locked_until[client] = now + timedelta(seconds=self.BASE_LOCKOUT * (2 ** over))
 
-    def success(self, client: str) -> None:
+    def success(self, client: str, store: Optional[SessionStore] = None) -> None:
         self._failures.pop(client, None)
         self._locked_until.pop(client, None)
+
+
+class RecordLoginLimiter(LoginLimiter):
+    """The same limits, counted in the record so that every hosted instance sees the same failures (feature 020,
+    FR-007). Clients are stored only as a hash. It uses the caller's open store: a second connection could wait
+    on the caller's own write."""
+
+    @staticmethod
+    def _id(client: str) -> str:
+        return hashlib.sha256(("limber-login:" + client).encode()).hexdigest()
+
+    def retry_after(self, client: str, store: Optional[SessionStore] = None) -> int:
+        if store is None:
+            return super().retry_after(client)
+        now = self.clock()
+        minute_ago = (now - timedelta(seconds=60)).isoformat()
+        waits = [0]
+        recent_all = store.conn.execute("SELECT COUNT(*), MIN(at) FROM login_failures WHERE at > ?", (minute_ago,)).fetchone()
+        if recent_all[0] >= self.GLOBAL_PER_MINUTE:
+            waits.append(math.ceil(60 - (now - datetime.fromisoformat(recent_all[1])).total_seconds()))
+        cid = self._id(client)
+        row = store.conn.execute("SELECT until FROM login_lockouts WHERE client = ?", (cid,)).fetchone()
+        if row is not None:
+            until = datetime.fromisoformat(row[0])
+            window_start = (now - timedelta(seconds=self.WINDOW)).isoformat()
+            recent = store.conn.execute("SELECT COUNT(*) FROM login_failures WHERE client = ? AND at > ?",
+                                        (cid, window_start)).fetchone()[0]
+            if until > now and recent:
+                waits.append(math.ceil((until - now).total_seconds()))
+        return max(waits)
+
+    def failure(self, client: str, store: Optional[SessionStore] = None) -> None:
+        if store is None:
+            return super().failure(client)
+        now = self.clock()
+        cid = self._id(client)
+        store.conn.execute("DELETE FROM login_failures WHERE at <= ?", ((now - timedelta(seconds=self.WINDOW)).isoformat(),))
+        store.conn.execute("INSERT INTO login_failures (client, at) VALUES (?, ?)", (cid, now.isoformat()))
+        recent = store.conn.execute("SELECT COUNT(*) FROM login_failures WHERE client = ?", (cid,)).fetchone()[0]
+        over = recent - self.PER_CLIENT
+        if over >= 0:
+            until = now + timedelta(seconds=self.BASE_LOCKOUT * (2 ** over))
+            store.conn.execute("INSERT INTO login_lockouts (client, until) VALUES (?, ?) "
+                               "ON CONFLICT(client) DO UPDATE SET until = excluded.until", (cid, until.isoformat()))
+        store.conn.commit()
+
+    def success(self, client: str, store: Optional[SessionStore] = None) -> None:
+        if store is None:
+            return super().success(client)
+        cid = self._id(client)
+        store.conn.execute("DELETE FROM login_failures WHERE client = ?", (cid,))
+        store.conn.execute("DELETE FROM login_lockouts WHERE client = ?", (cid,))
+        store.conn.commit()
 
 
 # ----------------------------------------------------------------------------- issue, sign in, sign out
@@ -190,13 +249,13 @@ def sign_in(store: SessionStore, key: bytes, code: Optional[str], client: str, l
     A device sign-in (the installed app) lasts DEVICE_LIMIT with no idle limit; a browser sign-in
     keeps the idle and absolute limits. Raises LockedOut or AccessDenied; every refusal reads the
     same to the visitor."""
-    wait = limiter.retry_after(client)
+    wait = limiter.retry_after(client, store)
     if wait:
         store.portal_audit_add("locked_out", None, client)
         raise LockedOut(wait)
 
     def refuse(detail: str, patient_id: Optional[str] = None):
-        limiter.failure(client)
+        limiter.failure(client, store)
         store.portal_audit_add("login_failed", patient_id, client, detail)
         raise AccessDenied()
 
@@ -212,7 +271,7 @@ def sign_in(store: SessionStore, key: bytes, code: Optional[str], client: str, l
     if store.get_discharge(status.patient_id) is not None:
         refuse("discharged", status.patient_id)
 
-    limiter.success(client)
+    limiter.success(client, store)
     token = ("d." if device else "b.") + secrets.token_urlsafe(32)      # the prefix says which rules apply
     store.portal_signin_create(token_hash(token), status.patient_id,
                                clock() + (DEVICE_LIMIT if device else ABSOLUTE_LIMIT), keep=SIGN_INS_PER_PATIENT)

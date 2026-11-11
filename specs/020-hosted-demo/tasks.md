@@ -47,13 +47,13 @@ hosted settings at each merge.
 
 ## Slice C: Shared settings (Story 1; FR-007, FR-008, FR-010 to FR-012)
 
-- [ ] T017 The sign-in limiter's counts kept in the record (test: five wrong passwords through two app instances
+- [x] T017 The sign-in limiter's counts kept in the record (test: five wrong passwords through two app instances
       lock the account)
-- [ ] T018 Server key from `PTASSIST_PORTAL_KEY` on hosted installs; refuse to start without it
-- [ ] T019 `/api/health` checks the record and the file store; 503 names which one is down
-- [ ] T020 `deploy demo-reset`: replace the hosted record and files with a fresh seed, print the new access codes
+- [x] T018 Server key from `PTASSIST_PORTAL_KEY` on hosted installs; refuse to start without it
+- [x] T019 `/api/health` checks the record and the file store; 503 names which one is down
+- [x] T020 `deploy demo-reset`: replace the hosted record and files with a fresh seed, print the new access codes
       once; refuse an unmarked record
-- [ ] T021 The hosted AI cap: 10 calls per account per day, set by `demo-reset`
+- [x] T021 The hosted AI cap: 10 calls per account per day, set by `demo-reset`
 
 ## Slice D: The patient portal as Vercel Python functions (Story 1; FR-015)
 

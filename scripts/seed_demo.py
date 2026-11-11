@@ -372,11 +372,11 @@ DEMO_PATIENTS = (("P-017", "knee, steady progress"), ("P-021", "hip, pain rising
 DEMO_SECOND_CASELOAD = ("P-018", "P-022", "P-024")   # rivera's patients; everyone else is the lead therapist's
 
 
-def write_demo_logins(db_path: Path) -> None:
-    """Test sign-ins for the demo record, printed and saved to data/demo-logins.txt (gitignored with the rest of
-    data/): the installation therapist (also an admin), a second therapist with their own caseload, an admin who
-    is not a therapist, a patient with a username, and a fresh access code per demo patient (feature 016).
-    Demo record only: codes are issued against the demo database's own server key."""
+def demo_logins(db_path: Path) -> list:
+    """Create the demo sign-ins and return the access codes as (patient, about, code): the installation therapist
+    (also an admin), a second therapist with their own caseload, an admin who is not a therapist, a patient with a
+    username, and a fresh access code per demo patient (feature 016). Codes are issued against the server key
+    (PTASSIST_PORTAL_KEY when set, as on the hosted demo, else the demo database's own key file)."""
     from src.portal import access, accounts, admin
     with SessionStore(db_path).open() as s:
         lead = admin.set_password(s, DEMO_PASSWORD)
@@ -390,7 +390,12 @@ def write_demo_logins(db_path: Path) -> None:
             accounts.create_account(s, username="patient017", display_name="Demo patient", password=DEMO_PASSWORD,
                                     role="patient", patient_id="P-017")
         key = access.load_key(access.default_key_path(db_path))
-        codes = [(pid, about, access.issue_code(s, key, pid, days=30)[0]) for pid, about in DEMO_PATIENTS]
+        return [(pid, about, access.issue_code(s, key, pid, days=30)[0]) for pid, about in DEMO_PATIENTS]
+
+
+def write_demo_logins(db_path: Path) -> None:
+    """The demo sign-ins, printed and saved to data/demo-logins.txt (gitignored with the rest of data/)."""
+    codes = demo_logins(db_path)
     lines = [
         "Limber demo sign-ins (simulated data only; reissued every time the demo is rebuilt)",
         "",
