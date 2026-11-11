@@ -26,7 +26,23 @@ cp "$REPO/deploy/vercel/.python-version" "$OUT/.python-version"
 # A Dockerfile at the root would switch Vercel to its container runtime, which the hosted demo doesn't use.
 rm -f "$OUT/Dockerfile.vercel" "$OUT/railway.json"
 
-"$PY" "$OUT/scripts/fetch_portal_assets.py" >/dev/null
+# The pose assets patients' browsers load from Limber: this machine's copies, re-checked against the pinned SHA-256
+# list in scripts/fetch_portal_assets.py (their original download site, tfhub.dev, now answers 404).
+"$PY" - "$REPO" "$OUT" <<'PYCODE'
+import hashlib, shutil, sys
+from pathlib import Path
+repo, out = Path(sys.argv[1]), Path(sys.argv[2])
+sys.path.insert(0, str(repo / "scripts"))
+from fetch_portal_assets import ASSETS
+src, dest = repo / "interfaces/portal_static/vendor", out / "interfaces/portal_static/vendor"
+for rel, (_url, digest) in ASSETS.items():
+    data = (src / rel).read_bytes()
+    if hashlib.sha256(data).hexdigest() != digest:
+        sys.exit(f"Refusing to deploy: vendor/{rel} does not match its pinned SHA-256")
+    (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+    (dest / rel).write_bytes(data)
+print(f"pose assets: {len(ASSETS)} files, hashes checked")
+PYCODE
 
 for secret in .env data; do
     if [ -e "$OUT/$secret" ]; then echo "Refusing to deploy: $secret is in the deploy folder." >&2; exit 1; fi
