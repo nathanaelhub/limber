@@ -1,0 +1,22 @@
+# What the hosted demo's upload leaves out (feature 020): secrets and records, and everything the portal doesn't
+# need at run time.
+.env
+.env.*
+data/
+.venv/
+.git/
+.github/
+.claude/
+.specify/
+deploy/secrets/
+deploy/limber.env
+models/*.pt
+videos/
+design/
+docs/
+specs/
+tests/
+exports/
+sessions/
+observation_logs/
+output/

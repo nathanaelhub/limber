@@ -23,6 +23,7 @@ cp "$REPO/deploy/vercel/requirements.txt" "$OUT/requirements.txt"
 cp "$REPO/deploy/vercel/index.py" "$OUT/index.py"
 cp "$REPO/deploy/vercel/vercel.json" "$OUT/vercel.json"
 cp "$REPO/deploy/vercel/.python-version" "$OUT/.python-version"
+cp "$REPO/deploy/vercel/.vercelignore" "$OUT/.vercelignore"
 # A Dockerfile at the root would switch Vercel to its container runtime, which the hosted demo doesn't use.
 rm -f "$OUT/Dockerfile.vercel" "$OUT/railway.json"
 
