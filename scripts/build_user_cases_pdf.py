@@ -256,9 +256,10 @@ CASES = [
                 "measures the left arm. Measured on the visible right arm, the same clip gives 73° instead of 85° "
                 "and form 53 instead of 68. Claude spotted the hidden arm in one run, then called the visible arm "
                 "the left in a rerun, so it can't be relied on for left and right. Each check took about 13 "
-                "seconds.",
-         status="issue", issues=[23, 24],
-         shot_height=2.3, shots=["c18a_leg_extension_3_reps.png", "c18b_push_up_overlay.png"]),
+                "seconds. In the app's Video analysis page (9 Nov dry run) the annotated video didn't play "
+                "(#35, fixed).",
+         status="issue", issues=[23, 24, 35],
+         shot_height=2.1, shots=["c18a_leg_extension_3_reps.png", "c18b_push_up_overlay.png"]),
     dict(id=19, who="script", title="Summary and drafts after the video sessions",
          persona="The therapist, after the three videos were saved under P-021, with summaries and drafts on for "
                  "P-017, P-021 and P-023.",
@@ -273,7 +274,8 @@ CASES = [
                 "call before the next hip session. <b>Issues:</b> P-017's draft, made on 5 Nov, called a 29 Oct "
                 "check-in “yesterday”, because drafts aren't told today's date. And when called directly, the "
                 "draft function wrote a reply in P-017's archived plan. The app hides that button, but the "
-                "function itself doesn't refuse.",
+                "function itself doesn't refuse. <b>Both fixed:</b> drafts are now given today's date (#29), and "
+                "the function refuses an archived plan without calling the AI (#32).",
          status="issue", issues=[25, 26], shots=[]),
 ]
 
@@ -283,8 +285,10 @@ FINDINGS = [
     (16, "“I fell behind on my exercises” shows the emergency card (false alarm). Fixed (#19)."),
     (23, "Video analysis counts 1 rep where a leg-extension clip has 3."),
     (24, "Push-up results change by up to 20° depending on which arm the exercise setting measures."),
-    (25, "AI reply drafts don't know today's date, so they say “yesterday” about last week."),
-    (26, "The draft function makes an AI call for an archived plan."),
+    (25, "AI reply drafts don't know today's date, so they say “yesterday” about last week. Fixed (#29)."),
+    (26, "The draft function makes an AI call for an archived plan. Fixed (#32)."),
+    (33, "Dry run: made-up 2024 sessions on the Dashboard. Fixed (#34)."),
+    (35, "Dry run: annotated video didn't play; report download crashed. Fixed (#36)."),
 ]
 PHOTO_CREDITS = [
     ("Staples, day 12", "HReuter", "CC BY-SA 4.0", "Entfernung_von_Hautklammern_nach_Knie-Operation_7364.jpg"),
@@ -395,7 +399,8 @@ def cover():
   <div class="small">Cases 1–16 tested 1 November 2026 against a freshly seeded demo clinic. Cases 17–19 added
   5 November 2026: a trial of AI on photos and videos. Every patient is simulated and known only by a code such as
   P-021, never by name. Live AI: Claude Opus 5.5 (therapist summaries, drafts and the trial) and Claude Sonnet 5.5
-  (patient coach). Source: github.com/nathanaelhub/limber, issues #13 and #27.</div>
+  (patient coach). Source: github.com/nathanaelhub/limber, issues #13 and #27. Updated 10 November 2026 with
+  the fixes since, and a demo dry run of the whole app on 9 November.</div>
 </section>"""
 
 
@@ -536,10 +541,9 @@ def closing():
   first need a spec and a new notice to patients.</p>
   <h3>Issues filed</h3><ul>{issues}</ul>
   <h3>Worth knowing (not bugs)</h3><ul>{notes}</ul>
-  <p class="small">Case 17 photos: Wikimedia Commons, credited on that page. Case 18 videos: Ultralytics demo clips
-  (github.com/ultralytics/assets, release v0.0.0).</p>
-  <p class="small" style="margin-top:24px">Regenerate this document with
-  <code>python scripts/build_user_cases_pdf.py</code>. The screenshots are in <code>docs/user-cases/shots/</code>.</p>
+  <p class="small">Case 18 videos: Ultralytics demo clips (github.com/ultralytics/assets, release v0.0.0).
+  Regenerate this document with <code>python scripts/build_user_cases_pdf.py</code>; the screenshots are in
+  <code>docs/user-cases/shots/</code>.</p>
 </section>"""
 
 
