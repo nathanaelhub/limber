@@ -1,0 +1,25 @@
+# The Dockerfile copies the repository into the image. Keep secrets, records and local tooling out of it.
+.env
+.env.*
+data/
+.venv/
+.git/
+.github/
+.claude/
+.specify/
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+*.pyc
+.DS_Store
+.playwright-mcp/
+deploy/secrets/
+deploy/limber.env
+exports/
+sessions/
+observation_logs/
+output/
+models/*.pt
+videos/
+design/
+docs/user-cases/
