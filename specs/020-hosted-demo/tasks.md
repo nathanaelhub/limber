@@ -12,20 +12,22 @@ hosted settings at each merge.
 
 ## Slice A: The record on libSQL (Story 1, Story 3; FR-001 to FR-003b, FR-009)
 
-- [ ] T004 `libsql` in `requirements.txt` with a lower-bound pin; one connection function in `src/ptlog/` that
+- [x] T004 `libsql` in `requirements.txt` with a lower-bound pin; one connection function in `src/ptlog/` that
       returns `sqlite3` locally and a wrapped libSQL connection when `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
       are set
-- [ ] T005 The wrapper's four rules, each with a test first (FR-002): rows by column name, `lastrowid` per
+- [x] T005 The wrapper's four rules, each with a test first (FR-002): rows by column name, `lastrowid` per
       statement, `IntegrityError`/`OperationalError` from libSQL's `ValueError`, commit before a script
-- [ ] T006 Store contract run: the store and portal tests run a second time through the wrapper against a libSQL
+- [x] T006 Store contract run: the store and portal tests run a second time through the wrapper against a libSQL
       local file in CI (no network); the 5 backup tests are skipped there with the reason stated
-- [ ] T007 Embedded replica on hosted installs (FR-003a): the copy under `/tmp`, a sync at the start of every
+- [x] T007 Embedded replica on hosted installs (FR-003a): the copy under `/tmp`, a sync at the start of every
       request; test with two replicas of one local primary
-- [ ] T008 The simulated-data marker: `seed_demo.py` writes it; hosted settings without `LIMBER_DEMO=1` and the
+- [x] T008 The simulated-data marker: `seed_demo.py` writes it; hosted settings without `LIMBER_DEMO=1` and the
       marker refuse to start, with a plain reason (FR-009, SC-005); `deploy preflight` reports the backend
-- [ ] T009 `/api/today` and `/api/progress` load each list in one query (FR-003b); a test counts statements per
-      patient request and fails above 50
-- [ ] T010 Live check, owner's machine only: the store against the Turso database, a write through one connection
+- [-] T009 Dropped (FR-003b): with the embedded replica, Today's 253 reads are local and took the same 0.3 s as a
+      13-statement page
+- [x] T009a Writes take turns per instance (FR-003c); opening writes nothing and `last_seen_at` is refreshed at
+      most once a minute (FR-003d)
+- [x] T010 Live check, owner's machine only: the store against the Turso database, a write through one connection
       read through another (not in CI)
 
 ## Slice B: Files on Cloudflare R2 (Story 2; FR-004 to FR-006)
