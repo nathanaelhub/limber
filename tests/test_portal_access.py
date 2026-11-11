@@ -107,6 +107,20 @@ class TestIssueAndSignIn:
         with pytest.raises(PortalError):
             access.issue_code(store, KEY, "P-017", days=400)
 
+    def test_last_seen_is_refreshed_at_most_once_a_minute(self, store, fake_clock):
+        """Feature 020: each refresh is a write, which on the hosted demo is a round trip to Turso. Refreshing at
+        most once a minute can only end an idle sign-in up to a minute early, never late."""
+        code, _ = access.issue_code(store, KEY, "P-017")
+        token = access.sign_in(store, KEY, code, "client-a", access.LoginLimiter(clock=fake_clock), clock=fake_clock)
+        digest = access.token_hash(token)
+        first = store.portal_signin_get(digest).last_seen_at
+        fake_clock.advance(30)
+        assert access.current_patient(store, token, clock=fake_clock) == "P-017"
+        assert store.portal_signin_get(digest).last_seen_at == first                     # 30 s later: no write
+        fake_clock.advance(31)
+        assert access.current_patient(store, token, clock=fake_clock) == "P-017"
+        assert store.portal_signin_get(digest).last_seen_at > first                      # over a minute: refreshed
+
     def test_sign_in_and_current_patient_limits(self, store, fake_clock):
         code, _ = access.issue_code(store, KEY, "P-017")
         lim = access.LoginLimiter(clock=fake_clock)

@@ -181,8 +181,12 @@ therapist's computer.
 - **FR-003a**: On Vercel the record is an **embedded replica**: each instance keeps a copy in temporary storage,
   reads it locally, sends writes to Turso, and syncs at the start of every request so it sees other instances'
   writes. Fully remote mode was measured too slow (G1).
-- **FR-003b**: `/api/today` (253 statements) and `/api/progress` (495) load lists one row at a time. They are
-  rewritten to load each list in one query, so that no patient request runs more than 50 statements.
+- **FR-003b** (dropped 11 November 2026, see slice A results): with the embedded replica, reads are local, so
+  `/api/today` (253 statements) took the same 0.3 s from a laptop as a page with 13. Rewriting it isn't needed.
+- **FR-003c**: Writes on one instance take turns: a transaction holds a per-process lock from its first write to its
+  commit or rollback. Turso keeps one writer at a time and rolls back a transaction left waiting behind another.
+- **FR-003d**: Opening an up-to-date record writes nothing, and a signed-in request refreshes `last_seen_at` at most
+  once a minute, because every write on a hosted install is a round trip to Turso.
 - **FR-003**: The schema and migrations are the same on both backends. A migration that needs a SQLite feature the
   hosted database lacks is a test failure, not a silent difference.
 - **FR-004**: Files go through one storage interface in `src/media/` (put, get, delete, delete everything under
@@ -235,6 +239,24 @@ therapist's computer.
   `/api/progress` 495. Fully remote, Progress would take about 4 seconds, hence FR-003a and FR-003b.
 - **Embedded replica**: local reads under 1 ms; a sync about 140 ms from the owner's laptop (expected to be much
   less from `iad1`); another replica sees a write only after its own sync, hence a sync at the start of each request.
+
+## Slice A results (11 November 2026)
+
+Measured with the real store against the Turso database, from the owner's laptop (expected to be faster from
+Vercel's `iad1`, next to Turso):
+
+- The full suite passes on local SQLite and again through libSQL: 1,258 tests each.
+- Opening a warm copy: 0.3 s (was 0.7 s): the connection `PRAGMA`s and a no-op `CREATE TABLE IF NOT EXISTS` were
+  each a round trip to Turso; they are now skipped on a replica or checked with a local read first.
+- Patient API requests: about 0.3 s each, including Today with 253 local reads (was 1.2 s: every request wrote
+  `last_seen_at`). Sign-in: 2.4 s, four writes.
+- Six writers at once on one instance: all six written. Without the write lock, most were rolled back.
+- A message written through one instance was read through another at once.
+- The guard refused to open the record without `LIMBER_DEMO=1`.
+- **A sixth difference**: over the network, libSQL's `executescript` stops at the first failing statement without
+  raising an error. Loading the demo into Turso therefore runs statement by statement, tables in foreign-key order
+  (1,416 rows in 101 s from a laptop; every table's count matched). Schema changes on the hosted demo are applied
+  by resetting it from a fresh seed, not by migrating in place.
 
 ## Decision Gates (owner)
 
