@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Live session states</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb sheet" style="width: 1280px; min-height: 980px">
+<div class="cols" style="gap: 40px">
+
+<div class="state-box">
+<p class="cap">Before you start</p>
+<div class="card stack">
+<h2>Start a live session</h2>
+<div class="rowflex" style="align-items: flex-end">
+<label class="field" style="flex: 1; min-width: 150px"><span>Patient</span><select class="input"><option>P-021 · Right hip replacement</option><option>P-017 · Post-op knee</option></select></label>
+<label class="field" style="flex: 1; min-width: 150px"><span>Exercise</span><select class="input"><option>Heel slides · 3 sets of 10</option><option>Quad sets · 3 sets of 15</option><option>Straight-leg raises · 2 sets of 10</option><option>Hip abduction · 10 reps</option></select></label>
+</div>
+<p class="rowflex small"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span><b>Video stays in this browser.</b> Only 17 body points are sent to Limber.</span></p>
+<div class="rowflex"><button class="btn" type="button">Start</button><span class="hint">Your browser will ask to use the camera.</span></div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Model loading</p>
+<div class="cam">
+<div class="center" role="status">
+<span class="spin" aria-hidden="true" style="width: 24px; height: 24px; border-color: rgba(255,255,255,.35); border-top-color: #FFFFFF"></span>
+<p class="strong">Getting the body-point model ready</p>
+<p class="small">About 10 seconds the first time. It runs on this computer.</p>
+<div class="track-bar" style="width: 220px; background: rgba(255,255,255,.25)"><span style="width: 60%; background: #FFFFFF"></span></div>
+</div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Camera blocked</p>
+<div class="cam">
+<div class="center" role="alert">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px"><path d="M3 7h11v10H3zM14 10l7-3v10l-7-3M3 3l18 18"/></svg>
+<p class="strong">Limber can't use the camera</p>
+<p class="small" style="max-width: 36ch">Allow the camera for this site in your browser's address bar, then try again. No video leaves this computer.</p>
+<button class="btn" type="button" style="background: #FFFFFF; color: #16302C">Try again</button>
+</div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Finished summary</p>
+<div class="card stack">
+<div class="rowflex"><h2>Session finished</h2><span class="small dim sp">P-021 · Tue 4 Nov, 9:22 · 11 minutes</span></div>
+<div class="scroll">
+<table class="table">
+<thead><tr><th scope="col">Exercise</th><th scope="col" class="r">Reps</th><th scope="col" class="r">Form score, 0 to 100</th><th scope="col" class="r">Best range of motion, degrees</th></tr></thead>
+<tbody>
+<tr><td>Heel slides</td><td class="r">30 of 30</td><td class="r">81</td><td class="r">96</td></tr>
+<tr><td>Quad sets</td><td class="r">45 of 45</td><td class="r">84</td><td class="r dim">Not measured</td></tr>
+<tr><td>Straight-leg raises</td><td class="r">14 of 20</td><td class="r">66</td><td class="r">48</td></tr>
+</tbody>
+</table>
+</div>
+<p class="small">Straight-leg raises stopped early at rep 14.</p>
+<div class="rowflex"><a class="btn" href="ObservationLogs.html">Open the log</a><a class="btn quiet" href="PatientNotes.html">Add a session note</a><button class="btn plain" type="button">Start another</button></div>
+</div>
+</div>
+
+</div>
+</div>
+</body>
+</html>

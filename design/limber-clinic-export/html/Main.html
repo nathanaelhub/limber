@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Inbox</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb" style="min-height: 900px; display: flex; flex-direction: column">
+
+<header class="top">
+<a class="brand" href="Main.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/><circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>Limber</a>
+<nav class="nav" aria-label="Main"><a href="Main.html" aria-current="page">Inbox <span class="count">5<span class="vh"> need you</span></span></a><a href="Patients.html">Patients</a><a href="Schedule.html">Schedule</a></nav>
+<label class="find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="vh">Find a patient</span><input type="search" placeholder="Find a patient"></label>
+<details class="drop"><summary>Tools</summary><div class="menu"><a href="Dashboard.html">Dashboard</a><a href="LiveSession.html">Live session</a><a href="VideoAnalysis.html">Video analysis</a><a href="Sessions.html">Sessions</a><a href="ObservationLogs.html">Observation logs</a><a href="Review.html">Review</a><a href="Tracker.html">Tracker</a><a href="HowItWorks.html">How it works</a></div></details>
+<details class="drop"><summary>Me</summary><div class="menu"><p class="who">Signed in as <b>Therapist</b></p><a href="Settings.html">My settings</a><a href="People.html">People</a><a href="SystemStates.html">Sign out</a></div></details>
+</header>
+
+<div class="split">
+<nav class="side" aria-label="Needs you">
+<div class="side-head"><h2>Needs you</h2><span class="count">5</span></div>
+
+<a class="row" href="#">
+<span></span>
+<span><span class="l1"><span class="code">P-023</span><span class="tag urgent"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Urgent</span><span class="micro dim sp">8:12</span></span>
+<span class="l2">Shoulder · May need a direct response</span></span>
+</a>
+
+<a class="row unread" href="#" aria-current="true">
+<span class="dot"></span>
+<span><span class="l1"><span class="code">P-021</span><span class="tag new">1 new</span><span class="micro dim sp">8:40</span></span>
+<span class="l2">Right hip replacement · Voice note, 0:42</span></span>
+</a>
+
+<a class="row" href="#">
+<span></span>
+<span><span class="l1"><span class="code">P-021</span><span class="tag ghost"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Reschedule</span><span class="micro dim sp">7:55</span></span>
+<span class="l2">Asks for Fri 6 Nov, 09:00</span></span>
+</a>
+
+<a class="row unread" href="#">
+<span class="dot"></span>
+<span><span class="l1"><span class="code">P-017</span><span class="tag new">3 new</span><span class="micro dim sp">Yesterday</span></span>
+<span class="l2">Post-op knee · Is some swelling normal after…</span></span>
+</a>
+
+<a class="row unread" href="#">
+<span class="dot"></span>
+<span><span class="l1"><span class="code">P-021</span><span class="tag new">1 new</span><span class="micro dim sp">Yesterday</span></span>
+<span class="l2">Left shoulder · The band feels too easy now</span></span>
+</a>
+
+<p class="small dim" style="padding: 16px 8px 0"><a href="#">Show handled today (3)</a></p>
+</nav>
+
+<main class="pane">
+<div class="pane-head ruled">
+<div class="stack tight">
+<h1>P-021 · Right hip replacement</h1>
+<p class="dim">Started 3 weeks ago · Next visit Tue 4 Nov, 9:00</p>
+</div>
+<a class="btn quiet small sp" href="Patients.html">Open patient</a>
+<details class="drop inline"><summary>More</summary><div class="menu"><button type="button">Mark as handled</button><button type="button">Turn messaging off for P-021</button><a href="Patients.html">Change plan of care</a></div></details>
+</div>
+
+<div class="pane-body">
+<p class="day">Yesterday</p>
+<div class="msg me">
+<p class="bubble">Good work on the heel slides. Keep each quad set to a 5-second hold.</p>
+<p class="meta">Therapist · 17:05</p>
+</div>
+
+<p class="day">Today</p>
+<div class="msg">
+<p class="bubble">Here is the scar this morning, and the sheet from my surgeon.</p>
+<div class="thumbs">
+<button class="ph" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>Photo 1</button>
+<button class="ph" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>Photo 2</button>
+</div>
+<a class="chip" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>Surgeon-notes.pdf · 2 pages</a>
+<p class="meta">P-021 · 8:38</p>
+</div>
+
+<div class="msg">
+<div class="voice">
+<button class="play" type="button" aria-label="Play voice note"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
+<svg class="wave" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"><path d="M2 12v0M8 8v8M14 4v16M20 9v6M26 6v12M32 10v4M38 3v18M44 8v8M50 11v2M56 6v12M62 9v6M68 4v16M74 10v4M80 7v10M86 11v2M92 5v14M98 9v6M104 11v2M110 8v8M116 11v2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+<span class="small num">0:42</span>
+</div>
+<div class="transcript">
+<p class="micro strong">Automatic transcript — may contain mistakes</p>
+<p>The heel slides feel fine, but the straight-leg raises hurt more than last week. About a six out of ten.</p>
+</div>
+<p class="meta">P-021 · 8:40 <span class="tag new">New</span></p>
+</div>
+</div>
+
+<div class="pane-foot">
+
+
+<div class="reply">
+<label class="vh" for="reply-idle">Reply to P-021</label>
+<textarea id="reply-idle" placeholder="Reply to P-021"></textarea>
+<div class="reply-bar">
+<button class="btn plain small" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3l8-8"/></svg>Attach</button>
+<span class="hint">Up to 4 photos or 1 PDF</span>
+<button class="btn quiet sp" type="button"><span class="ai-tag" aria-hidden="true">AI</span>Draft a reply</button>
+<button class="btn" type="button">Send</button>
+</div>
+</div>
+
+
+
+
+
+
+</div>
+</main>
+</div>
+</div>
+</body>
+</html>

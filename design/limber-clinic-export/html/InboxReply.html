@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Reply box states</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb pane-only sheet" style="width: 880px; min-height: 1240px">
+
+<div class="state-box">
+<p class="cap">Photos attached</p>
+<div class="reply">
+<label class="vh" for="r1">Reply to P-021</label>
+<textarea id="r1">Here are the two positions for the hip abduction. Stop if the pain goes above 4 out of 10.</textarea>
+<div class="attached">
+<span class="att"><span class="ph sm"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span><button type="button" aria-label="Remove photo 1">×</button></span>
+<span class="att"><span class="ph sm"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span><button type="button" aria-label="Remove photo 2">×</button></span>
+</div>
+<div class="reply-bar">
+<button class="btn plain small" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3l8-8"/></svg>Attach</button>
+<span class="hint">2 of 4 photos</span>
+<button class="btn quiet sp" type="button"><span class="ai-tag" aria-hidden="true">AI</span>Draft a reply</button>
+<button class="btn" type="button">Send</button>
+</div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">PDF attached. Photos are off once a PDF is added.</p>
+<div class="reply">
+<label class="vh" for="r2">Reply to P-021</label>
+<textarea id="r2" style="min-height: 52px">Your updated exercise sheet is attached.</textarea>
+<div class="attached"><span class="chip"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>Hip-program-week-4.pdf<button type="button" aria-label="Remove PDF">×</button></span></div>
+<div class="reply-bar">
+<button class="btn plain small" type="button" disabled><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3l8-8"/></svg>Attach</button>
+<span class="hint">1 PDF attached. Remove it to add photos.</span>
+<button class="btn sp" type="button">Send</button>
+</div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Drafting, a few seconds</p>
+<div class="reply">
+<div class="reply-top"><span class="spin" aria-hidden="true"></span><span class="ai-label" role="status"><span class="ai-tag" aria-hidden="true">AI</span>Drafting a reply. This takes a few seconds.</span><button class="btn plain small sp" type="button">Cancel</button></div>
+<div class="stack" style="padding: 16px"><div class="sk" style="width: 82%"></div><div class="sk" style="width: 64%"></div><div class="sk" style="width: 40%"></div></div>
+<div class="reply-bar"><span class="hint">Nothing is sent until you press Send.</span><button class="btn sp" type="button" disabled>Send</button></div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Draft in the box. Editable, never sent automatically.</p>
+<div class="reply ai">
+<div class="reply-top"><span class="ai-label"><span class="ai-tag" aria-hidden="true">AI</span>AI-drafted — check before sending</span><button class="btn plain small sp" type="button">Discard draft</button></div>
+<label class="vh" for="r4">Reply to P-021, AI-drafted, editable</label>
+<textarea id="r4" style="min-height: 104px">Thanks for the photos and the voice note. Some soreness with straight-leg raises can happen, but a 6 out of 10 is more than I'd like. Please skip them until Tuesday and keep going with the heel slides and quad sets. We'll look at it together at your visit.</textarea>
+<div class="reply-bar">
+<button class="btn plain small" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3l8-8"/></svg>Attach</button>
+<span class="hint">Edit it freely. Nothing is sent until you press Send.</span>
+<button class="btn sp" type="button">Send</button>
+</div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Looks like a phone number or a name</p>
+<div class="reply">
+<label class="vh" for="r5">Reply to P-021</label>
+<textarea id="r5" style="min-height: 52px">If it gets worse tonight, call me on 615 555 0142. Sam</textarea>
+<div style="padding: 0 12px 4px">
+<div class="notice plain" role="alert">
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+<div class="stack tight">
+<h3>Check before you send</h3>
+<p>This reply looks like it holds a phone number and a name. Messages here should not carry personal details.</p>
+</div>
+</div>
+</div>
+<div class="reply-bar">
+<span class="hint">Not sent yet.</span>
+<button class="btn quiet sp" type="button">Send anyway</button>
+<button class="btn" type="button">Edit reply</button>
+</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

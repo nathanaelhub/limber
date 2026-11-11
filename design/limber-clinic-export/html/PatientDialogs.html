@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limber · Patient dialogs</title>
+<link rel="stylesheet" href="limber.css">
+</head>
+<body style="margin:0">
+<div class="lb sheet across" style="width: 1280px; min-height: 760px">
+
+<div class="state-box">
+<p class="cap">Register a patient</p>
+<form class="dialog" style="width: 370px" role="dialog" aria-labelledby="dlg-reg">
+<h2 id="dlg-reg">Register a patient</h2>
+<p class="dim">The next free code is <b style="color: var(--ink)">P-031</b>. Limber never stores a name, email or birth date.</p>
+<label class="field"><span>First plan of care</span><input class="input" type="text" placeholder="For example, Post-op knee"></label>
+<label class="field"><span>Label (optional)</span><input class="input" type="text"><span class="hint">A short reminder for staff. No names.</span></label>
+<label class="field"><span>Therapist</span><select class="input"><option>Therapist</option></select></label>
+<div class="dialog-actions"><button class="btn quiet" type="button">Cancel</button><button class="btn" type="button">Register P-031</button></div>
+</form>
+</div>
+
+<div class="state-box">
+<p class="cap">Access code, shown once</p>
+<div class="dialog" style="width: 370px" role="dialog" aria-labelledby="dlg-code">
+<h2 id="dlg-code">Access code for P-021</h2>
+<p>Give this code to P-021 now. It is shown once and cannot be looked up later.</p>
+<p class="once">7KQ4-M2XD</p>
+<div class="rowflex"><button class="btn quiet" type="button">Copy code</button><button class="btn quiet" type="button">Print</button></div>
+<label class="check"><input type="checkbox"> <span>I have given the code to P-021</span></label>
+<div class="dialog-actions"><button class="btn" type="button" disabled>Done</button></div>
+</div>
+</div>
+
+<div class="state-box">
+<p class="cap">Delete, strong confirmation</p>
+<form class="dialog" style="width: 370px" role="alertdialog" aria-labelledby="dlg-del">
+<h2 id="dlg-del">Delete P-021?</h2>
+<p>This removes P-021 and every record: 2 plans of care, 46 messages, 9 sessions and 3 videos. It cannot be undone.</p>
+<p class="small dim">To keep the records, discharge P-021 instead.</p>
+<label class="field"><span>Type P-021 to confirm</span><input class="input" type="text" autocomplete="off"></label>
+<div class="dialog-actions"><button class="btn quiet" type="button">Keep P-021</button><button class="btn danger solid" type="button" disabled>Delete for good</button></div>
+</form>
+</div>
+
+</div>
+</body>
+</html>

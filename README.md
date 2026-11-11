@@ -122,9 +122,37 @@ Therapists get an **Inbox** for conversations with patients (`python interfaces/
 messaging is off until turned on per patient. Patients see today's plan, run a guided camera session (their video never leaves their device; only
 body-point positions are sent), and see their progress. Details: `specs/007-online-patient-view/`.
 
-**Try it with simulated data:** `python scripts/seed_demo.py` writes an invented caseload (pseudonymous
-IDs only) to `data/demo.db`; run the app on it with `PTASSIST_DB=data/demo.db streamlit run interfaces/app.py`.
-The script refuses to write into the real record.
+### Try the demo (simulated data)
+
+`scripts/seed_demo.py` writes an invented caseload (pseudonymous IDs only) to `data/demo.db`, with dates
+counted back from today. It refuses to write into the real record. Rebuild it on the day you show it:
+
+```bash
+python scripts/seed_demo.py                                                        # writes data/demo.db
+PTASSIST_DB=data/demo.db python interfaces/cli.py portal serve                     # front page, :8600
+PTASSIST_DB=data/demo.db streamlit run interfaces/app.py --server.port 8501        # therapist app, :8501
+```
+
+Open **http://127.0.0.1:8600**. These sign-ins exist only in the demo database. Never create them on a real
+installation.
+
+| Door | Username | Password | Sees |
+|---|---|---|---|
+| Therapist sign-in | `therapist` | `limber-demo-2026` | Admin and therapist: every demo patient except P-018, P-022, P-024 |
+| Therapist sign-in | `rivera` | `limber-demo-2026` | Therapist: only P-018, P-022, P-024 (caseload separation) |
+| Therapist sign-in | `admin` | `limber-demo-2026` | Admin only: People and My settings, no clinical pages |
+| Patient, "I have a username and password" | `patient017` | `limber-demo-2026` | P-017 |
+
+Patients can also sign in with an **access code**. New codes are made every time the demo is rebuilt, so they
+aren't listed here: `seed_demo.py` prints them and saves them, with the sign-ins above, to `data/demo-logins.txt`
+(git-ignored). There's one each for P-017 (knee, steady progress), P-021 (hip, pain rising) and P-023 (shoulder,
+has a red-flag message).
+
+For the AI features (an Anthropic key in `.env` as `LIMBER_ANTHROPIC_API_KEY`), use **P-021**, which has
+summaries, drafts and the coach turned on: Inbox → Draft a reply, Patients → Weekly summary, and the patient's
+Coach page. P-023's message shows a draft withheld for a red flag. The user cases, tried by hand in this demo,
+are in [`docs/user-cases/Limber-User-Cases.pdf`](docs/user-cases/Limber-User-Cases.pdf), also online at
+<https://limber-user-cases.vercel.app>.
 
 **Where data lives:** every session is written to one local SQLite file, `data/ptassist.db`
 (set `PTASSIST_DB=/path/to/file.db` to use another location). Exports default to `exports/`.

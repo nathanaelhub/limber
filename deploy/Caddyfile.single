@@ -1,0 +1,42 @@
+# One-port hosting (Railway, Render, Fly): the platform terminates HTTPS and sends plain HTTP to $PORT.
+# Caddy runs inside the Limber container and routes like the two-container setup in Caddyfile.
+{
+	auto_https off
+	admin off
+	# Only the platform's edge can reach this port, so keep the client address and scheme it forwards.
+	servers {
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
+}
+
+:{$PORT} {
+	encode zstd gzip
+
+	# The therapist app lives under /therapist and shows only a sign-in until the therapist signs in.
+	handle /therapist* {
+		reverse_proxy 127.0.0.1:8501 {
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	# Everything else is the front page and the patient service (including the session WebSocket).
+	handle {
+		reverse_proxy 127.0.0.1:8600 {
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers delete
+				request>uri query delete
+			}
+		}
+	}
+}
