@@ -57,18 +57,18 @@ hosted settings at each merge.
 
 ## Slice D: The patient portal as Vercel Python functions (Story 1; FR-015)
 
-- [ ] T022 **Gate E (owner, Principle I)**: the portal imports the engine (`src.portal.live` → `src.live_session`
+- [x] T022 **Gate E (owner, Principle I)**: the portal imports the engine (`src.portal.live` → `src.live_session`
       → `analyze.py`), which loads Ultralytics and torch, and `src.ptlog.models` → `src.utils` loads OpenCV. Live
       sessions need only the engine's rep counting and angle maths. The owner chooses how the portal avoids
       the heavy imports: (a) load YOLO inside `analyze.py` only when a model is created (a two-line engine change),
       or (b) a torch-free copy of the counting rules outside the engine, kept identical by a test
-- [ ] T023 A hosted requirements file without torch, Ultralytics, OpenCV, or Streamlit; a test that importing the
+- [x] T023 A hosted requirements file without torch, Ultralytics, OpenCV, or Streamlit; a test that importing the
       portal loads none of them
-- [ ] T024 Vercel entry point (ASGI) and `vercel.json`: the portal's pages, API, and static files; the Therapist
+- [x] T024 Vercel entry point (ASGI) and `vercel.json`: the portal's pages, API, and static files; the Therapist
       door explains which clinic pages are online so far (Story 5, scenario 1)
-- [ ] T025 Deploy to `limber-demo` (Python, not the container preset); settings in Vercel: Turso, R2,
+- [x] T025 Deploy to `limber-demo` (Python, not the container preset); settings in Vercel: Turso, R2,
       `PTASSIST_PORTAL_KEY`, `LIMBER_DEMO=1`, the AI key
-- [ ] T026 Verify on the live site: 50 parallel signed-in requests (SC-001), a message written through one instance
+- [~] T026 (SC-001, SC-002 and the patient checks pass; photo upload waits for T016's CORS rule; SC-004 cold start not yet timed) Verify on the live site: 50 parallel signed-in requests (SC-001), a message written through one instance
       read through another (SC-002), first page from scaled to zero within 15 s (SC-004), and the patient dry run
       on a phone-sized browser
 - [ ] T027 Remove the container-beta setup that 020 replaces (`Dockerfile.vercel`, the start-up seeding in demo
