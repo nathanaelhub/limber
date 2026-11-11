@@ -34,8 +34,20 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Tuple, List, Dict, Any
 from collections import deque
-from ultralytics import YOLO
-from ultralytics.solutions import AIGym
+
+
+# Ultralytics (and torch through it) is loaded only when a model is created, so code that uses only the engine's
+# counting and drawing, like the patient portal's live sessions, runs where torch can't be installed (feature 020,
+# gate E, the owner's choice). Behaviour is unchanged wherever a model is used.
+def YOLO(*args, **kwargs):
+    from ultralytics import YOLO as _YOLO
+    return _YOLO(*args, **kwargs)
+
+
+def AIGym(*args, **kwargs):
+    from ultralytics.solutions import AIGym as _AIGym
+    return _AIGym(*args, **kwargs)
+
 from src.form_assessment import FormAnalyzer
 from src.ptlog.models import PatientNotFoundError
 from src.ptlog.recorder import SessionRecorder

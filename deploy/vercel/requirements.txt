@@ -1,0 +1,13 @@
+# What Vercel installs for the hosted demo's patient portal (feature 020, slice D). Kept light on purpose: no torch,
+# Ultralytics, Streamlit, or desktop OpenCV. tests/test_hosted_imports.py checks this list.
+starlette>=1.6.0
+python-multipart>=0.0.20
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+Pillow>=10.0.0
+PyYAML>=6.0
+av>=10.0.0
+httpx>=0.28.0
+anthropic>=2.3.0
+libsql>=0.1.11
+boto3>=1.35.0
