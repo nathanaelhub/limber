@@ -229,23 +229,43 @@
 
   // ---- sending ----
   function hideWarning() { warn.hidden = true; box.classList.remove("flagged"); }
+  function asJson(r) {
+    return r.json().catch(function () { return {}; }).then(function (d) { return { status: r.status, data: d }; });
+  }
+  function jsonPost(path, body) {
+    return fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+                         body: JSON.stringify(body) }).then(asJson);
+  }
+  // The hosted demo takes files straight into its storage (a request there can't exceed 4.5 MB): ask for one
+  // signed link per file, upload each, then send the message naming the uploads. Elsewhere the links route
+  // answers 501 and the files go with the message, as before.
+  function sendWithFiles(confirm) {
+    var declared = files.map(function (f) { return { type: f.file.type || "", size: f.file.size }; });
+    return jsonPost("/api/attachments/upload-links", { files: declared }).then(function (links) {
+      if (links.status === 501) {
+        var data = new FormData();
+        data.append("text", box.value);
+        data.append("confirm", confirm ? "true" : "false");
+        files.forEach(function (f) { data.append("files", f.file, f.name); });
+        return fetch("/api/plans/" + current.id + "/messages", { method: "POST", credentials: "same-origin", body: data }).then(asJson);
+      }
+      if (links.status !== 200) { return links; }
+      var uploads = links.data.uploads;
+      return Promise.all(uploads.map(function (u, i) {
+        return fetch(u.url, { method: "PUT", headers: { "Content-Type": u.type }, body: files[i].file }).then(function (r) {
+          if (!r.ok) { throw new Error("upload"); }
+        });
+      })).then(function () {
+        return jsonPost("/api/plans/" + current.id + "/messages",
+                        { text: box.value, confirm: confirm, uploaded: uploads.map(function (u) { return u.key; }) });
+      });
+    });
+  }
   function send(confirm) {
     error.hidden = true;
     if (!box.value.trim() && !files.length) { error.textContent = "Write a message first."; error.hidden = false; return; }
-    var options = { method: "POST", credentials: "same-origin" };
-    if (files.length) {
-      var data = new FormData();
-      data.append("text", box.value);
-      data.append("confirm", confirm ? "true" : "false");
-      files.forEach(function (f) { data.append("files", f.file, f.name); });
-      options.body = data;
-    } else {
-      options.headers = { "Content-Type": "application/json" };
-      options.body = JSON.stringify({ text: box.value, confirm: confirm });
-    }
     $("send").disabled = true;
-    fetch("/api/plans/" + current.id + "/messages", options)
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { status: r.status, data: d }; }); })
+    (files.length ? sendWithFiles(confirm) : jsonPost("/api/plans/" + current.id + "/messages", { text: box.value, confirm: confirm }))
       .then(function (res) {
         $("send").disabled = false;
         if (res.status === 201) { box.value = ""; clearTray(); hideWarning(); return loadThread(); }

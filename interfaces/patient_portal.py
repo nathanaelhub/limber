@@ -35,6 +35,7 @@ from starlette.staticfiles import StaticFiles  # noqa: E402
 from src.deploy import preflight  # noqa: E402
 from src.portal import pwa  # noqa: E402
 from src.ptlog import entries as entry_rules  # noqa: E402
+from src.media import files as media_files  # noqa: E402
 from src.media.probe import MediaRejected  # noqa: E402
 from src.portal import access, accounts, admin, attachments, diary, frames, live, messages, plans, questionnaires, uploads, viewmodels, voice  # noqa: E402
 from src.ptlog import origin  # noqa: E402
@@ -49,6 +50,28 @@ LOOPBACK = ("127.0.0.1", "localhost", "::1")
 CSP = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; "
        "img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+
+
+MEDIA_TYPES = {"mp4": "video/mp4", "mov": "video/quicktime", "webm": "video/webm", "m4a": "audio/mp4",
+               "ogg": "audio/ogg", "mp3": "audio/mpeg", "wav": "audio/wav"}
+
+
+def media_mime(m) -> str:
+    """The type a clip or voice note is served with; every format the media probe accepts has one."""
+    return MEDIA_TYPES.get(m.ext, "application/octet-stream")
+
+
+def csp() -> str:
+    """The content security policy. On the hosted demo, media are fetched from (and later sent to) the private R2
+    bucket through signed links, so its address is allowed for images, media and uploads (feature 020)."""
+    bucket = media_files.r2_origin()
+    if not bucket:
+        return CSP
+    return (CSP.replace("connect-src 'self'", f"connect-src 'self' {bucket}")
+               .replace("img-src 'self' data: blob:", f"img-src 'self' data: blob: {bucket}")
+               .replace("media-src 'self' blob:", f"media-src 'self' blob: {bucket}"))
+
+
 SECURITY_HEADERS = {
     "content-security-policy": CSP,
     "x-content-type-options": "nosniff",
@@ -65,7 +88,7 @@ class SecurityHeaders:
 
     def __init__(self, app, hsts: bool = False):
         self.app = app
-        self.headers = dict(SECURITY_HEADERS)
+        self.headers = dict(SECURITY_HEADERS, **{"content-security-policy": csp()})
         if hsts:
             self.headers["strict-transport-security"] = "max-age=31536000"
 
@@ -355,8 +378,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 "reviewed": m.reviewed_at is not None, "deleted": m.deleted_at is not None, "warned": m.warned,
                 "type": _mime(m)}
 
-    def _mime(m):
-        return {"mp4": "video/mp4", "webm": "video/webm", "m4a": "audio/mp4", "ogg": "audio/ogg"}.get(m.ext, "application/octet-stream")
+    _mime = media_mime
 
     def _who(request, store):
         pid = signed_in(request, store)
@@ -490,12 +512,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             m = uploads.get_media(store, pid, request.path_params["media_id"])
         if m is None or m.deleted_at is not None:
             return _json({"error": "Not found."}, 404)
-        path = uploads.media_path(media_dir, m)
-        if not path.is_file():
-            return _json({"error": "Not found."}, 404)
-        return FileResponse(str(path), media_type=_mime(m), headers={
-            "Cache-Control": "private, no-store", "Content-Security-Policy": "sandbox",
-            "Content-Disposition": f'inline; filename="{m.kind}.{m.ext}"', "Accept-Ranges": "bytes"})
+        served = media_files.at(media_dir).response(uploads.media_rel(m), _mime(m), f"{m.kind}.{m.ext}")
+        return served if served is not None else _json({"error": "Not found."}, 404)
 
     def media_delete(request: Request):
         if (request.headers.get("origin") or "").rstrip("/") not in origins:
@@ -552,9 +570,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 body = await request.json()
                 body = body if isinstance(body, dict) else {}
                 text, confirm = body.get("text"), body.get("confirm") is True
+                uploaded = body.get("uploaded")            # direct uploads on the hosted demo (feature 020)
         except ValueError:
             return _json({"error": "Send JSON, or a form with the files."}, 400)
         text = text if isinstance(text, str) or text is None else None
+        uploaded = None if multipart else uploaded
 
         def work():
             with open_store() as store:
@@ -563,8 +583,17 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     return _json({"error": "Please sign in."}, 401)
                 try:
                     plan = plans.own_plan(store, pid, request.path_params["plan_id"])
-                    sent = messages.send(store, pid, "patient", text, confirm=confirm, plan_id=plan.id,
-                                         files=files, media_dir=media_dir)
+                    sending = files
+                    if uploaded is not None:
+                        sending = attachments.take_uploaded(media_dir, pid, uploaded)
+                    try:
+                        sent = messages.send(store, pid, "patient", text, confirm=confirm, plan_id=plan.id,
+                                             files=sending, media_dir=media_dir)
+                    finally:
+                        # Sent or refused, the raw uploads go; a message needing confirmation is sent again
+                        # with fresh uploads.
+                        if uploaded is not None:
+                            attachments.discard_uploaded(media_dir, pid, uploaded)
                     return _json(viewmodels.message_json(sent), 201)
                 except messages.NeedsConfirmation as warn:
                     return _json({"error": str(warn), "reasons": warn.reasons}, 409)
@@ -576,6 +605,39 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     return _bad(err)
         return await run_in_threadpool(work)
 
+    async def attachment_upload_links(request: Request):
+        """Signed links to upload a message's photos or PDF straight to the hosted demo's bucket (feature 020).
+        Local installs answer 501: the page then sends the files with the message, as before."""
+        refused = check_post(request, "application/json")
+        if refused:
+            return refused
+        try:
+            body = await request.json()
+        except ValueError:
+            return _json({"error": "Send JSON."}, 400)
+        declared = body.get("files") if isinstance(body, dict) else None
+        if not isinstance(declared, list) or not all(isinstance(f, dict) for f in declared):
+            return _json({"error": "Say which files will be sent."}, 400)
+
+        def work():
+            with open_store() as store:
+                pid = signed_in(request, store)
+                if pid is None:
+                    return _json({"error": "Please sign in."}, 401)
+            fs = media_files.at(media_dir)
+            if not fs.remote:
+                return _json({"error": "Files are sent with the message on this installation."}, 501)
+            try:
+                types = attachments.check_declared([(f.get("type"), f.get("size")) for f in declared])
+            except PTLogError as err:
+                return _bad(err)
+            links = []
+            for mime in types:
+                key = attachments.upload_key(pid, mime)
+                links.append({"key": key, "url": fs.signed_put(key, mime), "type": mime})
+            return _json({"uploads": links})
+        return await run_in_threadpool(work)
+
     def attachment_file(request: Request):
         with open_store() as store:
             pid = signed_in(request, store)
@@ -584,12 +646,9 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             a = attachments.get(store, pid, request.path_params["attachment_id"])
         if a is None or a.deleted_at is not None:
             return _json({"error": "Not found."}, 404)
-        path = attachments.path(media_dir, a)
-        if not path.is_file():
-            return _json({"error": "Not found."}, 404)
-        return FileResponse(str(path), media_type=a.mime, headers={
-            "Cache-Control": "private, no-store", "Content-Security-Policy": "sandbox",
-            "X-Content-Type-Options": "nosniff", "Content-Disposition": f'inline; filename="{a.kind}.{a.ext}"'})
+        served = media_files.at(media_dir).response(attachments.rel(a), a.mime, f"{a.kind}.{a.ext}",
+                                                    {"X-Content-Type-Options": "nosniff"})
+        return served if served is not None else _json({"error": "Not found."}, 404)
 
     def attachment_delete(request: Request):
         if (request.headers.get("origin") or "").rstrip("/") not in origins:
@@ -966,6 +1025,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         Route("/api/plans", plans_get, methods=["GET"]),
         Route("/api/plans/{plan_id:int}/messages", plan_messages_get, methods=["GET"]),
         Route("/api/plans/{plan_id:int}/messages", plan_messages_post, methods=["POST"]),
+        Route("/api/attachments/upload-links", attachment_upload_links, methods=["POST"]),
         Route("/api/attachments/{attachment_id}", attachment_file, methods=["GET"]),
         Route("/api/attachments/{attachment_id}", attachment_delete, methods=["DELETE"]),
         Route("/api/appointments", appointments_get, methods=["GET"]),
