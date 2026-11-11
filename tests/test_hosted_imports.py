@@ -96,3 +96,16 @@ def test_the_hosted_app_keeps_clinic_time(monkeypatch):
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+def test_a_visit_during_a_reset_gets_a_plain_503(monkeypatch, tmp_path):
+    from starlette.testclient import TestClient
+    from interfaces import vercel_app
+    from src.ptlog import backend
+    monkeypatch.setenv("LIMBER_DB_BACKEND", "libsql")
+    monkeypatch.setenv("LIMBER_DEMO", "1")
+    app = vercel_app.build(tmp_path / "replica.db", "https://limber-demo.vercel.app", key=b"k" * 32)
+    monkeypatch.setattr(backend, "hosted", lambda: True)                  # an empty hosted record: mid-reset
+    c = TestClient(app, base_url="https://limber-demo.vercel.app", raise_server_exceptions=False)
+    r = c.get("/api/today")
+    assert r.status_code == 503 and "being reset" in r.json()["error"]

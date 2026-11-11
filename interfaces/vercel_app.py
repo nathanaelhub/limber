@@ -55,6 +55,15 @@ def build(db_path: Path, origin: str, key: Optional[bytes] = None):
         return HTMLResponse(THERAPIST_PAGE, headers={"Cache-Control": "no-store"})
 
     app.router.add_route("/therapist", therapist_door, methods=["GET"])
+
+    from starlette.responses import JSONResponse
+    from src.ptlog import backend
+
+    async def demo_unavailable(_request, exc):
+        # A visit while the demo is being reset, or a record that isn't the demo: a plain answer, not an error page.
+        return JSONResponse({"error": str(exc)}, status_code=503, headers={"Retry-After": "120"})
+
+    app.add_exception_handler(backend.HostedRecordRefused, demo_unavailable)
     return app
 
 

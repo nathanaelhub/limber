@@ -869,6 +869,16 @@ class SessionStore:
     # ---------------------------------------------------------------- schema
 
     def _migrate(self) -> None:
+        if backend.hosted():
+            # The hosted demo is never migrated in place: its schema comes only from `deploy demo-reset`. A live
+            # instance that met a half-reset record once migrated it mid-reset (feature 020).
+            has_table = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'").fetchone()
+            current = self.conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] if has_table else 0
+            if (current or 0) != MIGRATIONS[-1][0]:
+                raise backend.HostedRecordRefused("The demo is being reset, or needs a reset (deploy demo-reset). "
+                                                  "Please try again in a few minutes.")
+            return
         # Checked with a read first: on the hosted demo even a no-op CREATE is a round trip to Turso (feature 020).
         if self.conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'").fetchone() is None:
             self.conn.execute(
