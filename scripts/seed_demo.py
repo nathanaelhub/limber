@@ -86,6 +86,9 @@ def build(db_path: Path, seed: int = 7) -> None:
     clock = Clock()
     today = date.today()
     with SessionStore(db_path, clock=clock).open() as s:
+        # The simulated-data marker: a hosted demo opens only a record that carries it (feature 020, FR-009).
+        from src.ptlog import backend
+        backend.mark_simulated(s)
 
         def review_all(pid, step="continue", leave=0):
             rows = s.list_sessions(pid)                       # newest first

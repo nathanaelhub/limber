@@ -26,3 +26,8 @@ jobs:
         env:
           LIMBER_ANTHROPIC_API_KEY: ""
         run: python -m pytest -q
+      - name: Run the record, portal, AI and deploy tests again on libSQL (feature 020)
+        env:
+          LIMBER_ANTHROPIC_API_KEY: ""
+          LIMBER_DB_BACKEND: libsql
+        run: python -m pytest -q tests/test_ptlog*.py tests/test_portal*.py tests/test_assist.py tests/test_deploy*.py

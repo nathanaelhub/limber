@@ -118,3 +118,6 @@ pytest>=7.4.0
 # anthropic - the official Claude API client, used only by src/assist/. Justified under constitution
 # Principle V: hand-written HTTP calls would re-implement its retries, typed errors, and beta parameters.
 anthropic>=2.3.0
+
+# Feature 020: the hosted demo's record on Turso (libSQL). Unused unless TURSO_DATABASE_URL is set.
+libsql>=0.1.11

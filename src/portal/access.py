@@ -26,6 +26,9 @@ ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"     # Crockford base32: no I, L, O
 CODE_LENGTH = 12                                  # 60 bits
 DEFAULT_DAYS, MAX_DAYS = 90, 365
 IDLE_LIMIT = timedelta(minutes=30)
+# Refresh last_seen_at at most this often: each refresh is a write, a round trip to Turso on the hosted demo
+# (feature 020). It can only end an idle sign-in up to this much early, never late.
+TOUCH_INTERVAL = timedelta(minutes=1)
 ABSOLUTE_LIMIT = timedelta(hours=12)
 DEVICE_LIMIT = timedelta(days=30)        # an installed patient app on the patient's own phone (feature 010)
 SIGN_INS_PER_PATIENT = 3
@@ -242,7 +245,8 @@ def current_patient(store: SessionStore, token: Optional[str],
             or store.get_discharge(signin.patient_id) is not None):
         store.portal_signin_delete(digest)
         return None
-    store.portal_signin_touch(digest)
+    if now - datetime.fromisoformat(signin.last_seen_at) >= TOUCH_INTERVAL:
+        store.portal_signin_touch(digest)
     return signin.patient_id
 
 

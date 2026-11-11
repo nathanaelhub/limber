@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from .privacy import validate_label, validate_notes, validate_patient_id
-from . import thresholds
+from . import backend, thresholds
 from .models import (
     PTLogError,
     Media,
@@ -813,12 +813,15 @@ class SessionStore:
 
     def open(self) -> "SessionStore":
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.db_path), timeout=5.0, check_same_thread=self.check_same_thread)
+        # Feature 020: a local SQLite file, or the hosted demo's libSQL copy (src/ptlog/backend.py)
+        self.conn = backend.connect(self.db_path, timeout=5.0, check_same_thread=self.check_same_thread)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=FULL")
         self.conn.execute("PRAGMA foreign_keys=ON")
         self._migrate()
+        if backend.hosted():
+            backend.check_hosted_record(self)       # simulated data only (constitution 1.5.0, Principle III)
         self._ensure_builtin_patient()
         self._recover_running_sessions()
         return self
@@ -850,9 +853,11 @@ class SessionStore:
     # ---------------------------------------------------------------- schema
 
     def _migrate(self) -> None:
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
-        )
+        # Checked with a read first: on the hosted demo even a no-op CREATE is a round trip to Turso (feature 020).
+        if self.conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'").fetchone() is None:
+            self.conn.execute(
+                "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
         row = self.conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         current = row[0] or 0
         for version, sql in MIGRATIONS:
