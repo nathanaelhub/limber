@@ -1,12 +1,14 @@
 <!--
 Sync Impact Report (temporary; remove before the next amendment)
-Version change: 1.3.0 -> 1.4.0 (MINOR: materially expanded guidance, no principle removed)
-Rationale: the owner chose to replace the Streamlit therapist app with a new web app (feature 019), because
-the framework's layout and widgets are the cause of the cluttered look. Both apps exist until cutover.
-Modified: Technical Constraints, User interface.
+Version change: 1.4.0 -> 1.5.0 (MINOR: materially expanded guidance, no principle removed)
+Rationale: the owner wants a hosted demo on Vercel (feature 020). Vercel's instances share nothing, so a demo
+there needs its record in a hosted SQLite-compatible database (Turso) and its files in a hosted store
+(Cloudflare R2). Both are third parties, which Principle III did not allow. The exception is limited to a record
+of simulated data, enforced by a guard, so every real record stays local.
+Modified: Principle III (new bullet: hosted demo), Technical Constraints (Canonical store).
 Added sections: none. Removed sections: none.
-Follow-ups: specs/019 carries the Constitution Check. At cutover, remove the transition wording here and the
-Streamlit mention in Principle V.
+Follow-ups: specs/020 carries the Constitution Check and the guard's tests (SC-005). Carried over from 1.4.0: at
+019's cutover, remove the Streamlit transition wording in Technical Constraints and Principle V.
 -->
 
 # PT Assist Constitution
@@ -65,6 +67,11 @@ Patient data stays on the user's machine, and patients are never identifiable fr
 - All data MUST be stored locally by default. No feature MAY send patient data over the network
   unless it is an explicit, separately specified opt-in feature whose spec includes a
   Constitution Check against this principle.
+- A **hosted demo** MAY keep its record in a hosted SQLite-compatible database and its uploaded files in a
+  hosted file store, only if: the record holds simulated data only and carries the simulated-data marker that
+  `scripts/seed_demo.py` writes; the installation refuses to start on a hosted record without that marker; it
+  is never used for real patients or consented study participants; and it is protected or clearly labelled as
+  a demo. Every other installation stores its record and files locally (feature 020).
 - A networked feature's spec MUST state exactly which data crosses the network, which data
   never does, and who may use the feature. It MUST be off until a therapist turns it on for a
   specific patient, MUST expose to a signed-in patient only that patient's own data, and MUST
@@ -139,7 +146,8 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
   created from `/opt/homebrew/bin/python3.13`. `requirements.txt` is the single dependency
   manifest; new dependencies MUST be added there with a lower-bound pin. Python 3.14 is not
   supported until torch publishes wheels for it.
-- **Canonical store**: the canonical session record MUST persist to a single local file.
+- **Canonical store**: the canonical session record MUST persist to a single local file, except for a
+  hosted demo under Principle III (feature 020).
   SQLite through the standard library `sqlite3` module is the default choice; a plan MAY choose
   otherwise only with a justification under Principle V.
 - **User interface**: the clinic app in `interfaces/clinic.py` (feature 019) and the CLI in
@@ -191,4 +199,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.4.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-05
+**Version**: 1.5.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-10

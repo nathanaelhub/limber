@@ -1,0 +1,90 @@
+# Tasks: A Hosted Demo on Vercel (feature 020)
+
+Each slice is one issue, branch, and pull request, merged with the owner's go-ahead. Tests come first in every
+slice. Local and self-hosted installs keep working after every slice (Story 3): the full suite passes with no
+hosted settings at each merge.
+
+## Slice 0: Spec and amendment
+
+- [x] T001 Spec (`spec.md`), gate G1 spike and its results (PR #40)
+- [x] T002 Constitution 1.5.0: the hosted-demo bullet in Principle III and the Canonical store exception
+- [x] T003 This task list
+
+## Slice A: The record on libSQL (Story 1, Story 3; FR-001 to FR-003b, FR-009)
+
+- [ ] T004 `libsql` in `requirements.txt` with a lower-bound pin; one connection function in `src/ptlog/` that
+      returns `sqlite3` locally and a wrapped libSQL connection when `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
+      are set
+- [ ] T005 The wrapper's four rules, each with a test first (FR-002): rows by column name, `lastrowid` per
+      statement, `IntegrityError`/`OperationalError` from libSQL's `ValueError`, commit before a script
+- [ ] T006 Store contract run: the store and portal tests run a second time through the wrapper against a libSQL
+      local file in CI (no network); the 5 backup tests are skipped there with the reason stated
+- [ ] T007 Embedded replica on hosted installs (FR-003a): the copy under `/tmp`, a sync at the start of every
+      request; test with two replicas of one local primary
+- [ ] T008 The simulated-data marker: `seed_demo.py` writes it; hosted settings without `LIMBER_DEMO=1` and the
+      marker refuse to start, with a plain reason (FR-009, SC-005); `deploy preflight` reports the backend
+- [ ] T009 `/api/today` and `/api/progress` load each list in one query (FR-003b); a test counts statements per
+      patient request and fails above 50
+- [ ] T010 Live check, owner's machine only: the store against the Turso database, a write through one connection
+      read through another (not in CI)
+
+## Slice B: Files on Cloudflare R2 (Story 2; FR-004 to FR-006)
+
+- [ ] T011 `src/media/files.py`: put, get, delete, delete-everything-for-a-patient; the local folder by default,
+      R2 when the `LIMBER_R2_*` settings are set; every write of an uploaded file goes through it (test: nothing
+      else writes under the media folder)
+- [ ] T012 Signed links: upload and download links for one file, valid for minutes, issued only after the existing
+      route checks; never logged or stored (FR-005); test that the bucket address never appears in a response body
+- [ ] T013 Clips and voice notes: parts stored through the interface, so consecutive parts may reach different
+      instances (FR-006)
+- [ ] T014 Message attachments on hosted installs: the browser uploads each file straight to R2 with a signed
+      link; Limber then checks size, type, and the media probe before attaching it; a file that fails is deleted
+- [ ] T015 Deleting a patient deletes their files in R2 (test against a fake bucket)
+- [ ] T016 **Owner step**: add the bucket's CORS rule (uploads from the demo's address only); the exact rule is
+      written in the slice's pull request
+
+## Slice C: Shared settings (Story 1; FR-007, FR-008, FR-010 to FR-012)
+
+- [ ] T017 The sign-in limiter's counts kept in the record (test: five wrong passwords through two app instances
+      lock the account)
+- [ ] T018 Server key from `PTASSIST_PORTAL_KEY` on hosted installs; refuse to start without it
+- [ ] T019 `/api/health` checks the record and the file store; 503 names which one is down
+- [ ] T020 `deploy demo-reset`: replace the hosted record and files with a fresh seed, print the new access codes
+      once; refuse an unmarked record
+- [ ] T021 The hosted AI cap: 10 calls per account per day, set by `demo-reset`
+
+## Slice D: The patient portal as Vercel Python functions (Story 1; FR-015)
+
+- [ ] T022 **Gate E (owner, Principle I)**: the portal imports the engine (`src.portal.live` → `src.live_session`
+      → `analyze.py`), which loads Ultralytics and torch, and `src.ptlog.models` → `src.utils` loads OpenCV. Live
+      sessions need only the engine's rep counting and angle maths. The owner chooses how the portal avoids
+      the heavy imports: (a) load YOLO inside `analyze.py` only when a model is created (a two-line engine change),
+      or (b) a torch-free copy of the counting rules outside the engine, kept identical by a test
+- [ ] T023 A hosted requirements file without torch, Ultralytics, OpenCV, or Streamlit; a test that importing the
+      portal loads none of them
+- [ ] T024 Vercel entry point (ASGI) and `vercel.json`: the portal's pages, API, and static files; the Therapist
+      door explains which clinic pages are online so far (Story 5, scenario 1)
+- [ ] T025 Deploy to `limber-demo` (Python, not the container preset); settings in Vercel: Turso, R2,
+      `PTASSIST_PORTAL_KEY`, `LIMBER_DEMO=1`, the AI key
+- [ ] T026 Verify on the live site: 50 parallel signed-in requests (SC-001), a message written through one instance
+      read through another (SC-002), first page from scaled to zero within 15 s (SC-004), and the patient dry run
+      on a phone-sized browser
+- [ ] T027 Remove the container-beta setup that 020 replaces (`Dockerfile.vercel`, the start-up seeding in demo
+      mode on hosted installs), keeping the one-port mode for self-hosting
+
+## Slice E onward: the therapist side (Story 5) and video (Story 6)
+
+The therapist side on Vercel is delivered by 019's slices; each goes online as it merges, once Slice D exists.
+
+- [ ] T028 019 slices 1 to 5 deploy to the hosted demo as they merge (tracked in `specs/019-clinic-app/tasks.md`)
+- [ ] T029 **G5**: browser pose (MoveNet) against YOLO11 on the three Ultralytics clips, with tolerances set by the
+      owner (shared with 019's G2)
+- [ ] T030 Hosted video analysis (Story 6, FR-016, FR-017): the browser finds body points and draws the skeleton;
+      Limber counts and scores with the engine's rules; the video is never uploaded
+
+## Done when
+
+- SC-001 to SC-005 pass, on the live site where they are about the live site.
+- The patient dry run and, once 019 slices 1 to 5 are online, the therapist dry run pass on
+  `limber-demo.vercel.app`.
+- The full suite passes locally with no hosted settings.
