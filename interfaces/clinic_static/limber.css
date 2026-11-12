@@ -313,3 +313,37 @@ html,body{margin:0;background:#FAF8F4}
 .online-list{display:flex;flex-wrap:wrap;gap:8px}
 .lb .error-text{color:var(--warning);font-weight:600}
 .lb .menu button{font-weight:600}
+/* Inbox (slice 2) */
+.pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.pad-x{padding:0 8px}
+.ellipsis{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.convs{margin-top:16px;padding:12px 8px 0;border-top:1px solid var(--line)}
+.convs>summary{cursor:pointer;min-height:32px;display:flex;align-items:center;color:var(--teal-dark)}
+.convs .sidelist{margin-top:6px}
+.self-start{align-self:flex-start}
+.plain-set{border:0;padding:0;margin:8px 0 0}
+.plain-set legend{padding:0 0 8px}
+.field.w-day{width:180px}
+.field.w-time{width:130px}
+.grow-col{flex:1;min-width:0}
+.warn-box{margin:0 12px 8px}
+.file-pick{cursor:pointer}
+.thumb{overflow:hidden;padding:0}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.voice-note audio{width:320px;max-width:100%}
+.resched h2{display:flex;align-items:center;gap:8px}
+.resched{padding:20px}
+.pane-head .tabs{flex-basis:100%}
+.reply .error-text{padding:0 12px 10px}
+/* The export's reset (.lb p, .lb blockquote) outranks these, which left bubbles and quotes without padding. */
+.lb .bubble{padding:10px 14px}
+.lb .quote{padding:10px 14px}
+.lb .menu .who{padding:8px 10px 10px}
+/* The export's `.lb button{color:inherit}` outranks .btn, which left teal buttons with dark text. */
+.lb .btn{color:var(--on-teal)}
+.lb .btn.quiet,.lb .btn.plain{color:var(--teal-dark)}
+.lb .btn.danger{color:var(--warning)}
+.lb .btn.danger.solid{color:var(--on-teal)}
+.lb .btn[disabled]{color:var(--muted-text)}
+.lb .menu button{color:var(--ink)}
+.reply.ai textarea{min-height:150px}

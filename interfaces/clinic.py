@@ -33,12 +33,31 @@ from starlette.staticfiles import StaticFiles  # noqa: E402
 from interfaces import web_common  # noqa: E402
 from interfaces.web_common import json_response  # noqa: E402
 from src.clinic import nav, prefs as clinic_prefs, shell, signin  # noqa: E402
-from src.portal import access, accounts as ptaccounts, admin  # noqa: E402
-from src.ptlog.models import Account, PTLogError  # noqa: E402
+from src.clinic import inbox as clinic_inbox, inbox_view  # noqa: E402
+from src.clinic.inbox import NotYours  # noqa: E402
+from src.media import files as media_files  # noqa: E402
+from src.portal import messages as ptmessages, plans as ptplans  # noqa: E402
+from src.portal import access, accounts as ptaccounts, admin, attachments  # noqa: E402
+from src.ptlog.models import Account, PatientNotFoundError, PlanNotFound, PTLogError  # noqa: E402
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "clinic_static"
 PREFIX = signin.PREFIX
+
+
+# 4 photos of 15 MB, or one PDF of 20 MB, plus the text and the form's own overhead.
+FILES_REQUEST_MAX = attachments.MAX_PHOTOS * attachments.PHOTO_MAX + 1024 * 1024
+
+
+async def _form_body(request: Request) -> dict:
+    """A reply with photos or a PDF sent as a form (local installs; the hosted demo uploads straight to its bucket)."""
+    form = await request.form(max_files=attachments.MAX_PHOTOS + 1, max_fields=10)
+    body = {k: form.get(k) for k in ("text", "plan_id")}
+    body["confirm"] = form.get("confirm") in ("true", "1", "yes")
+    body["from_draft"] = form.get("from_draft") in ("true", "1", "yes")
+    body["files"] = [(u.content_type or "", await u.read(attachments.PDF_MAX + 1)) for u in form.getlist("files")]
+    await form.close()
+    return body
 
 
 @dataclass
@@ -97,8 +116,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             return RedirectResponse(where, status_code=303, headers={"Cache-Control": "no-store"})
         return html(shell.refused(account, classes), 403)
 
+    def not_found(kind: str, account: Optional[Account], classes: str) -> Response:
+        if kind == "page":
+            return html(shell.not_found(account, classes), 404)
+        return json_response({"error": "Not found."}, 404)
+
     def clinic_route(path: str, handler: Callable[[Ctx], Response], need: str, methods=("GET",),
-                     kind: str = "page") -> None:
+                     kind: str = "page", files: bool = False) -> None:
         """Register a route under /therapist with the role it needs. The only way a route is added."""
         if need not in signin.NEEDS:
             raise ValueError(f"{path}: a route needs one of {', '.join(signin.NEEDS)}")
@@ -114,19 +138,32 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 ptaccounts.restrict(store, account)          # always: no handler sees an unrestricted store
                 try:
                     return handler(Ctx(request, store, account, classes, body))
+                except (NotYours, PatientNotFoundError, PlanNotFound):
+                    # Another therapist's patient, plan, message, visit or file is answered as if it didn't exist.
+                    return not_found(kind, account, classes)
                 except PTLogError as err:
                     return web_common.bad(err)
 
         async def endpoint(request: Request) -> Response:
             body = None
             if request.method == "POST":
-                refused = web_common.check_post(request, origins, page_name="Limber clinic")
+                multipart = files and request.headers.get("content-type", "").lower().startswith("multipart/form-data")
+                refused = web_common.check_post(request, origins, "multipart/form-data" if multipart
+                                                else "application/json", page_name="Limber clinic")
                 if refused:
                     return refused
-                try:
-                    body = await request.json()
-                except ValueError:
-                    return json_response({"error": "Send JSON."}, 400)
+                if multipart:
+                    if int(request.headers.get("content-length") or 0) > FILES_REQUEST_MAX:
+                        return json_response({"error": "These files are too large to send together."}, 413)
+                    try:
+                        body = await _form_body(request)
+                    except ValueError:
+                        return json_response({"error": "Send a form with the files."}, 400)
+                else:
+                    try:
+                        body = await request.json()
+                    except ValueError:
+                        return json_response({"error": "Send JSON."}, 400)
             return await run_in_threadpool(run, request, body)
 
         name = full.strip("/").replace("/", ".") + ":" + ",".join(methods)
@@ -213,6 +250,204 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         def show(ctx: Ctx) -> Response:
             return html(shell.not_online(ctx.account, page_info, ctx.classes))
         return show
+
+    # ------------------------------------------------------------------ Inbox (slice 2)
+
+    media_dir = db_path.parent / "media"
+
+    def inbox_side(store: SessionStore, current=None) -> tuple:
+        items = clinic_inbox.needs_you(store)
+        return items, inbox_view.side(items, clinic_inbox.conversations(store), clock(), current)
+
+    def inbox_page(ctx: Ctx) -> Response:
+        items, side_html = inbox_side(ctx.store)
+        pane = inbox_view.empty_pane() if items else inbox_view.all_clear_pane()
+        return html(inbox_view.page(ctx.account, ctx.classes, side_html, pane))
+
+    def conversation_page(ctx: Ctx) -> Response:
+        store, pid = ctx.store, clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        wanted = ctx.request.query_params.get("plan")
+        plan = clinic_inbox.own_plan(store, pid, wanted) if wanted else clinic_inbox.default_plan(store, pid)
+        plans = store.plans(pid)
+        messages = clinic_inbox.thread(store, pid, plan)             # never marks read (FR-007)
+        from src.media import transcribe
+        voices = {m.media_id: (store.media_get(m.media_id), store.transcription_for(m.media_id))
+                  for m in messages if m.media_id}
+        state = clinic_inbox.reply_state(store, pid, plan)
+        flagged, words = clinic_inbox.withheld(store, pid, plan.id if plan else None)
+        requests = [(a, ptplans.appointment_json(store, a)) for a in ptplans.reschedule_requests(store)
+                    if a.patient_id == pid and (plan is None or a.plan_id == plan.id)]
+        bits = []
+        if plan:
+            bits.append(f"Started {datetime.fromisoformat(plan.start_date[:10]).strftime('%-d %b %Y')}")
+        upcoming = [v for v in ptplans.appointments_view(store, pid) if v["state"] == "upcoming"]
+        if upcoming:
+            bits.append("Next visit " + datetime.fromisoformat(upcoming[0]["starts_local"]).strftime("%a %-d %b, %H:%M"))
+        pane = inbox_view.conversation(
+            pid, plan, plans, store.messages_unread_by_plan("patient", pid), messages, clock(), state,
+            ptmessages.is_enabled(store, pid), clinic_inbox.assist_on(store, pid), flagged, words, voices,
+            transcribe.available(), " · ".join(bits) or "No plan of care yet", requests)
+        _, side_html = inbox_side(store, (pid, plan.id if plan else None))
+        return html(inbox_view.page(ctx.account, ctx.classes, side_html, pane, title=f"Inbox · {pid}"))
+
+    def _patient_plan(ctx: Ctx):
+        pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        body = ctx.body if isinstance(ctx.body, dict) else {}
+        return pid, clinic_inbox.own_plan(ctx.store, pid, body.get("plan_id")), body
+
+    def mark_read(ctx: Ctx) -> Response:
+        pid, plan, _ = _patient_plan(ctx)
+        clinic_inbox.mark_read(ctx.store, pid, plan)
+        return json_response({"ok": True})
+
+    def reply(ctx: Ctx) -> Response:
+        pid, plan, body = _patient_plan(ctx)
+        text = body.get("text") if isinstance(body.get("text"), str) or body.get("text") is None else None
+        uploaded = body.get("uploaded")
+        sending = body.get("files") or []
+        try:
+            if uploaded is not None:
+                sending = attachments.take_uploaded(media_dir, pid, uploaded)
+            try:
+                sent = clinic_inbox.send(ctx.store, pid, plan, text, confirm=body.get("confirm") is True,
+                                         files=sending, from_draft=body.get("from_draft") is True,
+                                         media_dir=media_dir)
+            finally:
+                if uploaded is not None:
+                    attachments.discard_uploaded(media_dir, pid, uploaded)
+        except ptmessages.NeedsConfirmation as warn:
+            return json_response({"error": str(warn), "reasons": warn.reasons, "needs_confirm": True}, 409)
+        except ptmessages.MessagingOff as off:
+            return json_response({"error": str(off)}, 403)
+        return json_response({"id": sent.id}, 201)
+
+    def upload_links(ctx: Ctx) -> Response:
+        pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        declared = (ctx.body or {}).get("files") if isinstance(ctx.body, dict) else None
+        if not isinstance(declared, list) or not all(isinstance(f, dict) for f in declared):
+            return json_response({"error": "Say which files will be sent."}, 400)
+        fs = media_files.at(media_dir)
+        if not fs.remote:
+            return json_response({"error": "Files are sent with the reply on this installation."}, 501)
+        types = attachments.check_declared([(f.get("type"), f.get("size")) for f in declared])
+        links = []
+        for mime in types:
+            key = attachments.upload_key(pid, mime)
+            links.append({"key": key, "url": fs.signed_put(key, mime), "type": mime})
+        return json_response({"uploads": links})
+
+    def draft(ctx: Ctx) -> Response:
+        """An AI draft for the reply box. It is never sent: the therapist edits it and presses Send."""
+        pid, plan, _ = _patient_plan(ctx)
+        if not clinic_inbox.assist_on(ctx.store, pid):
+            return json_response({"state": "off", "notice": clinic_inbox.DRAFT_NOTICES["off"]})
+        from src.assist import assistant
+        result = assistant.draft_reply(ctx.store, pid, plan.id if plan else None, account_id=ctx.account.id)
+        if result.state == "ok":
+            return json_response({"state": "ok", "text": result.text})
+        return json_response({"state": result.state, "notice": clinic_inbox.DRAFT_NOTICES.get(
+            result.state, clinic_inbox.DRAFT_NOTICES["unavailable"])})
+
+    def handled(ctx: Ctx) -> Response:
+        pid, plan, _ = _patient_plan(ctx)
+        from src.assist import assistant
+        flagged, _words = clinic_inbox.withheld(ctx.store, pid, plan.id if plan else None)
+        for m in flagged:
+            assistant.mark_handled(ctx.store, m.id, ctx.account.id)
+        return json_response({"handled": len(flagged)})
+
+    def messaging(ctx: Ctx) -> Response:
+        pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        on = isinstance(ctx.body, dict) and ctx.body.get("enabled") is True
+        ptmessages.set_enabled(ctx.store, pid, on)
+        return json_response({"enabled": on})
+
+    def remove_message(ctx: Ctx) -> Response:
+        pid = ctx.request.path_params["patient_id"]
+        m = clinic_inbox.own_message(ctx.store, pid, ctx.request.path_params["message_id"])
+        plan = ctx.store.plan_get(m.plan_id) if m.plan_id is not None else None
+        if plan is not None and plan.read_only:
+            return json_response({"error": "This plan is archived, so its conversation is read-only.",
+                                  "archived": True}, 409)
+        ptmessages.remove(ctx.store, m.id)
+        return json_response({"removed": m.id})
+
+    def voice_action(action: str) -> Callable[[Ctx], Response]:
+        def act(ctx: Ctx) -> Response:
+            pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+            media = clinic_inbox.own_voice(ctx.store, pid, ctx.request.path_params["media_id"])
+            from src.portal import uploads, voice
+            if action == "heard":
+                uploads.mark_reviewed(ctx.store, media.id)
+            elif action == "delete":
+                voice.delete(ctx.store, media_dir, pid, media.id, by="therapist")
+            else:
+                job = ctx.store.transcription_for(media.id)
+                if job is None:
+                    raise NotYours()
+                ctx.store.transcription_remove_text(job.id)
+            return json_response({"ok": True})
+        return act
+
+    def answer_visit(ctx: Ctx) -> Response:
+        pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        a = clinic_inbox.own_appointment(ctx.store, pid, ctx.request.path_params["appointment_id"])
+        body = ctx.body if isinstance(ctx.body, dict) else {}
+        note = body.get("note") if isinstance(body.get("note"), str) else ""
+        if body.get("answer") == "keep":
+            ptplans.decline_request(ctx.store, a.id, note)
+        elif body.get("answer") == "move":
+            date, at = body.get("date"), body.get("time")
+            if not (isinstance(date, str) and isinstance(at, str)):
+                return json_response({"error": "Choose the day and the time."}, 400)
+            ptplans.move(ctx.store, a.id, f"{date}T{at}")
+            if note.strip():
+                ctx.store.appointment_update(a.id, response_note=note.strip()[:300])
+        else:
+            return json_response({"error": "Choose an answer."}, 400)
+        return json_response({"ok": True})
+
+    def attachment_file(ctx: Ctx) -> Response:
+        pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        a = attachments.get(ctx.store, pid, ctx.request.path_params["attachment_id"])
+        if a is None or a.deleted_at is not None:
+            raise NotYours()
+        served = media_files.at(media_dir).response(attachments.rel(a), a.mime, f"{a.kind}.{a.ext}",
+                                                    {"X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"})
+        if served is None:
+            raise NotYours()
+        return served
+
+    def voice_file(ctx: Ctx) -> Response:
+        pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
+        m = clinic_inbox.own_voice(ctx.store, pid, ctx.request.path_params["media_id"])
+        if m.deleted_at is not None:
+            raise NotYours()
+        from src.portal import uploads
+        served = media_files.at(media_dir).response(uploads.media_rel(m), web_common.media_mime(m),
+                                                    f"voice.{m.ext}", {"Cache-Control": "no-store"})
+        if served is None:
+            raise NotYours()
+        return served
+
+    api = "/api/inbox/{patient_id}"
+    clinic_route("/inbox", inbox_page, "therapist")
+    clinic_route("/inbox/{patient_id}", conversation_page, "therapist")
+    clinic_route(api + "/read", mark_read, "therapist", methods=("POST",), kind="api")
+    clinic_route(api + "/reply", reply, "therapist", methods=("POST",), kind="api", files=True)
+    clinic_route(api + "/uploads", upload_links, "therapist", methods=("POST",), kind="api")
+    clinic_route(api + "/draft", draft, "therapist", methods=("POST",), kind="api")
+    clinic_route(api + "/handled", handled, "therapist", methods=("POST",), kind="api")
+    clinic_route(api + "/messaging", messaging, "therapist", methods=("POST",), kind="api")
+    clinic_route(api + "/messages/{message_id:int}/remove", remove_message, "therapist", methods=("POST",),
+                 kind="api")
+    for action in ("heard", "delete", "text"):
+        clinic_route(api + f"/voice/{{media_id}}/{action}", voice_action(action), "therapist", methods=("POST",),
+                     kind="api")
+    clinic_route(api + "/visits/{appointment_id:int}/answer", answer_visit, "therapist", methods=("POST",),
+                 kind="api")
+    clinic_route("/files/{patient_id}/attachments/{attachment_id}", attachment_file, "therapist", kind="api")
+    clinic_route("/files/{patient_id}/voice/{media_id}", voice_file, "therapist", kind="api")
 
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")
