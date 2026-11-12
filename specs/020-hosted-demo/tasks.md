@@ -82,15 +82,19 @@ On Vercel a connection is cut at the function's time limit (300 s on Hobby), and
 running session's owner is alive with `os.kill(pid, 0)` (`store.py`), which can mark a live session interrupted
 when another instance opens the record.
 
-- [ ] T031 Spike: does `/ws/session` upgrade on Vercel's Python runtime, when is it cut, and what does the browser
-      see? Record the answers here
-- [ ] T032 Session ownership by lease, not process id: the recorder writes an owner and `lease_until` into
+- [x] T031 Spike (2026-11-12, a throwaway Vercel project): the WebSocket upgrades on the Python runtime and stays on
+      one instance; Vercel cuts it at 300-310 s with close code 1006 and no reason, so the browser can't tell it
+      from a dropped network. Option A follows
+- [x] T032 Session ownership by lease, not process id: the recorder writes an owner and `lease_until` into
       `source_extras` and renews it about every 30 s; recovery treats a session as alive while its lease runs
       (old rows: same host and a living process). No migration. Tests with two stores and fake clocks
-- [ ] T033 A second device is refused across instances, using the lease in the record
-- [ ] T034 The duration limit, chosen after T031: (A) reconnect in segments and resume the same session, or
-      (B) stateless HTTP replay of the current set's frames
-- [ ] T035 Deploy and run a camera session longer than the limit on the hosted demo
+- [x] T033 A second device is refused across instances, using the lease in the record
+- [x] T034 Option A: segments. With `ws_segment_seconds` (270 s on the hosted demo) the server ends a connection as
+      a rep completes (at most 15 s late), says `segment`, and keeps the session running under its lease; the page
+      resumes it, the count carries on, and a new set of the same exercise records the rest. Local installs don't
+      segment
+- [x] T035 On the hosted demo (2026-11-12): a 433 s session sending body points at 15 fps was segmented at 272 s,
+      resumed, and completed as one session (159 reps, two sets of the same exercise)
 
 ## Slice E onward: the therapist side (Story 5) and video (Story 6)
 
