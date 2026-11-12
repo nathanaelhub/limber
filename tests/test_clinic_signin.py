@@ -27,7 +27,7 @@ def test_the_pass_signs_in_once_and_leaves_the_address(tmp_db, fake_clock):
     a_pass = _pass(tmp_db, fake_clock)
     with client(tmp_db, fake_clock) as c:
         r = c.get(f"/therapist/?pass={a_pass}", follow_redirects=False)
-        assert r.status_code == 303 and r.headers["location"] == "/therapist/inbox"      # the pass is gone
+        assert r.status_code == 303 and r.headers["location"] == "/therapist/dashboard"      # the pass is gone
         assert c.get("/therapist/api/me").json()["username"] == "therapist"
     with client(tmp_db, fake_clock) as other:
         r = other.get(f"/therapist/?pass={a_pass}", follow_redirects=False)                  # used once already
@@ -42,7 +42,7 @@ def test_the_pass_can_carry_a_safe_next_page_only(tmp_db, fake_clock):
         assert r.headers["location"] == "/therapist/settings"
     with client(tmp_db, fake_clock) as c:
         r = c.get(f"/therapist/?pass={_pass(tmp_db, fake_clock)}&next=//evil.example/x", follow_redirects=False)
-        assert r.headers["location"] == "/therapist/inbox"
+        assert r.headers["location"] == "/therapist/dashboard"
 
 
 def test_an_old_pass_does_not_sign_in(tmp_db, fake_clock):

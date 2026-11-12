@@ -36,6 +36,11 @@
     drops.forEach((d) => { if (d.open) { d.open = false; d.querySelector("summary").focus(); } });
   });
 
+  // Filters (the Dashboard's period, a patient) apply as soon as they change.
+  document.querySelectorAll("select[data-submit-on-change]").forEach((sel) => {
+    sel.addEventListener("change", () => sel.form.submit());
+  });
+
   // Sign out.
   document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", async () => {
     try { await api("/api/logout", {}); } catch (_) { /* already signed out */ }

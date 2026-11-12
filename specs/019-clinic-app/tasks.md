@@ -67,9 +67,11 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 5a: Dashboard, Sessions, Observation logs (Story 5; FR-011)
 
-- [ ] T024 `src/clinic/dashboard.py`; Sessions with exports; Observation logs (charts, rep table, timeline)
-- [ ] T025 `src/clinic/exports.py` with the standard library, checked against golden files taken from today's
-      pandas output first (rep CSV, full log JSON, video report)
+- [x] T024 `src/clinic/records.py`; Sessions with exports; Observation logs (charts, rep table, timeline). Owner's
+      decision (12 November 2026): the Dashboard is the therapist's home page and the first item in the top bar,
+      with Needs you, today's visits and patients to look at above the caseload's activity
+- [x] T025 Exports with the standard library: the four session exports already were (`src/ptlog/exports`); the
+      rep CSV is checked byte for byte against the old pandas output in a test. The video report moves with slice 6
 
 ## Slice 5b: Review (Story 5)
 

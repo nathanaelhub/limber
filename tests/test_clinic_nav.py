@@ -12,10 +12,10 @@ def keys(items):
 def test_a_therapist_sees_daily_work_and_tools(tmp_db, fake_clock):
     made = seed(tmp_db, fake_clock)
     rivera = made["rivera"]
-    assert keys(nav.main_items(rivera)) == ["inbox", "patients", "schedule"]
-    assert "dashboard" in keys(nav.tools_items(rivera)) and "how" in keys(nav.tools_items(rivera))
+    assert keys(nav.main_items(rivera)) == ["dashboard", "inbox", "patients", "schedule"]
+    assert "sessions" in keys(nav.tools_items(rivera)) and "how" in keys(nav.tools_items(rivera))
     assert keys(nav.me_items(rivera)) == ["settings"]                       # no People: not an admin
-    assert nav.home(rivera) == "/therapist/inbox"
+    assert nav.home(rivera) == "/therapist/dashboard"
 
 
 def test_the_lead_therapist_is_also_an_admin(tmp_db, fake_clock):
@@ -45,7 +45,7 @@ def test_the_top_bar_on_a_page(tmp_db, fake_clock):
     with client(tmp_db, fake_clock) as c:
         sign_in(c, "rivera")
         page = c.get("/therapist/settings").text
-        assert '<nav class="nav" aria-label="Main"><a href="/therapist/inbox">Inbox</a>' in page
+        assert '<nav class="nav" aria-label="Main"><a href="/therapist/dashboard">Dashboard</a><a href="/therapist/inbox">Inbox</a>' in page
         assert '<summary>Tools</summary>' in page and 'href="/therapist/people"' not in page
         assert 'href="/therapist/settings" aria-current="page"' in page
         assert "Signed in as <b>Rivera</b> · Therapist" in page
