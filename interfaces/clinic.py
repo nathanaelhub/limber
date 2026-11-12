@@ -35,6 +35,7 @@ from interfaces.web_common import json_response  # noqa: E402
 from src.clinic import nav, prefs as clinic_prefs, shell, signin  # noqa: E402
 from src.clinic import inbox as clinic_inbox, inbox_view  # noqa: E402
 from src.clinic import assist_view, patients as clinic_patients, patients_view  # noqa: E402
+from src.clinic import people as clinic_people, schedule as clinic_schedule, schedule_people_view  # noqa: E402
 from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
@@ -85,7 +86,7 @@ class ClinicRoute:
 def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                allowed_origins: Iterable[str] = (), clock: Callable[[], datetime] = datetime.now,
                static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False,
-               portal_url: str = "/") -> Starlette:
+               portal_url: str = "http://localhost:8600") -> Starlette:
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
     origins = {o.rstrip("/") for o in allowed_origins}
@@ -702,6 +703,59 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route(pat + "/questionnaires/{assignment_id:int}/end", end_questionnaire, "therapist", methods=("POST",),
                  kind="api")
 
+    # ------------------------------------------------------------------ Schedule and People (slice 4)
+
+    def schedule_page(ctx: Ctx) -> Response:
+        content = schedule_people_view.schedule(clinic_schedule.visits(ctx.store), str(ptplans.clinic_zone(ctx.store)))
+        return html(schedule_people_view.page(ctx.account, ctx.classes, "schedule", "Schedule", content))
+
+    def people_page(ctx: Ctx) -> Response:
+        store, me = ctx.store, ctx.account
+        content = schedule_people_view.people(
+            me, clinic_people.staff(store, me), clinic_people.patient_accounts(store, me),
+            clinic_people.invites(store, me), clinic_people.therapists(store), clinic_people.patient_ids(store, me),
+            clock())
+        return html(schedule_people_view.page(me, ctx.classes, "people", "People", content))
+
+    def _int(value) -> Optional[int]:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def people_invite(ctx: Ctx) -> Response:
+        body = _body(ctx)
+        role = _text(body, "role")
+        token, invite = clinic_people.invite(
+            ctx.store, ctx.account, role, _int(body.get("therapist_id")) if role == "patient" else None,
+            (_text(body, "patient_id") or "").strip() if role == "patient" else None,
+            body.get("make_admin") is True and role == "therapist", clock=clock)
+        link = f"{portal_url.rstrip('/')}/invite/{token}"
+        return json_response({"show": link, "note": "Copy this link now and give it to the person. It is shown only "
+                              "once, works once, and lasts 7 days. Limber does not send it anywhere."}, 201)
+
+    def people_revoke(ctx: Ctx) -> Response:
+        if not clinic_people.revoke(ctx.store, ctx.account, ctx.request.path_params["invite_id"]):
+            raise NotYours()
+        return ok()
+
+    def people_status(ctx: Ctx) -> Response:
+        status = _text(_body(ctx), "status")
+        clinic_people.set_status(ctx.store, ctx.account, ctx.request.path_params["account_id"], status or "")
+        return ok()
+
+    def people_reassign(ctx: Ctx) -> Response:
+        body = _body(ctx)
+        clinic_people.reassign(ctx.store, ctx.account, _text(body, "patient_id") or "", _int(body.get("therapist_id")))
+        return ok()
+
+    clinic_route("/schedule", schedule_page, "therapist")
+    clinic_route("/people", people_page, "admin")
+    clinic_route("/api/people/invite", people_invite, "admin", methods=("POST",), kind="api")
+    clinic_route("/api/people/invites/{invite_id:int}/revoke", people_revoke, "admin", methods=("POST",), kind="api")
+    clinic_route("/api/people/accounts/{account_id:int}/status", people_status, "admin", methods=("POST",), kind="api")
+    clinic_route("/api/people/reassign", people_reassign, "admin", methods=("POST",), kind="api")
+
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")
     clinic_route("/api/login", login, "public", methods=("POST",), kind="api")
@@ -739,10 +793,13 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--public-origin", action="append", default=[], metavar="URL",
                         help="An address staff use to reach this app, e.g. a tunnel's https URL (repeatable)")
     parser.add_argument("--trust-proxy", action="store_true", help="Read the visitor's address from X-Forwarded-For")
+    parser.add_argument("--portal-url", default="http://localhost:8600",
+                        help="Where the patient portal runs; invite links point there")
     args = parser.parse_args(argv)
     origins = [f"http://{h}:{args.port}" for h in {args.host, "127.0.0.1", "localhost"}] + list(args.public_origin)
     secure = any(o.startswith("https://") for o in args.public_origin)
-    app = create_app(allowed_origins=origins, trust_proxy=args.trust_proxy, secure_cookie=secure)
+    app = create_app(allowed_origins=origins, trust_proxy=args.trust_proxy, secure_cookie=secure,
+                     portal_url=args.portal_url)
     if args.host not in ("127.0.0.1", "localhost", "::1") and not secure:
         print("WARNING: serving plain HTTP beyond this machine. Put the clinic app behind HTTPS.")
     print(f"Limber clinic app on http://{args.host}:{args.port}{PREFIX}/  (demo and study use only)")

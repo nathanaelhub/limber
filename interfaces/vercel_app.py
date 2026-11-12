@@ -62,7 +62,7 @@ def build(db_path: Path, origin: str, key: Optional[bytes] = None, ws_segment_se
     portal = create_app(db_path=db_path, key=key, allowed_origins=[origin], trust_proxy=True, secure_cookie=secure,
                         therapist_url=f"{origin}/therapist", ws_segment_seconds=ws_segment_seconds)
     therapist = clinic.create_app(db_path=db_path, key=key, allowed_origins=[origin], trust_proxy=True,
-                                  secure_cookie=secure)
+                                  secure_cookie=secure, portal_url=origin)
 
     async def demo_unavailable(_request, exc):
         # A visit while the demo is being reset, or a record that isn't the demo: a plain answer, not an error page.

@@ -15,7 +15,7 @@ from tests.clinic_helpers import client, seed, sign_in
 # Paths that take a patient, plan, visit or file, with how to fill them for another therapist's patient. Each
 # slice that adds such a route adds its pattern here; an unknown placeholder fails the walk below.
 OTHERS = {"patient_id": "P-001", "message_id": "1", "media_id": "m1", "attachment_id": "a1",
-          "appointment_id": "1", "plan_id": "1", "assignment_id": "1"}
+          "appointment_id": "1", "plan_id": "1", "assignment_id": "1", "invite_id": "1", "account_id": "1"}
 
 
 def _app(tmp_db, fake_clock):
@@ -81,6 +81,8 @@ def test_a_therapist_cannot_reach_another_therapists_patient(tmp_db, fake_clock)
             if "{" not in route.path:
                 continue
             path = _concrete(route.path)
+            if route.need != "therapist":
+                continue                              # admin routes: a role refusal, tested in test_clinic_schedule_people
             for method in route.methods:
                 r = c.get(path) if method == "GET" else c.post(path, json={}, headers={"Origin": "http://testserver"})
                 assert r.status_code == 404, (method, route.path, r.status_code)
@@ -103,5 +105,5 @@ def test_unbuilt_pages_say_so_and_list_what_works(tmp_db, fake_clock):
     seed(tmp_db, fake_clock)
     with client(tmp_db, fake_clock) as c:
         sign_in(c)
-        page = c.get("/therapist/schedule").text
+        page = c.get("/therapist/dashboard").text
         assert "not online yet" in page and 'href="/therapist/settings"' in page
