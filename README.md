@@ -122,6 +122,19 @@ Therapists get an **Inbox** for conversations with patients (`python interfaces/
 messaging is off until turned on per patient. Patients see today's plan, run a guided camera session (their video never leaves their device; only
 body-point positions are sent), and see their progress. Details: `specs/007-online-patient-view/`.
 
+### Try the hosted demo
+
+A copy with simulated patients only runs at **<https://limber-demo.vercel.app>**:
+
+- **Patients:** the front page. Sign in with `patient017` (password below) or an access code.
+- **Therapists:** the front page's Therapist door, or **<https://limber-demo.vercel.app/therapist>** directly.
+  Inbox, Patients, Schedule, People and My settings are online; the Tools pages (dashboard, sessions,
+  review, tracker, video and live session) are moving there next and run locally for now.
+
+It uses the same demo sign-ins as below. Access codes are not listed here: they change every time the hosted demo
+is reset, and are given out with the demo. The record is invented and reset often, so nothing entered there is
+kept. While it is being reset the site answers "The demo is being reset" for a few minutes.
+
 ### Try the demo (simulated data)
 
 `scripts/seed_demo.py` writes an invented caseload (pseudonymous IDs only) to `data/demo.db`, with dates
