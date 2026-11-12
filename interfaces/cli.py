@@ -771,6 +771,22 @@ def cmd_deploy(args):
             done = preflight.initialise(db, _Path(args.password_file) if args.password_file else None)
             print("; ".join(done) if done else "Nothing to do: the server key and the therapist password already exist.")
             return 0
+        if sub == "demo-reset":
+            # Feature 020: replace the hosted demo with a fresh simulated clinic. Needs the Turso settings, and
+            # PTASSIST_PORTAL_KEY so the new access codes work on every instance.
+            from src.deploy import demo
+            from src.ptlog import backend
+            if not backend.hosted():
+                print_error("Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN (the hosted demo's database) first.")
+                return 1
+            print("Resetting the hosted demo from a fresh simulated seed (one statement at a time; a minute or two)...")
+            report = demo.reset(db)
+            print(f"Done: {report['patients']} patients, {report['rows']} rows in {report['seconds']} s. "
+                  f"AI calls are capped at {demo.HOSTED_AI_CAP} per account per day.")
+            print("New access codes (shown once; the old ones no longer work):")
+            for pid, code in report["codes"].items():
+                print(f"  {code}  {pid}")
+            return 0
         key = backup.load_backup_key(_Path(args.key_file))
         if sub == "backup":
             out = backup.create(db, _Path(args.dest), key, keep=args.keep)
@@ -783,7 +799,7 @@ def cmd_deploy(args):
                 return 1
             print(f"Restored to {backup.restore(_Path(args.file), db, key, force=args.force, media_backup_dir=_Path(args.file).parent / 'media')}")
             return 0
-        print_error("Usage: deploy {preflight,init,backup,restore}")
+        print_error("Usage: deploy {preflight,init,backup,restore,demo-reset}")
         return 1
     except (PTLogError, OSError) as e:
         print_error(str(e))
@@ -1482,6 +1498,7 @@ Examples:
     dpb.add_argument("--dest", default="data/backups")
     dpb.add_argument("--key-file", default="data/backup.key", help="Keep a copy of this key away from the backups")
     dpb.add_argument("--keep", type=int, default=14)
+    dep_sub.add_parser("demo-reset", help="Hosted demo only: replace it with a fresh simulated clinic (feature 020)")
     dpr = dep_sub.add_parser("restore", help="Restore the record from an encrypted backup (stop Limber first)")
     dpr.add_argument("file")
     dpr.add_argument("--key-file", default="data/backup.key")

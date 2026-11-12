@@ -135,7 +135,9 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
     origins = {o.rstrip("/") for o in allowed_origins}
-    limiter = access.LoginLimiter(clock=clock)
+    from src.ptlog import backend as record_backend
+    # On the hosted demo every instance must count the same failures, so they live in the record (feature 020).
+    limiter = access.RecordLoginLimiter(clock=clock) if record_backend.hosted() else access.LoginLimiter(clock=clock)
     registry = live.LiveRegistry(limit=max_live_sessions)
 
     def open_store() -> SessionStore:
@@ -698,13 +700,26 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         return Response(_sw, media_type="application/javascript", headers={"Cache-Control": "no-store"})
 
     def health(_request: Request):
-        """Used by the proxy and the uptime check: proves the record can be read and written."""
-        if preflight._record_writable(db_path) is not None:
+        """Used by the proxy and the uptime check: proves the record can be read and written, and the file store
+        reached. On the hosted demo the record check is a read: a write test there would change Turso on every
+        check (feature 020, FR-011)."""
+        from src.ptlog import backend as record_backend
+        if record_backend.hosted():
+            try:
+                with open_store() as store:
+                    store.conn.execute("SELECT 1 FROM schema_version").fetchone()
+            except Exception:  # noqa: BLE001 — any failure to reach the record is "unavailable"
+                return _json({"ok": False, "record": "unavailable"}, 503)
+        elif preflight._record_writable(db_path) is not None:
             return _json({"ok": False, "record": "unavailable"}, 503)
+        try:
+            media_files.at(media_dir).list(".health/")
+        except Exception:  # noqa: BLE001 — the bucket or folder can't be reached
+            return _json({"ok": False, "record": "ok", "files": "unavailable"}, 503)
         with open_store() as store:
             therapist = admin.password_is_set(store)
         from src.media import transcribe
-        return _json({"ok": True, "record": "ok", "pose_assets": pose_assets_present(static_dir),
+        return _json({"ok": True, "record": "ok", "files": "ok", "pose_assets": pose_assets_present(static_dir),
                       "therapist_sign_in": therapist,
                       # Optional: voice notes arrive and play whether or not this is set up (feature 014).
                       "voice_transcripts": transcribe.available()})
