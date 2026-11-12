@@ -1521,6 +1521,12 @@ Examples:
     mr = msg_sub.add_parser("remove", help="Remove one message, leaving a marker")
     mr.add_argument("message_id", type=int)
 
+    clinic_parser = subparsers.add_parser("clinic", help="Run the clinic app (the new therapist side) at /therapist")
+    clinic_parser.add_argument("--host", default="127.0.0.1")
+    clinic_parser.add_argument("--port", type=int, default=8502)
+    clinic_parser.add_argument("--public-origin", action="append", default=[], metavar="URL")
+    clinic_parser.add_argument("--trust-proxy", action="store_true")
+
     portal_parser = subparsers.add_parser("portal", help="Home access for patients: codes, access history, the patient service")
     portal_sub = portal_parser.add_subparsers(dest="portal_cmd")
     pcode = portal_sub.add_parser("code", help="Issue, list, or revoke a patient's access code")
@@ -1580,6 +1586,12 @@ Examples:
         return cmd_review(args)
     elif args.command == "tracker":
         return cmd_tracker(args)
+    elif args.command == "clinic":
+        from interfaces import clinic
+        argv = ["--host", args.host, "--port", str(args.port)] + (["--trust-proxy"] if args.trust_proxy else [])
+        for origin in args.public_origin:
+            argv += ["--public-origin", origin]
+        return clinic.main(argv)
     elif args.command == "portal":
         return cmd_portal(args)
     elif args.command == "messages":
