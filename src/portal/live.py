@@ -77,6 +77,7 @@ class PortalLiveSession:
         self = object.__new__(cls)
         self.patient_id, self.registry, self.clock = patient_id, registry, clock
         self.bad_frames = 0
+        self._rep_offset = 0          # reps of this exercise done before a resume (feature 020)
         self._lock = threading.RLock()
         self._keypoints: Optional[np.ndarray] = None
         self._result: Optional[Dict[str, Any]] = None
@@ -90,6 +91,11 @@ class PortalLiveSession:
                 raise LiveRefused("no_program")
             if store.current_plan(patient_id) is None and store.plans(patient_id):
                 raise LiveRefused("plan_archived")              # feature 017: nothing new in an archived plan
+            # Another device may be recording on another hosted instance (feature 020). Opening the store has
+            # already recovered abandoned sessions, so one still running here has a live owner.
+            if store.conn.execute("SELECT 1 FROM sessions WHERE patient_id = ? AND status = 'running'",
+                                  (patient_id,)).fetchone():
+                raise LiveRefused("second_device")
             registry.claim(patient_id, self)
         except Exception:
             store.close()
@@ -111,6 +117,76 @@ class PortalLiveSession:
             store.close()
             raise
         return self
+
+    @classmethod
+    def resume(cls, db_path: Path, patient_id: str, session_id: Any, registry: LiveRegistry,
+               pose_model: str = DEFAULT_POSE_MODEL, form_analyzer_factory: Optional[Callable[[str], Any]] = None,
+               clock: Callable[[], datetime] = datetime.now, rate_cap: int = 20) -> "PortalLiveSession":
+        """Pick up the patient's own running home session after the host cut the connection (feature 020).
+        The exercise carries on where it was, in a new set; the screen keeps counting from the reps already done."""
+        import json
+        self = object.__new__(cls)
+        self.patient_id, self.registry, self.clock = patient_id, registry, clock
+        self.bad_frames = 0
+        self._lock = threading.RLock()
+        self._keypoints: Optional[np.ndarray] = None
+        self._result: Optional[Dict[str, Any]] = None
+        self.meter = frames.RateMeter(clock=clock, nominal=NOMINAL_FPS, cap=rate_cap)
+        store = SessionStore(db_path, clock=clock, check_same_thread=False).open()
+        try:
+            row = None
+            if isinstance(session_id, int) and not isinstance(session_id, bool):
+                row = store.conn.execute("SELECT patient_id, status, source_extras FROM sessions WHERE id = ?",
+                                         (session_id,)).fetchone()
+            extras = json.loads(row["source_extras"] or "{}") if row else {}
+            if row is None or row["patient_id"] != patient_id or row["status"] != "running" \
+                    or extras.get("origin") != "portal":
+                raise LiveRefused("not_resumable")
+            now = clock()
+            self.exercises = viewmodels.program_exercises(store, patient_id, now.date())
+            if not self.exercises:
+                raise LiveRefused("no_program")
+            open_set = store.session_open_set(session_id)
+            key = store.conn.execute("SELECT exercise_key FROM exercise_sets WHERE id = ?",
+                                     (open_set,)).fetchone()[0] if open_set else self.exercises[0]["key"]
+            self.index = next((i for i, e in enumerate(self.exercises) if e["key"] == key), 0)
+            current = self.exercises[self.index]
+            self._rep_offset = store.conn.execute(
+                "SELECT COUNT(*) FROM reps r JOIN exercise_sets s ON s.id = r.set_id "
+                "WHERE s.session_id = ? AND s.exercise_key = ? AND r.out_of_range = 0",
+                (session_id, current["key"])).fetchone()[0]
+            registry.claim(patient_id, self)
+        except Exception:
+            store.close()
+            raise
+        try:
+            model = str(pose_model)[:40] if isinstance(pose_model, str) and pose_model else DEFAULT_POSE_MODEL
+            self.store = store
+            self.live = LiveSession(
+                store, patient_id, current["key"], max(1, current["target_reps"] - self._rep_offset), "home",
+                self._infer, fps=float(NOMINAL_FPS), draw=False, clock=clock,
+                form_analyzer_factory=form_analyzer_factory,
+                extras={"origin": "portal", "pose_model": model, "fps_nominal": NOMINAL_FPS, "camera_id": "home"})
+            self.session_id = self.live.resume(session_id)
+        except Exception:
+            registry.release(patient_id, self)
+            store.close()
+            raise
+        return self
+
+    def detach(self) -> Dict[str, Any]:
+        """Hand the session over to a later `resume`: write what is buffered, keep it running (its lease holds it),
+        and let go of this connection. Idempotent."""
+        with self._lock:
+            if self.ended:
+                return self._result
+            self.live.detach()
+            self._result = {"type": "segment", "session_id": self.session_id}
+            try:
+                self.registry.release(self.patient_id, self)
+            finally:
+                self.store.close()
+            return self._result
 
     # the engine's "inference": the body points that came with the current message
     def _infer(self, _frame):
@@ -141,7 +217,7 @@ class PortalLiveSession:
         with self._lock:
             m = self.live.metrics or {}
             current = self.exercises[self.index]
-            reps = int(m.get("rep_count", 0))
+            reps = self._rep_offset + int(m.get("rep_count", 0))
             seen = self._keypoints is not None
             notice = "low_rate" if self.meter.low_rate else (None if seen or not self.meter.accepted else "no_person")
             angle = m.get("current_angle")
@@ -159,6 +235,7 @@ class PortalLiveSession:
         with self._lock:
             if not self.ended and self.index < len(self.exercises) - 1:
                 self.index += 1
+                self._rep_offset = 0
                 upcoming = self.exercises[self.index]
                 self.live.set_target_reps(upcoming["target_reps"])
                 self.live.switch(upcoming["key"])

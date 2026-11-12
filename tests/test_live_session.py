@@ -57,8 +57,9 @@ class TestStart:
         sid = live.start()
         s = store.load_session(sid)
         assert (s.status, s.source, s.source_ref, s.patient_id) == ("running", "webcam", "Default", "P-017")
+        lease = {k: s.source_extras.pop(k) for k in ("host", "lease_until")}   # feature 020's lease
         assert s.source_extras == {"camera_id": "Default", "imgsz": 320, "frame_skip": 1, "origin": "web",
-                                   "pid": os.getpid()}
+                                   "pid": os.getpid()} and all(lease.values())
         assert len(s.sets) == 1
         assert (s.sets[0].exercise_key, s.sets[0].exercise_name, s.sets[0].target_reps) == (
             "knee_extension", "Knee Extension", 12)

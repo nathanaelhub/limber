@@ -23,7 +23,7 @@ MAX_MESSAGE_BYTES = 4096
 POINTS = 17
 REFERENCE_HEIGHT = 720.0          # the engine's pixel-distance form checks were tuned near 720p
 MIN_SIDE, MAX_SIDE = 64, 4096
-MESSAGE_TYPES = ("start", "frame", "next", "stop")
+MESSAGE_TYPES = ("start", "resume", "frame", "next", "stop")   # resume: feature 020
 
 
 class FrameError(PortalError):

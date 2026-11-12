@@ -44,12 +44,18 @@ def check_settings(env: Mapping[str, str]) -> None:
         raise RuntimeError("LIMBER_DEMO must be 1: the hosted record is the simulated demo only.")
 
 
-def build(db_path: Path, origin: str, key: Optional[bytes] = None):
+# Vercel ends a function's connection at 300 s (measured 2026-11-12: cut at 300-310 s, close code 1006). Live
+# sessions end each connection between reps after this long (at most 15 s more) and the page resumes them.
+SEGMENT_SECONDS = 270
+
+
+def build(db_path: Path, origin: str, key: Optional[bytes] = None, ws_segment_seconds: float = SEGMENT_SECONDS):
     from starlette.responses import HTMLResponse
     from interfaces.patient_portal import create_app
     origin = origin.rstrip("/")
     app = create_app(db_path=db_path, key=key, allowed_origins=[origin], trust_proxy=True,
-                     secure_cookie=origin.startswith("https://"), therapist_url=f"{origin}/therapist")
+                     secure_cookie=origin.startswith("https://"), therapist_url=f"{origin}/therapist",
+                     ws_segment_seconds=ws_segment_seconds)
 
     async def therapist_door(_request):
         return HTMLResponse(THERAPIST_PAGE, headers={"Cache-Control": "no-store"})
@@ -72,7 +78,8 @@ def _app_from_environment():
     use_clinic_time(os.environ)
     db = Path(os.environ.get("PTASSIST_DB", "/tmp/limber/replica.db"))
     db.parent.mkdir(parents=True, exist_ok=True)
-    return build(db, os.environ["LIMBER_PUBLIC_ORIGIN"])
+    segment = float(os.environ.get("LIMBER_WS_SEGMENT_SECONDS") or SEGMENT_SECONDS)
+    return build(db, os.environ["LIMBER_PUBLIC_ORIGIN"], ws_segment_seconds=segment)
 
 
 app = _app_from_environment() if os.environ.get("VERCEL") else None

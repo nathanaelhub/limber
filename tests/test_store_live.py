@@ -96,11 +96,13 @@ def test_recorder_marks_every_session_with_its_process(tmp_db):
     store = SessionStore(tmp_db).open()
     rec = SessionRecorder(store)
     sid = rec.start(None, "webcam", "0", cfg, exercise_key="knee_extension", extras={"camera_id": 0})
-    assert store.load_session(sid).source_extras == {"camera_id": 0, "pid": os.getpid()}
+    extras = store.load_session(sid).source_extras
+    assert {k: extras[k] for k in ("camera_id", "pid")} == {"camera_id": 0, "pid": os.getpid()}
+    assert extras["host"] and extras["lease_until"]                     # the lease (feature 020, slice F)
     video = SessionRecorder(store)
     assert _status(tmp_db, sid) == ("running", None)
     vid = video.start(None, "video", "clip.mp4", cfg, exercise_key="knee_extension")
-    assert store.load_session(vid).source_extras == {"pid": os.getpid()}
+    assert store.load_session(vid).source_extras["pid"] == os.getpid()
     store.close()
 
 

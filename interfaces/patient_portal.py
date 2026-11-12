@@ -131,7 +131,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                allowed_origins: Iterable[str] = (), clock: Callable[[], datetime] = datetime.now,
                static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False,
                therapist_url: str = "http://localhost:8501", frame_rate_cap: int = 20,
-               max_live_sessions: int = 8) -> Starlette:
+               max_live_sessions: int = 8, ws_segment_seconds: Optional[float] = None) -> Starlette:
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
     origins = {o.rstrip("/") for o in allowed_origins}
@@ -912,6 +912,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         await ws.accept()
         session, bad, accepted = None, 0, 0
         last_sent, last_sent_at, started_at = None, 0.0, asyncio.get_running_loop().time()
+        segment_start = clock()           # feature 020: a host that cuts connections (Vercel: 300 s)
+        reps_when_due = None
 
         async def send_state(state, force=False):
             nonlocal last_sent, last_sent_at
@@ -953,6 +955,18 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                 await ws.close(code=1000)
                                 return
                         await send_state(session.state(), force=True)
+                    elif kind == "resume":
+                        if session is None:
+                            try:
+                                session = await run_in_threadpool(
+                                    lambda: live.PortalLiveSession.resume(db_path, patient_id, message.get("session_id"),
+                                                                          registry, pose_model=message.get("pose_model") or live.DEFAULT_POSE_MODEL,
+                                                                          clock=clock, rate_cap=frame_rate_cap))
+                            except live.LiveRefused as refused:
+                                await ws.send_json({"type": "refused", "reason": refused.reason, "message": str(refused)})
+                                await ws.close(code=1000)
+                                return
+                        await send_state(session.state(), force=True)
                     elif session is None:
                         raise frames.FrameError("start first")
                     elif kind == "frame":
@@ -974,6 +988,18 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     if bad >= BAD_LIMIT:
                         await run_in_threadpool(_audit, "live_refused", patient_id, "bad_frames")
                         await close_with("bad_frames")
+                        return
+                if session is not None and ws_segment_seconds:
+                    over = (clock() - segment_start).total_seconds() - ws_segment_seconds
+                    current = session.state()
+                    if over > 0 and reps_when_due is None:
+                        reps_when_due = current.get("rep_count", 0)
+                    if over > 0 and (over > 15 or current.get("phase") == "neutral"
+                                     or current.get("rep_count", 0) > reps_when_due):
+                        # End this connection as a rep completes, never mid-rep (at most 15 s late), and keep the
+                        # session running; the browser resumes it on a new connection.
+                        await ws.send_json(await run_in_threadpool(session.detach))
+                        await ws.close(code=1000)
                         return
                 if session is not None and asyncio.get_running_loop().time() - started_at > MAX_SECONDS:
                     await ws.send_json(await run_in_threadpool(session.stop))

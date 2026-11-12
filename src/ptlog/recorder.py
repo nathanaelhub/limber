@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from .models import (
@@ -27,7 +27,12 @@ from .models import (
     RepEvent,
     Session,
 )
-from .store import SessionStore
+from .store import SessionStore, this_host
+
+# A running session's lease (feature 020, slice F): renewed while frames arrive, so a session held by another
+# hosted instance is not taken for abandoned. Recovery waits out the lease before interrupting it.
+LEASE_SECONDS = 90
+RENEW_SECONDS = 30
 
 logger = logging.getLogger("ptlog")
 
@@ -115,12 +120,32 @@ class SessionRecorder:
         pid = patient_id or UNASSIGNED_ID
         if self.store.get_patient(pid) is None:
             raise PatientNotFoundError(f"Patient '{pid}' not found")
-        # The recording process id lets recovery tell a live session from an abandoned one.
-        extras = {**(extras or {}), "pid": os.getpid()}
+        # Who is recording, and until when, lets recovery tell a live session from an abandoned one: by process
+        # on this host, by lease from another host (feature 020: requests reach different hosted instances).
+        now = self.clock()
+        extras = {**(extras or {}), "pid": os.getpid(), "host": this_host(),
+                  "lease_until": (now + timedelta(seconds=LEASE_SECONDS)).isoformat()}
         self._session_id = self.store.start_session(pid, source, str(source_ref), extras)
+        self._lease_renewed = now
         self._last_flush = self.clock()
         self._open_set(exercise_config, exercise_key)
         return self._session_id
+
+    def resume(self, session_id: int, exercise_config: Any, exercise_key: Optional[str] = None) -> int:
+        """Carry on recording a running session that an earlier connection began (feature 020: a host that cuts
+        connections). The open set is closed and a new one opened for the same exercise, and this process takes
+        over the session's lease."""
+        now = self.clock()
+        ts = now.isoformat()
+        open_set = self.store.session_open_set(session_id)
+        if open_set is not None:
+            self.store.close_set(open_set, ts)
+        self._session_id = session_id
+        self.store.session_take_over(session_id, (now + timedelta(seconds=LEASE_SECONDS)).isoformat())
+        self._lease_renewed = now
+        self._last_flush = now
+        self._open_set(exercise_config, exercise_key, start_time=ts)
+        return session_id
 
     def observe(self, tracker: Any, metrics: Dict[str, Any], angle: Optional[float],
                 frame_num: int, assessment: Any) -> None:
@@ -140,6 +165,9 @@ class SessionRecorder:
                 ))
             if had_event or self._flush_due(now):
                 self.flush(now)
+            if (now - self._lease_renewed).total_seconds() >= RENEW_SECONDS:
+                self.store.session_renew_lease(self._session_id, (now + timedelta(seconds=LEASE_SECONDS)).isoformat())
+                self._lease_renewed = now
         except Exception as err:  # noqa: BLE001 — the on-screen session must never die because of logging
             self._degrade(err)
 
