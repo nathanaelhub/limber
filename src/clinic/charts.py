@@ -40,17 +40,18 @@ def _fmt(value: Optional[float], unit: str = "") -> str:
     return text + unit
 
 
-def _scale(values: Sequence[float], goal: Optional[float], floor_zero: bool) -> Tuple[float, float]:
+def _scale(values: Sequence[float], goal: Optional[float], floor_zero: bool) -> Tuple[float, float, float]:
+    """(lowest, highest, step): the axis runs between whole steps, so every label is a round number."""
     present = [v for v in values if v is not None] + ([goal] if goal is not None else [])
     if not present:
-        return 0.0, 1.0
+        return 0.0, 1.0, 1.0
     lo, hi = min(present), max(present)
     if floor_zero:
         lo = min(0.0, lo)
     if hi == lo:
         hi = lo + 1
     step = _nice_step((hi - lo) / 3)
-    return math.floor(lo / step) * step, math.ceil(hi / step) * step
+    return math.floor(lo / step) * step, math.ceil(hi / step) * step, step
 
 
 def _nice_step(raw: float) -> float:
@@ -72,8 +73,9 @@ def _x(i: int, n: int) -> float:
     return round(LEFT + pad + i * (RIGHT - LEFT - 2 * pad) / (n - 1), 1)
 
 
-def _frame(lo: float, hi: float, unit: str) -> List[str]:
-    ticks = [lo + (hi - lo) * k / 3 for k in range(4)]
+def _frame(lo: float, hi: float, unit: str, step: float) -> List[str]:
+    count = int(round((hi - lo) / step))
+    ticks = [lo + step * k for k in range(count + 1)]
     grid = "".join(f"M{LEFT} {_y(t, lo, hi)}H{RIGHT}" for t in ticks[1:])
     parts = [f'<path class="grid" d="{grid}"/>', f'<path class="axis" d="M{LEFT} {BOTTOM}H{RIGHT}"/>']
     parts += [f'<text x="{LEFT - 8}" y="{_y(t, lo, hi) + 4}" text-anchor="end">{escape(_fmt(t, unit))}</text>'
@@ -87,6 +89,14 @@ def _goal(goal: Optional[float], label: str, lo: float, hi: float, unit: str) ->
     y = _y(goal, lo, hi)
     return [f'<path class="goal" d="M{LEFT} {y}H{RIGHT}"/>',
             f'<text x="{RIGHT - 4}" y="{y - 6}" text-anchor="end">{escape(label)} {escape(_fmt(goal, unit))}</text>']
+
+
+def _x_labels(points: List[Point]) -> List[str]:
+    """One label per point, thinned to about 12 so they never overlap; the table keeps every value."""
+    n = len(points)
+    every = max(1, math.ceil(n / 12))
+    return [f'<text x="{_x(i, n)}" y="162" text-anchor="middle">{escape(label)}</text>'
+            for i, (label, _) in enumerate(points) if i % every == 0 or i == n - 1]
 
 
 def _svg(parts: List[str], description: str) -> str:
@@ -109,8 +119,8 @@ def line_chart(title: str, points: Sequence[Point], unit: str = "", goal: Option
                goal_label: str = "Goal") -> Chart:
     """A line through the values in order; a missing value breaks the line."""
     points = list(points)
-    lo, hi = _scale([v for _, v in points], goal, floor_zero=False)
-    parts = _frame(lo, hi, unit) + _goal(goal, goal_label, lo, hi, unit)
+    lo, hi, step = _scale([v for _, v in points], goal, floor_zero=False)
+    parts = _frame(lo, hi, unit, step) + _goal(goal, goal_label, lo, hi, unit)
     runs, current = [], []
     for i, (_, v) in enumerate(points):
         if v is None:
@@ -125,8 +135,7 @@ def line_chart(title: str, points: Sequence[Point], unit: str = "", goal: Option
         if len(run) > 1:
             parts.append('<path class="s1" d="M' + " ".join(f"{x} {y}" for x, y in run) + '"/>')
     parts += [f'<circle class="pt" cx="{x}" cy="{y}" r="4"/>' for run in runs for x, y in run]
-    parts += [f'<text x="{_x(i, len(points))}" y="162" text-anchor="middle">{escape(label)}</text>'
-              for i, (label, _) in enumerate(points)]
+    parts += _x_labels(points)
     description = _describe("line", title, points, unit, goal, goal_label)
     return Chart(title, "line", points, _svg(parts, description), description, unit, goal, goal_label,
                  _rows(points, unit, goal, goal_label))
@@ -136,8 +145,8 @@ def bar_chart(title: str, points: Sequence[Point], unit: str = "", goal: Optiona
               goal_label: str = "Goal", low_below: Optional[float] = None) -> Chart:
     """One bar per value from zero, each labelled with its number; a missing value says "none"."""
     points = list(points)
-    lo, hi = _scale([v for _, v in points], goal, floor_zero=True)
-    parts = _frame(lo, hi, unit) + _goal(goal, goal_label, lo, hi, unit)
+    lo, hi, step = _scale([v for _, v in points], goal, floor_zero=True)
+    parts = _frame(lo, hi, unit, step) + _goal(goal, goal_label, lo, hi, unit)
     n = max(1, len(points))
     width = min(30.0, round((RIGHT - LEFT) / n * 0.6, 1))
     for i, (label, v) in enumerate(points):
@@ -149,9 +158,9 @@ def bar_chart(title: str, points: Sequence[Point], unit: str = "", goal: Optiona
         low = " low" if low_below is not None and v < low_below else ""
         parts.append(f'<rect class="bar{low}" x="{round(cx - width / 2, 1)}" y="{min(top, base)}" '
                      f'width="{width}" height="{round(abs(base - top), 1)}"/>')
-        parts.append(f'<text x="{cx}" y="{min(top, base) - 6}" text-anchor="middle">{escape(_fmt(v, unit))}</text>')
-    parts += [f'<text x="{_x(i, n)}" y="162" text-anchor="middle">{escape(label)}</text>'
-              for i, (label, _) in enumerate(points)]
+        if n <= 15:                                       # beyond that the numbers would overlap: see the table
+            parts.append(f'<text x="{cx}" y="{min(top, base) - 6}" text-anchor="middle">{escape(_fmt(v, unit))}</text>')
+    parts += _x_labels(points)
     description = _describe("bar", title, points, unit, goal, goal_label)
     return Chart(title, "bar", points, _svg(parts, description), description, unit, goal, goal_label,
                  _rows(points, unit, goal, goal_label))

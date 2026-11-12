@@ -27,11 +27,11 @@ PAGES = (
     Page("inbox", "Inbox", "/inbox", "therapist", online=True),
     Page("patients", "Patients", "/patients", "therapist", online=True),
     Page("schedule", "Schedule", "/schedule", "therapist", online=True),
-    Page("dashboard", "Dashboard", "/dashboard", "therapist"),
+    Page("dashboard", "Dashboard", "/dashboard", "therapist", online=True),
     Page("live", "Live session", "/live", "therapist"),
     Page("video", "Video analysis", "/video", "therapist"),
-    Page("sessions", "Sessions", "/sessions", "therapist"),
-    Page("logs", "Observation logs", "/logs", "therapist"),
+    Page("sessions", "Sessions", "/sessions", "therapist", online=True),
+    Page("logs", "Observation logs", "/logs", "therapist", online=True),
     Page("review", "Review", "/review", "therapist"),
     Page("tracker", "Tracker", "/tracker", "therapist"),
     Page("how", "How it works", "/how-it-works", "therapist"),
@@ -39,9 +39,9 @@ PAGES = (
     Page("settings", "My settings", "/settings", "any", online=True),
 )
 BY_KEY = {p.key: p for p in PAGES}
-MAIN = ("inbox", "patients", "schedule")
+MAIN = ("dashboard", "inbox", "patients", "schedule")    # the Dashboard is home (owner, 12 Nov 2026)
 ADMIN_MAIN = ("people", "settings")             # an admin who is not a therapist
-TOOLS = ("dashboard", "live", "video", "sessions", "logs", "review", "tracker", "how")
+TOOLS = ("live", "video", "sessions", "logs", "review", "tracker", "how")
 ME = ("settings", "people")
 
 
@@ -71,7 +71,7 @@ def me_items(account: Optional[Account]) -> List[Page]:
 def home(account: Optional[Account]) -> str:
     """Where a staff member lands after signing in."""
     if account is not None and account.role == "therapist":
-        return BY_KEY["inbox"].href
+        return BY_KEY["dashboard"].href
     return BY_KEY["people"].href if account is not None and account.is_admin else BY_KEY["settings"].href
 
 

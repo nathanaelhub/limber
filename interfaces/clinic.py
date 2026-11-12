@@ -36,12 +36,14 @@ from src.clinic import nav, prefs as clinic_prefs, shell, signin  # noqa: E402
 from src.clinic import inbox as clinic_inbox, inbox_view  # noqa: E402
 from src.clinic import assist_view, patients as clinic_patients, patients_view  # noqa: E402
 from src.clinic import people as clinic_people, schedule as clinic_schedule, schedule_people_view  # noqa: E402
+from src.clinic import records as clinic_records, records_view  # noqa: E402
 from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
 from src.portal import messages as ptmessages, plans as ptplans  # noqa: E402
 from src.portal import access, accounts as ptaccounts, admin, attachments  # noqa: E402
-from src.ptlog.models import Account, PatientNotFoundError, PlanNotFound, PTLogError  # noqa: E402
+from src.ptlog.models import (Account, PatientNotFoundError, PlanNotFound, PTLogError,  # noqa: E402
+                              SessionNotFoundError)
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "clinic_static"
@@ -141,7 +143,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 ptaccounts.restrict(store, account)          # always: no handler sees an unrestricted store
                 try:
                     return handler(Ctx(request, store, account, classes, body))
-                except (NotYours, PatientNotFoundError, PlanNotFound):
+                except (NotYours, PatientNotFoundError, PlanNotFound, SessionNotFoundError):
                     # Another therapist's patient, plan, message, visit or file is answered as if it didn't exist.
                     return not_found(kind, account, classes)
                 except PTLogError as err:
@@ -755,6 +757,78 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/api/people/invites/{invite_id:int}/revoke", people_revoke, "admin", methods=("POST",), kind="api")
     clinic_route("/api/people/accounts/{account_id:int}/status", people_status, "admin", methods=("POST",), kind="api")
     clinic_route("/api/people/reassign", people_reassign, "admin", methods=("POST",), kind="api")
+
+    # ------------------------------------------------------------------ Dashboard, Sessions, Observation logs (slice 5a)
+
+    def dashboard_page(ctx: Ctx) -> Response:
+        store, now = ctx.store, clock()
+        days = clinic_records.period(ctx.request.query_params.get("days"))
+        attention = [r for r in clinic_patients.rows(store, now) if r.warn]
+        content = records_view.dashboard(
+            ctx.account.display_name or ctx.account.username, now.strftime("%A %-d %B %Y"),
+            clinic_inbox.needs_you(store), clinic_records.todays_visits(clinic_schedule.visits(store), now.date()),
+            attention, clinic_records.activity(store, now, days), days, clinic_records.recent(store))
+        return html(records_view.page(ctx.account, ctx.classes, "dashboard", "Dashboard", content))
+
+    def _patient_choice(ctx: Ctx) -> tuple:
+        patients = [p.id for p in ctx.store.list_patients() if not p.is_builtin]
+        chosen = ctx.request.query_params.get("patient") or None
+        if chosen is not None and chosen not in patients:
+            raise NotYours()
+        return patients, chosen
+
+    def sessions_page(ctx: Ctx) -> Response:
+        patients, chosen = _patient_choice(ctx)
+        content = records_view.sessions(clinic_records.session_rows(ctx.store, chosen), patients, chosen)
+        return html(records_view.page(ctx.account, ctx.classes, "sessions", "Sessions", content))
+
+    def session_page(ctx: Ctx) -> Response:
+        from src.ptlog import views as ptviews
+        sid = ctx.request.path_params["session_id"]
+        session = ctx.store.load_session(sid)
+        content = records_view.session_detail(session, ptviews.session_header_lines(session),
+                                              ptviews.event_log_lines(ctx.store, sid))
+        return html(records_view.page(ctx.account, ctx.classes, "sessions", f"Session {sid}", content))
+
+    def session_export(ctx: Ctx) -> Response:
+        try:
+            content, name, mime = clinic_records.export(ctx.store, ctx.request.path_params["session_id"],
+                                                        ctx.request.path_params["fmt"])
+        except KeyError:
+            raise NotYours() from None
+        return Response(content, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name}"',
+                                                           "Cache-Control": "no-store"})
+
+    def logs_page(ctx: Ctx) -> Response:
+        patients, chosen = _patient_choice(ctx)
+        sid = ctx.request.path_params.get("session_id")
+        log = clinic_records.log_data(ctx.store, sid) if sid is not None else None
+        side_html = records_view.log_side(clinic_records.session_rows(ctx.store, chosen), sid, patients, chosen)
+        return html(records_view.page(ctx.account, ctx.classes, "logs", "Observation logs",
+                                      side_html + records_view.log_pane(log), split=True))
+
+    def log_download(kind: str) -> Callable[[Ctx], Response]:
+        def run(ctx: Ctx) -> Response:
+            import json
+            sid = ctx.request.path_params["session_id"]
+            log = clinic_records.log_data(ctx.store, sid)
+            stem = f"{log['session'].patient_id}_session_{sid}"
+            if kind == "csv":
+                body, name, mime = clinic_records.rep_csv(log["reps"]), f"{stem}_reps.csv", "text/csv"
+            else:
+                body, name, mime = json.dumps(log["data"], indent=2), f"{stem}.json", "application/json"
+            return Response(body, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name}"',
+                                                            "Cache-Control": "no-store"})
+        return run
+
+    clinic_route("/dashboard", dashboard_page, "therapist")
+    clinic_route("/sessions", sessions_page, "therapist")
+    clinic_route("/sessions/{session_id:int}", session_page, "therapist")
+    clinic_route("/sessions/{session_id:int}/export/{fmt}", session_export, "therapist", kind="api")
+    clinic_route("/logs", logs_page, "therapist")
+    clinic_route("/logs/{session_id:int}", logs_page, "therapist")
+    clinic_route("/logs/{session_id:int}/reps.csv", log_download("csv"), "therapist", kind="api")
+    clinic_route("/logs/{session_id:int}/log.json", log_download("json"), "therapist", kind="api")
 
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")

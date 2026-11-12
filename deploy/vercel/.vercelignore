@@ -1,22 +1,23 @@
 # What the hosted demo's upload leaves out (feature 020): secrets and records, and everything the portal doesn't
-# need at run time.
+# need at run time. Folders start with / so they match at the top only: a bare `exports/` also dropped
+# src/ptlog/exports from the hosted bundle (fixed 12 November 2026).
 .env
 .env.*
-data/
-.venv/
-.git/
-.github/
-.claude/
-.specify/
-deploy/secrets/
-deploy/limber.env
-models/*.pt
-videos/
-design/
-docs/
-specs/
-tests/
-exports/
-sessions/
-observation_logs/
-output/
+/data/
+/.venv/
+/.git/
+/.github/
+/.claude/
+/.specify/
+/deploy/secrets/
+/deploy/limber.env
+/models/*.pt
+/videos/
+/design/
+/docs/
+/specs/
+/tests/
+/exports/
+/sessions/
+/observation_logs/
+/output/

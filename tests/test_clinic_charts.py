@@ -37,3 +37,16 @@ def test_labels_are_escaped_and_the_figure_has_a_table():
     assert "A &lt;b&gt;" in html and "A <b>" not in html
     assert "&lt;x&gt;" in html and "<x>" not in html
     assert '<details class="astable"><summary>Show as table</summary>' in html
+
+
+def test_axis_labels_are_round_numbers():
+    import re
+    c = charts.line_chart("Form", [("a", 85.9), ("b", 87.2), ("c", 84.3)])
+    labels = re.findall(r'text-anchor="end">([0-9.]+)</text>', c.svg)
+    assert labels and all(float(x) == int(float(x)) for x in labels), labels
+
+
+def test_many_points_keep_their_labels_apart():
+    c = charts.bar_chart("Form", [(str(i), 70) for i in range(1, 31)])
+    assert c.svg.count('y="162"') <= 13 and ">30</text>" in c.svg
+    assert ">70</text>" not in c.svg and len(c.rows) == 30                   # no crowded numbers; the table has them

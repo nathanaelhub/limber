@@ -1158,6 +1158,16 @@ class SessionStore:
 
     # ---------------------------------------------------------------- sessions (read)
 
+    def session_measures(self, since: str) -> List[dict]:
+        """Finished sessions started at or after `since`, with their stored measures, for the clinic dashboard
+        (feature 019). Limited to the visible patients like every other read."""
+        rows = self.conn.execute(
+            "SELECT id, patient_id, start_time, status, total_reps, avg_form_score, avg_rom FROM sessions "
+            "WHERE start_time >= ? AND status != 'running' ORDER BY start_time", (since,)).fetchall()
+        return [{"id": r["id"], "patient_id": r["patient_id"], "start_time": r["start_time"], "status": r["status"],
+                 "total_reps": r["total_reps"], "avg_form_score": r["avg_form_score"], "avg_rom": r["avg_rom"]}
+                for r in rows if self._vis(r["patient_id"])]
+
     def load_session(self, session_id: int) -> Session:
         """Load the full object graph for one session."""
         row = self.conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
