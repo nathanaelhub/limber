@@ -1,0 +1,39 @@
+"""Feature 019 slice 1 (T004, FR-011, FR-012): server-drawn charts with a description and a table."""
+
+from src.clinic import charts
+
+
+def test_a_line_chart_describes_itself_and_lists_its_numbers():
+    c = charts.line_chart("Range of motion, degrees", [("14 Oct", 70), ("21 Oct", 78), ("28 Oct", 85)],
+                          unit="°", goal=110)
+    assert c.svg.startswith('<svg viewBox="0 0 480 170" role="img" aria-label="Line chart of Range of motion')
+    assert "14 Oct: 70°" in c.description and "Goal 110°" in c.description
+    assert c.rows == [("14 Oct", "70°"), ("21 Oct", "78°"), ("28 Oct", "85°"), ("Goal", "110°")]
+    assert c.svg.count('class="pt"') == 3 and 'class="goal"' in c.svg
+
+
+def test_a_missing_value_is_a_gap_not_a_zero():
+    c = charts.line_chart("Pain", [("Mon", 3), ("Tue", None), ("Wed", 4), ("Thu", 5)])
+    assert c.svg.count('class="s1"') == 1                       # Mon stands alone; Wed-Thu is one line
+    assert c.svg.count('class="pt"') == 3
+    assert ("Tue", "none") in c.rows
+    bars = charts.bar_chart("Pain", [("Mon", 3), ("Tue", None)])
+    assert bars.svg.count('class="bar') == 1 and ">none</text>" in bars.svg
+
+
+def test_bars_start_at_zero_and_can_mark_low_values():
+    c = charts.bar_chart("Reps", [("Mon", 10), ("Tue", 4)], low_below=5)
+    assert 'class="bar low"' in c.svg and c.svg.count('class="bar"') == 1
+    assert '>0</text>' in c.svg
+
+
+def test_no_values_yet():
+    c = charts.line_chart("Pain", [])
+    assert "No values yet" in c.description
+
+
+def test_labels_are_escaped_and_the_figure_has_a_table():
+    html = charts.render(charts.bar_chart("A <b>", [("<x>", 1)]))
+    assert "A &lt;b&gt;" in html and "A <b>" not in html
+    assert "&lt;x&gt;" in html and "<x>" not in html
+    assert '<details class="astable"><summary>Show as table</summary>' in html

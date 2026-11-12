@@ -64,3 +64,12 @@ def test_pages_link_the_manifest_and_show_an_install_hint(client):
         assert 'rel="manifest"' in html and 'apple-touch-icon' in html and 'apple-mobile-web-app-capable' in html
     today = (patient_portal.STATIC_DIR / "today.html").read_text()
     assert 'id="install-hint"' in today and "Add to Home Screen" in today
+
+
+def test_service_worker_never_handles_the_clinic_app(client):
+    """Feature 019 FR-016: on the hosted demo the clinic shares this address. The worker returns before any
+    caching rule for /therapist, so no therapist page or data is ever put in the patient app's cache."""
+    js = client.get("/sw.js").text
+    skip = js.index('url.pathname.indexOf("/therapist/") === 0) { return; }')
+    assert 'url.pathname === "/therapist"' in js
+    assert skip < js.index("respondWith")                                    # before every rule that answers

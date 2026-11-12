@@ -57,15 +57,27 @@ def test_the_vercel_app_refuses_to_start_without_its_settings():
     vercel_app.check_settings(HOSTED)
 
 
-def test_the_therapist_door_explains_what_is_online(monkeypatch, tmp_path):
+def test_the_clinic_app_is_mounted_at_therapist(monkeypatch, tmp_path):
+    """019 T011: the hosted demo serves the clinic app at /therapist and the portal everywhere else."""
     from starlette.testclient import TestClient
     from interfaces import vercel_app
     monkeypatch.setenv("LIMBER_DB_BACKEND", "libsql")
     app = vercel_app.build(tmp_path / "replica.db", "https://limber-demo.vercel.app", key=b"k" * 32)
-    page = TestClient(app, base_url="https://limber-demo.vercel.app").get("/therapist?pass=abc")
-    assert page.status_code == 200 and "runs on the clinic's own computer" in " ".join(page.text.split())
-    assert "pass=abc" not in page.text
+    c = TestClient(app, base_url="https://limber-demo.vercel.app")
+    r = c.get("/therapist?pass=abc", follow_redirects=False)
+    assert r.status_code == 308 and r.headers["location"] == "/therapist/?pass=abc"     # the pass survives
+    r = c.get("/therapist/?pass=abc", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/therapist/signin?expired=1"
+    page = c.get("/therapist/signin")
+    assert page.status_code == 200 and "limber.css" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
+    assert c.get("/therapist/static/limber.css").status_code == 200
+    assert c.get("/therapistx").status_code == 404                                      # not the clinic's
+    assert c.get("/manifest.webmanifest").status_code == 200                           # the portal's
+
+
+def test_the_clinic_app_loads_no_heavy_library():
+    assert _loaded_by("import interfaces.clinic, interfaces.vercel_app") == []
 
 
 def test_the_vercel_bundle_is_light():

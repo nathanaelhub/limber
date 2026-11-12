@@ -13,23 +13,23 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 1: Foundation (Story 1; FR-001 to FR-006, FR-010, FR-012, FR-016)
 
-- [ ] T003 `interfaces/web_common.py`: the portal's shared web helpers lifted out of `patient_portal.py` with
+- [x] T003 `interfaces/web_common.py`: the portal's shared web helpers lifted out of `patient_portal.py` with
       parameters (CSP builder, security headers with a `csp=` argument, JSON and error responses, `check_post`,
       the client marker, HTML pages with first-render classes, the hosted 503 handler); the portal keeps its names
-- [ ] T004 `src/clinic/`: `signin.py` (account from the cookie, role check, safe `next`), `nav.py` (top bar, Tools
+- [x] T004 `src/clinic/`: `signin.py` (account from the cookie, role check, safe `next`), `nav.py` (top bar, Tools
       and Me menus by role, which pages are online), `prefs.py` (preferences to `lt`/`hc`/`lm`), `charts.py`
       (SVG line and bar charts with a table, text that scales)
-- [ ] T005 `interfaces/clinic.py` under `/therapist`: one store opener per request that always applies
+- [x] T005 `interfaces/clinic.py` under `/therapist`: one store opener per request that always applies
       `ptaccounts.restrict`; every route registered with the role it needs; Origin and content-type checks; CSP
-- [ ] T006 Sign-in: redeem the pass and remove it from the address, the `limber_staff` cookie, the in-app sign-in
+- [x] T006 Sign-in: redeem the pass and remove it from the address, the `limber_staff` cookie, the in-app sign-in
       screen with the portal's lockouts, sign out, the setup message when no staff password is set
-- [ ] T007 Shell from the design: converted `limber.css` (no `style=`, `[hidden]` rule), self-hosted Sora, top bar
+- [x] T007 Shell from the design: converted `limber.css` (no `style=`, `[hidden]` rule), self-hosted Sora, top bar
       and menus; My settings (Larger text, Higher contrast, Less motion), applied on first render
-- [ ] T008 Tests: sign-in (gate, pass single use, cookie flags, reload keeps sign-in, expiry, in-app form, 403, 415),
+- [x] T008 Tests: sign-in (gate, pass single use, cookie flags, reload keeps sign-in, expiry, in-app form, 403, 415),
       static files (no inline style or script, no outside URL), charts, nav by role
-- [ ] T009 Route-table test (SC-004): every route declares its role; `rivera` gets 404 for another therapist's
+- [x] T009 Route-table test (SC-004): every route declares its role; `rivera` gets 404 for another therapist's
       patient, plan, visit or file on every route; admin-only accounts get 403 on clinical routes
-- [ ] T010 The portal's service worker never handles `/therapist` (FR-016), with a test
+- [x] T010 The portal's service worker never handles `/therapist` (FR-016), with a test
 - [ ] T011 `interfaces/cli.py clinic` (port 8502); the hosted demo mounts the clinic at `/therapist` in
       `interfaces/vercel_app.py`; importing the clinic loads nothing heavy (test); deploy and check
 

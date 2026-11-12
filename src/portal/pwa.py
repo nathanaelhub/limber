@@ -78,6 +78,8 @@ function networkOnly(request) { return fetch(request); }
 self.addEventListener("fetch", function (event) {
   var url = new URL(event.request.url);
   if (url.origin !== self.location.origin || event.request.method !== "GET") { return; }
+  // The clinic app shares this address on the hosted demo: its pages and data are never touched here (FR-016).
+  if (url.pathname === "/therapist" || url.pathname.indexOf("/therapist/") === 0) { return; }
   if (url.pathname.indexOf("/api/") === 0 || url.pathname.indexOf("/ws/") === 0 || url.pathname === "/sw.js") {
     event.respondWith(networkOnly(event.request));                  // never cache the API
     return;
