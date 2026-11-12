@@ -18,6 +18,10 @@
   }
 
   document.querySelectorAll("form[data-api]").forEach((form) => {
+    // A switch that saves as soon as it is flipped.
+    if (form.hasAttribute("data-auto")) {
+      form.addEventListener("change", () => form.requestSubmit());
+    }
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;

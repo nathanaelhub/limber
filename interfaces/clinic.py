@@ -34,7 +34,8 @@ from interfaces import web_common  # noqa: E402
 from interfaces.web_common import json_response  # noqa: E402
 from src.clinic import nav, prefs as clinic_prefs, shell, signin  # noqa: E402
 from src.clinic import inbox as clinic_inbox, inbox_view  # noqa: E402
-from src.clinic import patients as clinic_patients, patients_view  # noqa: E402
+from src.clinic import assist_view, patients as clinic_patients, patients_view  # noqa: E402
+from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
 from src.portal import messages as ptmessages, plans as ptplans  # noqa: E402
@@ -482,7 +483,19 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 body = patients_view.overview(
                     pid, clinic_patients.facts(store, pid, now), patients_view.plans_section(pid, plans),
                     patients_view.visits_section(pid, visits, [p for p in plans if not p.read_only],
-                                                 str(ptplans.clinic_zone(store)), now.date()))
+                                                 str(ptplans.clinic_zone(store)), now.date()),
+                    assist_view.summary_section(pid, ai_config.available(),
+                                                bool(assistant.switches(store, pid)["summaries"])))
+            elif tab == "notes":
+                body = assist_view.notes_tab(pid, assistant.notes(store, pid))
+            elif tab == "ai":
+                if not ai_config.available():
+                    raise NotYours()                       # no key, no AI control anywhere (018 SC-003)
+                from src.assist import coach
+                switches = assistant.switches(store, pid)
+                body = assist_view.ai_tab(pid, switches, {k: store.assist_switched_on_at(pid, k) for k in switches},
+                                          {"summaries": assistant.NOTICE_SUMMARIES, "coach": assistant.NOTICE_COACH},
+                                          coach.conversations(store, pid))
             elif tab == "exercises":
                 from src.ptlog import instruments, programs, questionnaires
                 installed = instruments.load()
@@ -504,7 +517,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                              store.medication_list(pid), clinic_patients.access_line(status),
                                              status.state == "active", history)
             pane = patients_view.patient_pane(pid, clinic_patients.header(store, pid, now.date()), tab,
-                                              ptmessages.unread_count(store, pid, "therapist"), body)
+                                              ptmessages.unread_count(store, pid, "therapist"), body,
+                                              ai=ai_config.available())
             return patients_html(ctx, pane, pid, title=f"Patients · {pid}")
         return show
 
@@ -622,6 +636,38 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             return ok()
         return run
 
+    # ------------------------------------------------------------------ notes and AI (slice 3b)
+
+    def summary(ctx: Ctx) -> Response:
+        """A weekly summary for the page to show. Nothing is saved or sent: Save is a separate request."""
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        if not ai_config.available():
+            raise NotYours()
+        result = assistant.weekly_summary(ctx.store, pid, account_id=ctx.account.id)
+        return json_response(assist_view.summary_json(result, pid))
+
+    def add_note(ctx: Ctx) -> Response:
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        body = _body(ctx)
+        text = _text(body, "body") or ""
+        if not text.strip():
+            return json_response({"error": "Write the note first."}, 400)
+        drafted = body.get("ai_drafted") is True
+        assistant.save_note(ctx.store, pid, text, ai_drafted=drafted, account_id=ctx.account.id,
+                            edited=drafted and assist_view.note_is_edited(text, _text(body, "original")))
+        return ok()
+
+    def ai_switch(ctx: Ctx) -> Response:
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        if not ai_config.available():
+            raise NotYours()
+        body = _body(ctx)
+        which = _text(body, "which")
+        if which not in assistant.SWITCHES:
+            return json_response({"error": "Choose summaries or the coach."}, 400)
+        assistant.set_switch(ctx.store, pid, which, body.get("on") is True, account_id=ctx.account.id)
+        return ok()
+
     def end_questionnaire(ctx: Ctx) -> Response:
         pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
         wanted = ctx.request.path_params["assignment_id"]
@@ -636,6 +682,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/patients/{patient_id}", patient_tab("overview"), "therapist")
     clinic_route("/patients/{patient_id}/exercises", patient_tab("exercises"), "therapist")
     clinic_route("/patients/{patient_id}/details", patient_tab("details"), "therapist")
+    clinic_route("/patients/{patient_id}/notes", patient_tab("notes"), "therapist")
+    clinic_route("/patients/{patient_id}/ai", patient_tab("ai"), "therapist")
+    clinic_route(pat + "/summary", summary, "therapist", methods=("POST",), kind="api")
+    clinic_route(pat + "/notes", add_note, "therapist", methods=("POST",), kind="api")
+    clinic_route(pat + "/ai", ai_switch, "therapist", methods=("POST",), kind="api")
     clinic_route("/api/patients", register, "therapist", methods=("POST",), kind="api")
     for suffix, action in (("details", "details"), ("delete", "delete"), ("discharge", "discharge"),
                            ("reactivate", "reactivate"), ("plans", "open-plan"), ("visits", "add-visit"),

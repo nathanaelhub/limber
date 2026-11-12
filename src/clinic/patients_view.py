@@ -12,7 +12,8 @@ from typing import List, Optional
 from src.clinic import nav, patients as rules, shell
 from src.ptlog.models import Account, Patient, Plan
 
-TABS = (("overview", "Overview", ""), ("exercises", "Exercises", "/exercises"), ("details", "Details", "/details"))
+TABS = (("overview", "Overview", ""), ("exercises", "Exercises", "/exercises"), ("notes", "Session notes", "/notes"),
+        ("ai", "AI settings", "/ai"), ("details", "Details", "/details"))
 
 
 def nice_date(iso: str) -> str:
@@ -101,21 +102,22 @@ def register_pane() -> str:
 
 # ----------------------------------------------------------------------------- one patient
 
-def _tabs(pid: str, active: str, unread: int) -> str:
+def _tabs(pid: str, active: str, unread: int, ai: bool) -> str:
+    """The patient's sections. AI settings is there only when this installation has a key (018 SC-003)."""
     links = [f'<a href="/therapist/patients/{_e(pid)}{suffix}"{" aria-current=\"page\"" if key == active else ""}>'
-             f'{label}</a>' for key, label, suffix in TABS]
+             f'{label}</a>' for key, label, suffix in TABS if ai or key != "ai"]
     count = f' <span class="count">{unread}<span class="vh"> new</span></span>' if unread else ""
     links.insert(2, f'<a href="/therapist/inbox/{_e(pid)}">Messages{count}</a>')
     return f'<nav class="tabs" aria-label="{_e(pid)}">' + "".join(links) + "</nav>"
 
 
-def patient_pane(pid: str, subtitle: str, tab: str, unread: int, body: str) -> str:
+def patient_pane(pid: str, subtitle: str, tab: str, unread: int, body: str, ai: bool = False) -> str:
     return (f'<main class="pane" id="main"><div class="pane-head"><div class="stack tight"><h1>{_e(pid)}</h1>'
-            f'<p class="dim">{_e(subtitle)}</p></div><span class="sp"></span></div>{_tabs(pid, tab, unread)}'
+            f'<p class="dim">{_e(subtitle)}</p></div><span class="sp"></span></div>{_tabs(pid, tab, unread, ai)}'
             f'<div class="pane-body roomy">{body}</div></main>')
 
 
-def overview(pid: str, facts: dict, plans_html: str, visits_html: str) -> str:
+def overview(pid: str, facts: dict, plans_html: str, visits_html: str, summary_html: str = "") -> str:
     pain = facts["pain"]
     if pain:
         trend = ""
@@ -135,7 +137,7 @@ def overview(pid: str, facts: dict, plans_html: str, visits_html: str) -> str:
             '<div class="fact"><span class="lbl">Pain, latest</span>' + pain_html +
             '<span class="small dim">The patient\'s own rating at check-in, 0 (none) to 10 (worst)</span></div>'
             f'<div class="fact"><span class="lbl">Next visit</span>{visit_html}</div></div>'
-            f'{plans_html}{visits_html}')
+            f'{summary_html}{plans_html}{visits_html}')
 
 
 def plans_section(pid: str, plans: List[Plan]) -> str:
@@ -326,4 +328,4 @@ def details(patient: Patient, discharge, diary_on: bool, medications: List[str],
 
 def page(account: Account, classes: str, side_html: str, pane_html: str, title: str = "Patients") -> str:
     body = shell.top_bar(account, "patients") + f'<div class="split">{side_html}{pane_html}</div>'
-    return shell.document(title, body, classes, scripts=("clinic.js", "forms.js"))
+    return shell.document(title, body, classes, scripts=("clinic.js", "forms.js", "summary.js"))
