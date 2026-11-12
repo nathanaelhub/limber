@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional
 from urllib.parse import quote
@@ -34,6 +34,7 @@ from interfaces import web_common  # noqa: E402
 from interfaces.web_common import json_response  # noqa: E402
 from src.clinic import nav, prefs as clinic_prefs, shell, signin  # noqa: E402
 from src.clinic import inbox as clinic_inbox, inbox_view  # noqa: E402
+from src.clinic import patients as clinic_patients, patients_view  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
 from src.portal import messages as ptmessages, plans as ptplans  # noqa: E402
@@ -448,6 +449,207 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                  kind="api")
     clinic_route("/files/{patient_id}/attachments/{attachment_id}", attachment_file, "therapist", kind="api")
     clinic_route("/files/{patient_id}/voice/{media_id}", voice_file, "therapist", kind="api")
+
+    # ------------------------------------------------------------------ Patients (slice 3a)
+
+    def own_real_patient(store: SessionStore, patient_id: str):
+        """A patient on this caseload; the built-in placeholder patient has no page."""
+        clinic_inbox.own_patient(store, patient_id)
+        patient = store.get_patient(patient_id)
+        if patient is None or patient.is_builtin:
+            raise NotYours()
+        return patient
+
+    def patients_html(ctx: Ctx, pane: str, current: Optional[str] = None, title: str = "Patients") -> Response:
+        rows = clinic_patients.rows(ctx.store, clock())
+        side_html = patients_view.side(rows, current, ctx.request.query_params.get("discharged") == "1")
+        return html(patients_view.page(ctx.account, ctx.classes, side_html, pane, title))
+
+    def patients_page(ctx: Ctx) -> Response:
+        return patients_html(ctx, patients_view.pick_pane())
+
+    def register_page(ctx: Ctx) -> Response:
+        return patients_html(ctx, patients_view.register_pane(), title="Register a patient")
+
+    def patient_tab(tab: str) -> Callable[[Ctx], Response]:
+        def show(ctx: Ctx) -> Response:
+            store, now = ctx.store, clock()
+            patient = own_real_patient(store, ctx.request.path_params["patient_id"])
+            pid = patient.id
+            if tab == "overview":
+                visits = [ptplans.appointment_json(store, a) for a in store.appointments(pid)]
+                plans = store.plans(pid)
+                body = patients_view.overview(
+                    pid, clinic_patients.facts(store, pid, now), patients_view.plans_section(pid, plans),
+                    patients_view.visits_section(pid, visits, [p for p in plans if not p.read_only],
+                                                 str(ptplans.clinic_zone(store)), now.date()))
+            elif tab == "exercises":
+                from src.ptlog import instruments, programs, questionnaires
+                installed = instruments.load()
+                live = {a.instrument_key for a in store.assignments(pid)}
+                catalog = programs.load_catalog()
+                body = patients_view.exercises(
+                    pid, programs.list_programs(), [(k, programs.exercise_name(k)) for k in catalog.exercises],
+                    clinic_patients.program_rows(store, pid, now.date()),
+                    clinic_patients.questionnaire_rows(store, pid, installed, now.date()),
+                    [(i.key, i.name) for i in installed.listed() if i.key not in live],
+                    list(questionnaires.INTERVALS),
+                    [f"The questionnaire file {x.file} could not be used: {x.message}" for x in installed.problems],
+                    now.date())
+            else:
+                status = store.portal_status(pid)
+                history = [(h.at[:16].replace("T", " "), h.event, h.detail or "")
+                           for h in store.portal_audit_list(pid, limit=20)]
+                body = patients_view.details(patient, store.get_discharge(pid), store.diary_enabled(pid),
+                                             store.medication_list(pid), clinic_patients.access_line(status),
+                                             status.state == "active", history)
+            pane = patients_view.patient_pane(pid, clinic_patients.header(store, pid, now.date()), tab,
+                                              ptmessages.unread_count(store, pid, "therapist"), body)
+            return patients_html(ctx, pane, pid, title=f"Patients · {pid}")
+        return show
+
+    def _body(ctx: Ctx) -> dict:
+        return ctx.body if isinstance(ctx.body, dict) else {}
+
+    def _text(body: dict, key: str) -> Optional[str]:
+        value = body.get(key)
+        return value if isinstance(value, str) else None
+
+    def _day(value) -> Optional[date]:
+        if value in (None, ""):
+            return None
+        try:
+            return date.fromisoformat(value)
+        except (TypeError, ValueError):
+            raise PTLogError("Give the date as a day, for example 2026-11-20.") from None
+
+    def ok() -> Response:
+        return json_response({"ok": True})
+
+    def register(ctx: Ctx) -> Response:
+        body = _body(ctx)
+        pid = (_text(body, "patient_id") or "").strip()
+        ptaccounts.add_patient(ctx.store, ctx.account, pid, label=(_text(body, "label") or "").strip() or None,
+                               notes=(_text(body, "notes") or "").strip() or None)
+        return json_response({"redirect": f"{PREFIX}/patients/{pid}"}, 201)
+
+    def patient_api(action: str) -> Callable[[Ctx], Response]:
+        def run(ctx: Ctx) -> Response:
+            store, body = ctx.store, _body(ctx)
+            pid = own_real_patient(store, ctx.request.path_params["patient_id"]).id
+            if action == "details":
+                store.update_patient(pid, label=_text(body, "label") or "", notes=_text(body, "notes") or "")
+            elif action == "delete":
+                if (_text(body, "confirm") or "").strip() != pid:
+                    return json_response({"error": f"Type {pid} exactly to confirm."}, 400)
+                store.delete_patient(pid)
+                return json_response({"redirect": f"{PREFIX}/patients"})
+            elif action == "discharge":
+                store.discharge(pid, _day(body.get("on")), (_text(body, "reason") or "").strip() or None)
+            elif action == "reactivate":
+                store.reactivate(pid)
+            elif action == "open-plan":
+                ptplans.open_plan(store, pid, _text(body, "title"), _text(body, "diagnosis") or "",
+                                  body.get("diagnosis_visible") is True)
+            elif action == "add-visit":
+                plan = clinic_inbox.own_plan(store, pid, body.get("plan_id"))
+                minutes = body.get("minutes") if isinstance(body.get("minutes"), int) else 45
+                ptplans.schedule(store, pid, f"{_text(body, 'date') or ''}T{_text(body, 'time') or ''}", minutes,
+                                 _text(body, "note") or "", plan_id=plan.id if plan else None)
+            elif action == "program":
+                from src.ptlog import programs
+                per_week = body.get("per_week") if isinstance(body.get("per_week"), int) else 3
+                start, end = _day(body.get("start")), _day(body.get("end"))
+                if body.get("program") == "custom":
+                    keys = programs.validate_exercise_keys([k for k in body.get("keys") or [] if isinstance(k, str)])
+                    store.assign_program(pid, "custom", "Custom", keys, per_week, start, end)
+                else:
+                    prog = programs.get_program(_text(body, "program") or "")
+                    if prog is None:
+                        return json_response({"error": "Choose a program."}, 400)
+                    store.assign_program(pid, prog.id, prog.name, prog.exercise_keys, per_week, start, end)
+            elif action == "questionnaire":
+                from src.ptlog import instruments, questionnaires
+                chosen, interval = _text(body, "instrument"), _text(body, "interval")
+                if chosen not in instruments.load().by_key or interval not in questionnaires.INTERVAL_KEYS:
+                    return json_response({"error": "Choose a questionnaire and how often."}, 400)
+                store.assign_instrument(pid, chosen, interval)
+            elif action == "logging":
+                store.set_diary_enabled(pid, body.get("diary") is True)
+                lines = clinic_patients.medication_lines(body.get("medications"))
+                saved = store.set_medication_list(pid, lines)
+                warned = [n.strip() for n in lines if ptmessages.check_text(n.strip())]
+                if warned:
+                    return json_response({"ok": True, "notice": "Saved. These look like they contain identifying "
+                                          "details: " + ", ".join(warned), "saved": len(saved)})
+            elif action == "issue-code":
+                code, _ = access.issue_code(store, key, pid)
+                return json_response({"show": code, "note": "Shown only once. Give it to the patient now. "
+                                      "For demo and study use only."})
+            elif action == "revoke-code":
+                access.revoke_code(store, pid)
+            return ok()
+        return run
+
+    def plan_api(action: str) -> Callable[[Ctx], Response]:
+        def run(ctx: Ctx) -> Response:
+            pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+            plan = clinic_inbox.own_plan(ctx.store, pid, ctx.request.path_params["plan_id"])
+            if action not in clinic_patients.plan_actions(plan):
+                return json_response({"error": "This plan can't be changed that way now.",
+                                      "archived": plan.read_only}, 409)
+            body = _body(ctx)
+            if action == "edit":
+                ptplans.edit_plan(ctx.store, plan.id, title=_text(body, "title"), diagnosis=_text(body, "diagnosis") or "",
+                                  diagnosis_visible=body.get("diagnosis_visible") is True)
+            else:
+                {"complete": ptplans.complete, "reopen": ptplans.reopen, "archive": ptplans.archive}[action](
+                    ctx.store, plan.id)
+            return ok()
+        return run
+
+    def visit_api(action: str) -> Callable[[Ctx], Response]:
+        def run(ctx: Ctx) -> Response:
+            pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+            a = clinic_inbox.own_appointment(ctx.store, pid, ctx.request.path_params["appointment_id"])
+            body = _body(ctx)
+            if action == "move":
+                ptplans.move(ctx.store, a.id, f"{_text(body, 'date') or ''}T{_text(body, 'time') or ''}")
+            elif action == "decline":
+                ptplans.decline_request(ctx.store, a.id, _text(body, "note") or "")
+            else:
+                ptplans.cancel(ctx.store, a.id)
+            return ok()
+        return run
+
+    def end_questionnaire(ctx: Ctx) -> Response:
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        wanted = ctx.request.path_params["assignment_id"]
+        if wanted not in {a.id for a in ctx.store.assignments(pid)}:
+            raise NotYours()
+        ctx.store.end_assignment(wanted)
+        return ok()
+
+    pat = "/api/patients/{patient_id}"
+    clinic_route("/patients", patients_page, "therapist")
+    clinic_route("/patients/new", register_page, "therapist")
+    clinic_route("/patients/{patient_id}", patient_tab("overview"), "therapist")
+    clinic_route("/patients/{patient_id}/exercises", patient_tab("exercises"), "therapist")
+    clinic_route("/patients/{patient_id}/details", patient_tab("details"), "therapist")
+    clinic_route("/api/patients", register, "therapist", methods=("POST",), kind="api")
+    for suffix, action in (("details", "details"), ("delete", "delete"), ("discharge", "discharge"),
+                           ("reactivate", "reactivate"), ("plans", "open-plan"), ("visits", "add-visit"),
+                           ("program", "program"), ("questionnaires", "questionnaire"), ("logging", "logging"),
+                           ("access/issue", "issue-code"), ("access/revoke", "revoke-code")):
+        clinic_route(f"{pat}/{suffix}", patient_api(action), "therapist", methods=("POST",), kind="api")
+    for action in ("edit", "complete", "reopen", "archive"):
+        clinic_route(pat + "/plans/{plan_id:int}/" + action, plan_api(action), "therapist", methods=("POST",),
+                     kind="api")
+    for action in ("move", "decline", "cancel"):
+        clinic_route(pat + "/visits/{appointment_id:int}/" + action, visit_api(action), "therapist",
+                     methods=("POST",), kind="api")
+    clinic_route(pat + "/questionnaires/{assignment_id:int}/end", end_questionnaire, "therapist", methods=("POST",),
+                 kind="api")
 
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")
