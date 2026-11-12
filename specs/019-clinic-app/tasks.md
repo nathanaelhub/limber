@@ -53,9 +53,9 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 3b: Notes and AI (Story 3)
 
-- [ ] T019 `src/clinic/assist_view.py`: the weekly-summary states, citation labels, coach-log counts, "no key, no
+- [x] T019 `src/clinic/assist_view.py`: the weekly-summary states, citation labels, coach-log counts, "no key, no
       AI control", with tests
-- [ ] T020 Session notes, weekly summary, AI settings and coach log; tests for each behaviour in
+- [x] T020 Session notes, weekly summary, AI settings and coach log; tests for each behaviour in
       `test_app_assist.py`; deploy and check
 
 ## Slice 4: Schedule and People (Story 4) → milestone M3, the first showing
