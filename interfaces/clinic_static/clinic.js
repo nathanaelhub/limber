@@ -41,6 +41,34 @@
     sel.addEventListener("change", () => sel.form.submit());
   });
 
+  // The Needs you count stays fresh (019 Q3): every minute while the tab is shown, the badge and the tab title
+  // follow it. A page that lists those items offers Refresh rather than reloading, so a typed reply is never lost.
+  const badgeLink = document.querySelector("a[data-badge]");
+  if (badgeLink) {
+    const countOf = () => { const c = badgeLink.querySelector("[data-count]"); return c ? parseInt(c.firstChild.textContent, 10) : 0; };
+    const first = countOf();
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      let n;
+      try { n = (await api("/api/needs")).count; } catch (_) { return; }
+      let span = badgeLink.querySelector("[data-count]");
+      if (n && !span) {
+        span = document.createElement("span");
+        span.className = "count"; span.dataset.count = "";
+        const vh = document.createElement("span"); vh.className = "vh"; vh.textContent = " need you";
+        span.append(document.createTextNode(""), vh);
+        badgeLink.append(" ", span);
+      }
+      if (span) { span.firstChild.textContent = String(n); span.hidden = !n; }
+      document.title = (n ? "(" + n + ") " : "") + document.title.replace(/^\(\d+\) /, "");
+      const notice = document.querySelector("[data-new-items]");
+      if (notice && n !== first) notice.hidden = false;
+    };
+    setInterval(refresh, 60000);
+    document.addEventListener("visibilitychange", refresh);
+  }
+  document.querySelectorAll("[data-reload]").forEach((b) => b.addEventListener("click", () => location.reload()));
+
   // Sign out.
   document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", async () => {
     try { await api("/api/logout", {}); } catch (_) { /* already signed out */ }

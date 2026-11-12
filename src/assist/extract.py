@@ -48,6 +48,20 @@ def _program(store: SessionStore, patient_id: str) -> Optional[Dict[str, Any]]:
             "exercises": [programs.exercise_name(k) for k in a.exercise_keys]}
 
 
+def _next_visit(store: SessionStore, patient_id: str) -> Optional[Dict[str, Any]]:
+    """The patient's next booked visit, in clinic time, so a draft never guesses it from an old message (019 Q4).
+    The visit's notes are left out: the therapist's note and the patient's request are free text and may identify."""
+    from src.portal import plans as ptplans
+    upcoming = [v for v in ptplans.appointments_view(store, patient_id) if v["state"] == "upcoming"]
+    if not upcoming:
+        return None
+    v = min(upcoming, key=lambda a: a["starts_local"])
+    plan = store.plan_get(v["plan_id"]) if v["plan_id"] is not None else None
+    return {"date": v["date"], "day": datetime.fromisoformat(v["starts_local"]).strftime("%A"), "time": v["time"],
+            "minutes": v["minutes"], "plan": plan.title if plan else None,
+            "reschedule_requested": bool(v["reschedule_requested"])}
+
+
 def _sessions(store: SessionStore, patient_id: str, since: str) -> List[Dict[str, Any]]:
     from src.portal import diary
     out = []
@@ -132,6 +146,7 @@ def build(store: SessionStore, patient_id: str, days: int = WINDOW_DAYS) -> Extr
         "plans": [{"title": p.title, "status": p.status, "started": p.start_date} for p in plans
                   if p.status != "archived"],
         "program": _program(store, patient_id),
+        "next_visit": _next_visit(store, patient_id),
         "records": records,
     }
     return Extract(data, {r["id"] for r in records})
@@ -152,6 +167,7 @@ def build_for_reply(store: SessionStore, patient_id: str, plan_id: Optional[int]
         "today": datetime.fromisoformat(store._now()).strftime("%Y-%m-%d (%A)"),
         "plan": plan.title if plan else None,
         "program": _program(store, patient_id),
+        "next_visit": _next_visit(store, patient_id),
         "recent_logs": logs,
         "records": conversation,
     }

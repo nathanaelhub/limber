@@ -25,6 +25,7 @@ class Row:
     status: str                 # one short line under it
     warn: bool = False          # the status needs attention (shown with words, never colour alone)
     discharged: bool = False
+    label: str = ""             # the staff label, for search only
 
     @property
     def href(self) -> str:
@@ -90,26 +91,32 @@ def rows(store: SessionStore, now: datetime) -> List[Row]:
         live = [pl for pl in store.plans(p.id) if pl.status == "active"]
         title = live[0].title if live else (p.label or "")
         if store.get_discharge(p.id) is not None:
-            out.append(Row(p.id, title, "Discharged", discharged=True))
+            out.append(Row(p.id, title, label=p.label or "", status="Discharged", discharged=True))
             continue
         if assistant.needs_attention(store, p.id):
-            out.append(Row(p.id, title, "! Urgent message", warn=True))
+            out.append(Row(p.id, title, label=p.label or "", status="! Urgent message", warn=True))
             continue
         hurt = pain(store, p.id)
         if hurt and hurt["change"] is not None and hurt["change"] > 0:
-            out.append(Row(p.id, title, "↑ Pain rising", warn=True))
+            out.append(Row(p.id, title, label=p.label or "", status="↑ Pain rising", warn=True))
             continue
         last = p.last_session_at
         entries = store.entries(p.id, newest_first=True, limit=1)
         latest = max([x for x in (last, entries[0].recorded_at if entries else None) if x], default=None)
         if latest is None:
-            out.append(Row(p.id, title, "New · No records yet"))
+            out.append(Row(p.id, title, label=p.label or "", status="New · No records yet"))
             continue
         idle = (now.date() - date.fromisoformat(latest[:10])).days
-        out.append(Row(p.id, title, f"Inactive {idle // 7} weeks" if idle >= 14
+        out.append(Row(p.id, title, label=p.label or "", status=f"Inactive {idle // 7} weeks" if idle >= 14
                        else "Last active " + datetime.fromisoformat(latest[:19]).strftime("%-d %b")))
     out.sort(key=lambda r: (r.discharged, not r.warn, r.patient_id))
     return out
+
+
+def search(rows: List[Row], query: str) -> List[Row]:
+    """Patients whose code, plan title or staff label contains the text, ignoring case."""
+    q = query.strip().lower()
+    return [r for r in rows if q and (q in r.patient_id.lower() or q in r.title.lower() or q in r.label.lower())]
 
 
 def plan_actions(plan: Plan) -> List[str]:

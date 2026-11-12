@@ -45,7 +45,7 @@ def test_the_top_bar_on_a_page(tmp_db, fake_clock):
     with client(tmp_db, fake_clock) as c:
         sign_in(c, "rivera")
         page = c.get("/therapist/settings").text
-        assert '<nav class="nav" aria-label="Main"><a href="/therapist/dashboard">Dashboard</a><a href="/therapist/inbox">Inbox</a>' in page
+        assert '<nav class="nav" aria-label="Main"><a href="/therapist/dashboard">Dashboard</a><a href="/therapist/inbox" data-badge>Inbox</a>' in page
         assert '<summary>Tools</summary>' in page and 'href="/therapist/people"' not in page
         assert 'href="/therapist/settings" aria-current="page"' in page
         assert "Signed in as <b>Rivera</b> · Therapist" in page

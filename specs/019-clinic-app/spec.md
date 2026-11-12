@@ -169,7 +169,9 @@ rebuilt and reached from the Tools menu.
 
 ## Success Criteria
 
-- **SC-001**: The top bar has no more than six items, down from 13 sidebar links.
+- **SC-001**: The top bar has no more than seven items, down from 13 sidebar links: Dashboard, Inbox, Patients,
+  Schedule, Find a patient, Tools and Me. (Amended 12 November 2026 by the owner: the Dashboard became the home
+  page and a top-bar item, and the design's patient search stays in the top bar.)
 - **SC-002**: From sign-in, a therapist can open an unread conversation and send a reply in 3 clicks or fewer,
   plus typing.
 - **SC-003**: Every Streamlit page has a clinic equivalent, and every behaviour pinned by the current UI tests has
