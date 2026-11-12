@@ -388,3 +388,9 @@ pre.log{white-space:pre-wrap;font-size:var(--fs-small);padding:16px;border:1px s
 .side .new-items{margin:0 4px 8px}
 /* WCAG 2.2 target size: small links in side lists get a 24px target (axe, 019 Q5). */
 .side .pad-top a,.side .pad-x a{display:inline-flex;align-items:center;min-height:24px}
+.review-body{margin-top:20px}
+.field.w-full{min-width:420px;flex:1}
+video.clip{width:420px;max-width:100%;border-radius:10px;background:#000}
+/* A chart on its own keeps the size it has beside another, so its text stays in proportion. */
+.chart{max-width:560px}
+.cols .chart{max-width:none}

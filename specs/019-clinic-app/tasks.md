@@ -75,7 +75,7 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 5b: Review (Story 5)
 
-- [ ] T026 Measures, flags, compare, session review, from the patient, goals and thresholds (save rules moved,
+- [x] T026 Measures, flags, compare, session review, from the patient, goals and thresholds (save rules moved,
       with tests), exports
 
 ## Slice 5c: Tracker (Story 5)

@@ -16,7 +16,7 @@ from tests.clinic_helpers import client, seed, sign_in
 # slice that adds such a route adds its pattern here; an unknown placeholder fails the walk below.
 OTHERS = {"patient_id": "P-001", "message_id": "1", "media_id": "m1", "attachment_id": "a1",
           "appointment_id": "1", "plan_id": "1", "assignment_id": "1", "invite_id": "1", "account_id": "1",
-          "session_id": "1", "fmt": "pta_log"}
+          "session_id": "1", "fmt": "pta_log", "section": "trends", "kind": "report", "entry_id": "1"}
 
 
 def _app(tmp_db, fake_clock):
@@ -107,5 +107,5 @@ def test_unbuilt_pages_say_so_and_list_what_works(tmp_db, fake_clock):
     seed(tmp_db, fake_clock)
     with client(tmp_db, fake_clock) as c:
         sign_in(c)
-        page = c.get("/therapist/review").text
+        page = c.get("/therapist/tracker").text
         assert "not online yet" in page and 'href="/therapist/settings"' in page
