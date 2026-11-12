@@ -75,15 +75,31 @@ hosted settings at each merge.
 - [x] T027 Removed `Dockerfile.vercel` (a test now checks no container file is at the root). The entrypoint's
       demo mode stays: it serves one-port self-hosted demos and never runs on Vercel
 
+## Slice F: the patient live session on Vercel (before the clinic app)
+
+The patient's camera session (`/ws/session`, `src/portal/live.py`) keeps its whole state in one instance's memory.
+On Vercel a connection is cut at the function's time limit (300 s on Hobby), and `SessionStore` decides whether a
+running session's owner is alive with `os.kill(pid, 0)` (`store.py`), which can mark a live session interrupted
+when another instance opens the record.
+
+- [ ] T031 Spike: does `/ws/session` upgrade on Vercel's Python runtime, when is it cut, and what does the browser
+      see? Record the answers here
+- [ ] T032 Session ownership by lease, not process id: the recorder writes an owner and `lease_until` into
+      `source_extras` and renews it about every 30 s; recovery treats a session as alive while its lease runs
+      (old rows: same host and a living process). No migration. Tests with two stores and fake clocks
+- [ ] T033 A second device is refused across instances, using the lease in the record
+- [ ] T034 The duration limit, chosen after T031: (A) reconnect in segments and resume the same session, or
+      (B) stateless HTTP replay of the current set's frames
+- [ ] T035 Deploy and run a camera session longer than the limit on the hosted demo
+
 ## Slice E onward: the therapist side (Story 5) and video (Story 6)
 
-The therapist side on Vercel is delivered by 019's slices; each goes online as it merges, once Slice D exists.
+The therapist side on Vercel is the 019 clinic app, mounted at `/therapist`; each 019 slice deploys and is checked
+on the hosted demo as it merges (`specs/019-clinic-app/tasks.md`).
 
-- [ ] T028 019 slices 1 to 5 deploy to the hosted demo as they merge (tracked in `specs/019-clinic-app/tasks.md`)
-- [ ] T029 **G5**: browser pose (MoveNet) against YOLO11 on the three Ultralytics clips, with tolerances set by the
-      owner (shared with 019's G2)
-- [ ] T030 Hosted video analysis (Story 6, FR-016, FR-017): the browser finds body points and draws the skeleton;
-      Limber counts and scores with the engine's rules; the video is never uploaded
+- [ ] T028 019 slices 1 to 5 online (019 T011, T015, T018, T020, T023, T027)
+- [ ] T029 **G5** = 019 **G2** (019 T030): browser pose against YOLO11 on the three Ultralytics clips
+- [ ] T030 Hosted video analysis = 019 slice 6 (019 T028)
 
 ## Done when
 

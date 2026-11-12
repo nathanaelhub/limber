@@ -1,14 +1,13 @@
 <!--
 Sync Impact Report (temporary; remove before the next amendment)
-Version change: 1.4.0 -> 1.5.0 (MINOR: materially expanded guidance, no principle removed)
-Rationale: the owner wants a hosted demo on Vercel (feature 020). Vercel's instances share nothing, so a demo
-there needs its record in a hosted SQLite-compatible database (Turso) and its files in a hosted store
-(Cloudflare R2). Both are third parties, which Principle III did not allow. The exception is limited to a record
-of simulated data, enforced by a guard, so every real record stays local.
-Modified: Principle III (new bullet: hosted demo), Technical Constraints (Canonical store).
+Version change: 1.5.0 -> 1.5.1 (PATCH: wording, no new obligation)
+Rationale: on the hosted demo (feature 020) the clinic app (019) and the patient portal are served from one Vercel
+function, mounted at different paths. They stay separate applications with their own factory, routes, cookie and
+static folder; only the "separate launch" wording needed to allow one shared entry point.
+Modified: Technical Constraints, User interface.
 Added sections: none. Removed sections: none.
-Follow-ups: specs/020 carries the Constitution Check and the guard's tests (SC-005). Carried over from 1.4.0: at
-019's cutover, remove the Streamlit transition wording in Technical Constraints and Principle V.
+Follow-ups carried over: at 019's cutover, remove the Streamlit transition wording in Technical Constraints and the
+Streamlit mention in Principle V. specs/020 carries the hosted-demo Constitution Check (1.5.0).
 -->
 
 # PT Assist Constitution
@@ -154,8 +153,10 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
   `interfaces/cli.py` are the therapist's interface surfaces. The Streamlit app in
   `interfaces/app.py` remains in service only until the clinic app's cutover, then it is
   removed. The patient portal in `interfaces/patient_portal.py` is the one patient-facing
-  surface; it is a separate launch that contains no therapist pages, and the clinic app
-  contains no patient pages. Business logic MUST live in `src/` and be testable
+  surface. The portal and the clinic app are separate applications, each with its own factory,
+  routes, cookie, and static folder; a hosted demo MAY mount both at different path prefixes of
+  one entry point. The portal contains no therapist pages, and the clinic app contains no
+  patient pages. Business logic MUST live in `src/` and be testable
   without Streamlit or a running server; interface code only renders and dispatches. Browser
   JavaScript MUST stay free of clinical logic (rep counting, form wording, program order), so
   that behaviour is covered by the Python test suite.
@@ -199,4 +200,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.5.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-10
+**Version**: 1.5.1 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-11
