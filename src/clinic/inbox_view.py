@@ -26,6 +26,7 @@ I_CLIP = ('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11
 DONE = ('<svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="21" '
         'fill="#E3EFED"/><path d="m15 24 6 6 12-13" fill="none" stroke="#0E6B64" stroke-width="3.5" '
         'stroke-linecap="round" stroke-linejoin="round"/></svg>')
+NEW_ITEMS = ('<p class="new-items" role="status" data-new-items hidden>Something new needs you. <button class="btn quiet small" type="button" data-reload>Refresh</button></p>')
 AI_TAG = '<span class="ai-tag" aria-hidden="true">AI</span>'
 
 
@@ -58,7 +59,8 @@ def side(items: List[inbox.Item], conversations: List[dict], now: datetime, curr
         f'<span class="code">{_e(c["patient_id"])}</span>'
         f'<span class="dim ellipsis">{_e(c["summary"] or "No plan yet")}</span></a>'
         for c in conversations)
-    return (f'<nav class="side" aria-label="Needs you"><div class="side-head"><h2>Needs you</h2>{count}</div>{rows}'
+    return (f'<nav class="side" aria-label="Needs you"><div class="side-head"><h2>Needs you</h2>{count}</div>'
+            f'{NEW_ITEMS}{rows}'
             f'<details class="convs"><summary class="small strong">All conversations ({len(conversations)})</summary>'
             f'<div class="sidelist">{others}</div></details></nav>')
 

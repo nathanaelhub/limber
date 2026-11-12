@@ -84,7 +84,7 @@ def people(me: Account, staff: List[dict], patients: List[dict], invites: List[d
         rows.append(f'<tr><td class="strong">{_e(s["name"])}' + (' <span class="tag ghost">You</span>' if s["you"] else "")
                     + f'</td><td>{_e(s["username"])}</td><td>{_e(s["role"])}</td><td>{status}</td>'
                     f'<td class="r">{s["patients"] if s["patients"] is not None else "None"}</td><td>{action}</td></tr>')
-    staff_html = ('<div class="scroll"><table class="table"><thead><tr><th scope="col">Name</th><th scope="col">Username'
+    staff_html = ('<div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr><th scope="col">Name</th><th scope="col">Username'
                   '</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col" class="r">Patients</th>'
                   '<th scope="col"><span class="vh">Actions</span></th></tr></thead><tbody>' + "".join(rows)
                   + '</tbody></table></div><p class="hint">A disabled account can\'t sign in. Its records stay. '
@@ -111,7 +111,7 @@ def people(me: Account, staff: List[dict], patients: List[dict], invites: List[d
     pat_rows = "".join(f'<tr><td class="code">{_e(p["patient_id"])}</td><td>{_e(p["username"])}</td>'
                        f'<td>{_e(p["therapist"] or "nobody")}</td><td>{_e(p["status"].capitalize())}</td></tr>'
                        for p in patients)
-    pat_html = ('<div class="scroll"><table class="table"><thead><tr><th scope="col">Patient</th><th scope="col">Username'
+    pat_html = ('<div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr><th scope="col">Patient</th><th scope="col">Username'
                 '</th><th scope="col">Therapist</th><th scope="col">Status</th></tr></thead><tbody>' + pat_rows
                 + '</tbody></table></div>') if patients else '<p class="dim">No patient has a username yet.</p>'
     move = ""

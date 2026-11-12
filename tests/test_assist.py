@@ -187,6 +187,42 @@ class TestExtract:
         assert "Jane" not in dump and "Elm Street" not in dump and "ACL" not in dump
 
 
+class TestNextVisit:
+    """The booked visit reaches the model, so a draft never guesses the next visit from an old message (019 Q4)."""
+
+    def _book(self, store):
+        from src.portal import plans
+        plan = store.plans("P-021")[0].id
+        plans.schedule(store, "P-021", "2026-03-16T09:00", 45, "past one", plan_id=plan)
+        plans.schedule(store, "P-021", "2026-04-06T10:00", 30, "later one", plan_id=plan)
+        plans.schedule(store, "P-021", "2026-03-30T09:00", 45, "Call Jane at home", plan_id=plan)
+
+    def test_both_extracts_carry_the_next_booked_visit(self, store, fake_clock):
+        self._book(store)
+        _week_of_records(store, fake_clock)
+        for ex in (extract.build(store, "P-021"), extract.build_for_reply(store, "P-021", None)):
+            visit = ex.data["next_visit"]
+            assert visit == {"date": "2026-03-30", "day": "Monday", "time": "09:00", "minutes": 45,
+                             "plan": store.plans("P-021")[0].title, "reschedule_requested": False}
+            assert all(r["type"] != "visit" for r in ex.data["records"])
+
+    def test_the_visit_note_never_reaches_the_model(self, store, fake_clock):
+        self._book(store)
+        _week_of_records(store, fake_clock)
+        dump = json.dumps(extract.build_for_reply(store, "P-021", None).data) + \
+            json.dumps(extract.build(store, "P-021").data)
+        assert "Jane" not in dump and "later one" not in dump and "past one" not in dump
+
+    def test_no_visit_and_an_empty_week(self, store):
+        ex = extract.build(store, "P-021")
+        assert ex.data["next_visit"] is None and ex.empty                 # a booking alone is not a record
+        self._book(store)
+        assert extract.build(store, "P-021").empty
+
+    def test_the_prompts_say_how_to_use_it(self):
+        assert "next_visit" in assistant.DRAFT_SYSTEM and "next_visit" in assistant.SUMMARY_SYSTEM
+
+
 class TestNoAccountFieldsInRequests:
     def test_no_account_field_in_any_request_body(self, store, fake_clock):
         boss = accounts.create_account(store, username="zelda.admin", display_name="Zelda Quartermaine",

@@ -62,7 +62,7 @@ def section(title: str, body: str, aside: str = "") -> str:
 
 # ----------------------------------------------------------------------------- the list
 
-def side(rows: List[rules.Row], current: Optional[str], show_discharged: bool) -> str:
+def side(rows: List[rules.Row], current: Optional[str], show_discharged: bool, query: str = "") -> str:
     active = [r for r in rows if not r.discharged]
     gone = [r for r in rows if r.discharged]
     shown = active + (gone if show_discharged else [])
@@ -80,7 +80,11 @@ def side(rows: List[rules.Row], current: Optional[str], show_discharged: bool) -
     return (f'<nav class="side" aria-label="Patients"><div class="side-head"><h2>Patients</h2>'
             f'<span class="small dim">{len(active)} on caseload</span></div>'
             '<div class="pad-x pad-bottom"><a class="btn full" href="/therapist/patients/new">Register a patient</a></div>'
-            + ("".join(row(r) for r in shown) or '<p class="small dim pad-x">No patients yet.</p>') + toggle + "</nav>")
+            + (f'<p class="small pad-x">Matching “{_e(query)}” · <a href="/therapist/patients">Show all</a></p>'
+               if query else "")
+            + ("".join(row(r) for r in shown) or (f'<p class="small dim pad-x">No patient matches “{_e(query)}”.</p>'
+                                                  if query else '<p class="small dim pad-x">No patients yet.</p>'))
+            + ("" if query else toggle) + "</nav>")
 
 
 def pick_pane() -> str:
@@ -240,7 +244,7 @@ def exercises(pid: str, programs, exercise_names: List[tuple], history: List[dic
         rows = "".join(f'<tr><td>{_e(h["name"])}</td><td>{_e(h["from"])}</td><td>{_e(h["to"])}</td>'
                        f'<td>{_e(h["status"].capitalize())}</td><td class="r">{h["per_week"]}</td><td>{_e(h["exercises"])}</td></tr>'
                        for h in history)
-        table = ('<div class="scroll"><table class="table"><thead><tr><th scope="col">Program</th><th scope="col">From</th>'
+        table = ('<div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr><th scope="col">Program</th><th scope="col">From</th>'
                  '<th scope="col">To</th><th scope="col">Status</th><th scope="col" class="r">Sessions per week</th>'
                  f'<th scope="col">Exercises</th></tr></thead><tbody>{rows}</tbody></table></div>')
     else:
@@ -289,7 +293,7 @@ def details(patient: Patient, discharge, diary_on: bool, medications: List[str],
                    confirm="Revoke home access? The patient is signed out of the app.") if access_active else "")
     audit = ""
     if history:
-        audit = ('<details class="edit"><summary class="small strong">Access history</summary><div class="scroll">'
+        audit = ('<details class="edit"><summary class="small strong">Access history</summary><div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide">'
                  '<table class="table"><thead><tr><th scope="col">When</th><th scope="col">Event</th><th scope="col">'
                  'Detail</th></tr></thead><tbody>' + "".join(
                      f'<tr><td>{_e(w)}</td><td>{_e(ev)}</td><td>{_e(d)}</td></tr>' for w, ev, d in history)

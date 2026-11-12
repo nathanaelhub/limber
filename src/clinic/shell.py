@@ -6,6 +6,7 @@ Larger text and Higher contrast are right on the first paint. No inline style or
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from html import escape
 from typing import Iterable, Optional
 
@@ -17,11 +18,23 @@ STATIC = "/therapist/static"
 LOGO = ('<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19C5 11 9 5 19 5" '
         'fill="none" stroke="#0E6B64" stroke-width="3.5" stroke-linecap="round"/>'
         '<circle cx="5" cy="19" r="3" fill="#F2684A"/></svg>')
+# How many items Needs you holds, for the top bar on every page (019 Q2). Set per request by the clinic app's route
+# wrapper for therapists, so no page has to pass it along; None means no badge (admins, the sign-in page).
+BADGE: ContextVar[Optional[int]] = ContextVar("limber_badge", default=None)
+FIND = ('<form class="find-form" method="get" action="/therapist/patients" role="search"><label class="find">'
+        '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'
+        '</svg><span class="vh">Find a patient</span><input type="search" name="q" placeholder="Find a patient" '
+        'autocomplete="off" maxlength="60"></label></form>')
+
 CHECK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>'
 
 
 def _link(page: nav.Page, active: Optional[str]) -> str:
     current = ' aria-current="page"' if page.key == active else ""
+    if page.key == "inbox" and BADGE.get() is not None:
+        n = BADGE.get()
+        count = f' <span class="count" data-count>{n}<span class="vh"> need you</span></span>' if n else ""
+        return f'<a href="{page.href}"{current} data-badge>{escape(page.label)}{count}</a>'
     return f'<a href="{page.href}"{current}>{escape(page.label)}</a>'
 
 
@@ -34,16 +47,21 @@ def top_bar(account: Account, active: Optional[str] = None) -> str:
     who = (f'<p class="who">Signed in as <b>{escape(account.display_name or account.username)}</b>'
            f' · {escape(nav.role_text(account))}</p>')
     return (f'<header class="top"><a class="brand" href="{nav.home(account)}">{LOGO}Limber</a>'
-            f'<nav class="nav" aria-label="Main">{main}</nav>{tools_menu}'
+            f'<nav class="nav" aria-label="Main">{main}</nav>{FIND if account.role == "therapist" else ""}{tools_menu}'
             f'<details class="drop sp"><summary>Me</summary><div class="menu">{who}{me}'
             f'<button type="button" data-signout>Sign out</button></div></details></header>')
+
+
+def _count_prefix() -> str:
+    n = BADGE.get()
+    return f"({n}) " if n else ""
 
 
 def document(title: str, body: str, classes: str = "", scripts: Iterable[str] = ("clinic.js",)) -> str:
     tags = "".join(f'<script src="{STATIC}/{escape(s)}" defer></script>' for s in scripts)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
-            f'<title>Limber · {escape(title)}</title>'
+            f'<title>{_count_prefix()}Limber · {escape(title)}</title>'
             f'<link rel="icon" href="{STATIC}/favicon.png" type="image/png">'
             f'<link rel="stylesheet" href="{STATIC}/limber.css">{tags}</head>'
             f'<body><div class="lb app {escape(classes)}">{body}</div></body></html>')

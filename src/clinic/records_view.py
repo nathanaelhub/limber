@@ -8,6 +8,7 @@ from html import escape
 from typing import List, Optional
 
 from src.clinic import charts, inbox as inbox_rules, shell
+from src.clinic.inbox_view import NEW_ITEMS
 from src.clinic.records import EXPORTS, PERIODS
 from src.ptlog import views
 
@@ -31,7 +32,7 @@ def _fact(label: str, value: str, detail: str = "", href: str = "") -> str:
 def dashboard(name: str, today: str, needs: List[inbox_rules.Item], visits: List[dict], attention: List,
               act: dict, days: int, recent: List[dict]) -> str:
     head = (f'<div class="page-head"><div class="stack tight"><h1>Dashboard</h1><p class="dim">{_e(today)} · '
-            f'signed in as {_e(name)}</p></div></div>')
+            f'signed in as {_e(name)}</p></div></div>' + NEW_ITEMS)
     facts = ('<div class="facts">'
              + _fact("Needs you", f'{len(needs)}', "Open the Inbox", "/therapist/inbox")
              + _fact("Visits today", f'{len(visits)}', "Open the Schedule", "/therapist/schedule")
@@ -76,7 +77,7 @@ def dashboard(name: str, today: str, needs: List[inbox_rules.Item], visits: List
         f'{_e(r["patient_id"])}</a></td><td>{_e(r["exercises"])}</td><td>{"At home" if r["origin"] == "home" else "Clinic"}</td>'
         f'<td class="r">{r["reps"]}</td><td class="r">{_num(r["form"] and round(r["form"]))}</td>'
         f'<td><a href="/therapist/logs/{r["id"]}">Log</a></td></tr>' for r in recent)
-    rec_html = (('<div class="scroll"><table class="table"><thead><tr><th scope="col">When</th><th scope="col">Patient</th>'
+    rec_html = (('<div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr><th scope="col">When</th><th scope="col">Patient</th>'
                  '<th scope="col">Exercise</th><th scope="col">Where</th><th scope="col" class="r">Reps</th>'
                  '<th scope="col" class="r">Form score, 0 to 100</th><th scope="col"><span class="vh">Open</span></th>'
                  f'</tr></thead><tbody>{rec}</tbody></table></div>') if rec else
@@ -103,7 +104,7 @@ def sessions(rows: List[dict], patients: List[str], chosen: Optional[str]) -> st
         f'<td>{"" if r["status"] == "completed" else _e(r["status"].capitalize())}</td>'
         f'<td><a href="/therapist/sessions/{r["id"]}">Open</a> · <a href="/therapist/logs/{r["id"]}">Log</a></td></tr>'
         for r in rows)
-    table = (('<div class="scroll"><table class="table"><thead><tr><th scope="col">When</th><th scope="col">Patient</th>'
+    table = (('<div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr><th scope="col">When</th><th scope="col">Patient</th>'
               '<th scope="col">Exercise</th><th scope="col">Type</th><th scope="col" class="r">Reps</th>'
               '<th scope="col" class="r">Form score, 0 to 100</th><th scope="col">Status</th>'
               f'<th scope="col"><span class="vh">Open</span></th></tr></thead><tbody>{body}</tbody></table></div>')
@@ -177,7 +178,7 @@ def log_pane(log: Optional[dict]) -> str:
                        for e in reps)
         parts.append('<section class="sec"><div class="sec-head"><h2>Rep by rep</h2>'
                      f'<a class="btn quiet small sp" href="/therapist/logs/{s.id}/reps.csv" download>Download reps (CSV)</a>'
-                     '</div><div class="scroll"><table class="table"><thead><tr><th scope="col" class="r">Rep</th>'
+                     '</div><div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr><th scope="col" class="r">Rep</th>'
                      '<th scope="col">Exercise</th><th scope="col" class="r">Smallest angle, °</th><th scope="col" class="r">'
                      'Largest angle, °</th><th scope="col" class="r">Range of motion, °</th><th scope="col" class="r">'
                      'Duration, s</th><th scope="col" class="r">Form score, 0 to 100</th></tr></thead>'
@@ -188,7 +189,7 @@ def log_pane(log: Optional[dict]) -> str:
     if len(performed) > 1:
         rows = "".join(f'<tr><td>{_e(x["exercise"])}</td><td class="r">{x["reps"]}</td><td class="r">{x["avg_form_score"]}</td>'
                        f'<td class="r">{x["avg_rom"]}</td></tr>' for x in performed)
-        parts.append('<section class="sec"><h2>By exercise</h2><div class="scroll"><table class="table"><thead><tr>'
+        parts.append('<section class="sec"><h2>By exercise</h2><div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide"><table class="table"><thead><tr>'
                      '<th scope="col">Exercise</th><th scope="col" class="r">Reps</th><th scope="col" class="r">Average form, '
                      '0 to 100</th><th scope="col" class="r">Average range of motion, °</th></tr></thead>'
                      f'<tbody>{rows}</tbody></table></div></section>')

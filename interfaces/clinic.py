@@ -141,6 +141,9 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                 if status:
                     return refuse(status, kind, request, account, classes)
                 ptaccounts.restrict(store, account)          # always: no handler sees an unrestricted store
+                badge = None
+                if kind == "page" and account is not None and account.role == "therapist":
+                    badge = shell.BADGE.set(len(clinic_inbox.needs_you(store)))
                 try:
                     return handler(Ctx(request, store, account, classes, body))
                 except (NotYours, PatientNotFoundError, PlanNotFound, SessionNotFoundError):
@@ -148,6 +151,9 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     return not_found(kind, account, classes)
                 except PTLogError as err:
                     return web_common.bad(err)
+                finally:
+                    if badge is not None:
+                        shell.BADGE.reset(badge)
 
         async def endpoint(request: Request) -> Response:
             body = None
@@ -436,6 +442,10 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         return served
 
     api = "/api/inbox/{patient_id}"
+    def needs_count(ctx: Ctx) -> Response:
+        return json_response({"count": len(clinic_inbox.needs_you(ctx.store))})
+
+    clinic_route("/api/needs", needs_count, "therapist", kind="api")
     clinic_route("/inbox", inbox_page, "therapist")
     clinic_route("/inbox/{patient_id}", conversation_page, "therapist")
     clinic_route(api + "/read", mark_read, "therapist", methods=("POST",), kind="api")
@@ -470,7 +480,14 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         return html(patients_view.page(ctx.account, ctx.classes, side_html, pane, title))
 
     def patients_page(ctx: Ctx) -> Response:
-        return patients_html(ctx, patients_view.pick_pane())
+        query = (ctx.request.query_params.get("q") or "").strip()[:60]
+        if not query:
+            return patients_html(ctx, patients_view.pick_pane())
+        found = clinic_patients.search(clinic_patients.rows(ctx.store, clock()), query)
+        if len(found) == 1:                          # the top bar's search goes straight to a single match
+            return RedirectResponse(found[0].href, status_code=303, headers={"Cache-Control": "no-store"})
+        side_html = patients_view.side(found, None, True, query=query)
+        return html(patients_view.page(ctx.account, ctx.classes, side_html, patients_view.pick_pane(), "Patients"))
 
     def register_page(ctx: Ctx) -> Response:
         return patients_html(ctx, patients_view.register_pane(), title="Register a patient")
