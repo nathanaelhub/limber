@@ -6,7 +6,8 @@ from pathlib import Path
 
 import yaml
 
-DEPLOY = Path(__file__).resolve().parent.parent / "deploy"
+REPO = Path(__file__).resolve().parent.parent
+DEPLOY = REPO / "deploy"
 
 
 def test_dockerfile():
@@ -114,3 +115,22 @@ def test_demo_record_path_can_move_to_temporary_storage():
     text = (DEPLOY / "entrypoint.sh").read_text()
     assert 'PTASSIST_DB="${LIMBER_DEMO_DB:-/data/demo.db}"' in text
     assert 'mkdir -p "$(dirname "$PTASSIST_DB")"' in text
+
+
+def test_vercelignore_never_drops_runtime_code():
+    """A bare `exports/` in .vercelignore matched src/ptlog/exports too, and the hosted clinic's exports failed with
+    ModuleNotFoundError. Folder patterns are anchored to the top, and no pattern matches anything the app imports."""
+    import fnmatch
+    import subprocess
+    ignore = (REPO / "deploy" / "vercel" / ".vercelignore").read_text().splitlines()
+    patterns = [l.strip() for l in ignore if l.strip() and not l.startswith("#")]
+    for pattern in patterns:
+        if pattern.endswith("/") or "/" in pattern.rstrip("/"):
+            assert pattern.startswith("/"), f"{pattern}: anchor folder patterns with a leading /"
+    tracked = subprocess.run(["git", "ls-files", "src", "interfaces", "analyze.py"], cwd=REPO, capture_output=True,
+                             text=True).stdout.split()
+    for path in tracked:
+        for pattern in patterns:
+            anchored = pattern.lstrip("/").rstrip("/")
+            assert not (path == anchored or path.startswith(anchored + "/") or fnmatch.fnmatch(path, anchored)), \
+                f"{pattern} would leave {path} out of the hosted bundle"
