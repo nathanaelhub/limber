@@ -26,7 +26,7 @@ class Page:
 PAGES = (
     Page("inbox", "Inbox", "/inbox", "therapist", online=True),
     Page("patients", "Patients", "/patients", "therapist", online=True),
-    Page("schedule", "Schedule", "/schedule", "therapist"),
+    Page("schedule", "Schedule", "/schedule", "therapist", online=True),
     Page("dashboard", "Dashboard", "/dashboard", "therapist"),
     Page("live", "Live session", "/live", "therapist"),
     Page("video", "Video analysis", "/video", "therapist"),
@@ -35,7 +35,7 @@ PAGES = (
     Page("review", "Review", "/review", "therapist"),
     Page("tracker", "Tracker", "/tracker", "therapist"),
     Page("how", "How it works", "/how-it-works", "therapist"),
-    Page("people", "People", "/people", "admin"),
+    Page("people", "People", "/people", "admin", online=True),
     Page("settings", "My settings", "/settings", "any", online=True),
 )
 BY_KEY = {p.key: p for p in PAGES}

@@ -60,8 +60,8 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 4: Schedule and People (Story 4) → milestone M3, the first showing
 
-- [ ] T021 `src/clinic/schedule.py` (the visit list moved from `app.py`), with tests; Schedule page
-- [ ] T022 `src/clinic/people.py`: invite, revoke, disable and re-enable (never the last admin), reassign;
+- [x] T021 `src/clinic/schedule.py` (the visit list moved from `app.py`), with tests; Schedule page
+- [x] T022 `src/clinic/people.py`: invite, revoke, disable and re-enable (never the last admin), reassign;
       refused for non-admins; no clinical fields
 - [ ] T023 Deploy and run the "daily work" dry run on the hosted demo
 

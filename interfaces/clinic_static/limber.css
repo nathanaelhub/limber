@@ -371,3 +371,9 @@ select.input[multiple]{height:auto;min-height:140px}
 .summary-edit{min-height:260px;width:100%}
 .day-log>summary{padding:8px 0}
 .thread{gap:12px;padding:8px 0 16px}
+.page.wide{max-width:1000px}
+.w-when{width:150px;flex:none}
+.rowflex.top-row{align-items:flex-start}
+.lb a.code{color:var(--teal-dark);text-underline-offset:3px}
+.lb a.code:hover{color:var(--teal)}
+.table .inline-form .btn{min-height:32px;padding:0 12px;font-size:var(--fs-small)}
