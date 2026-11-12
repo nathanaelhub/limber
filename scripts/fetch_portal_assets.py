@@ -16,7 +16,7 @@ import hashlib
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 REPO = Path(__file__).resolve().parent.parent
 VENDOR = REPO / "interfaces" / "portal_static" / "vendor"
@@ -42,22 +42,63 @@ ASSETS: Dict[str, Tuple[str, str]] = {
 }
 
 
+# Where the same files can also be found when the main source fails (issue #53: tfhub.dev has answered 404). Every
+# file taken from a mirror is held to the same SHA-256 as above. Kaggle's archive was checked on 2026-11-11: its
+# model.json and both shards match the hashes recorded here exactly.
+MIRRORS: Dict[str, str] = {
+    "lightning/": "https://www.kaggle.com/api/v1/models/google/movenet/tfJs/singlepose-lightning/4/download",
+}
+
+
+def _from_archive(archive: bytes, name: str) -> bytes:
+    """One file, by its base name, from a .tar.gz archive."""
+    import io
+    import tarfile
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
+        for member in tar.getmembers():
+            if member.isfile() and Path(member.name).name == name:
+                return tar.extractfile(member).read()
+    raise OSError(f"{name} is not in the mirror archive")
+
+
+# tfhub.dev and Kaggle answer 404 to Python's default User-Agent ("Python-urllib/3.x"): the cause of issue #53.
+USER_AGENT = "limber-fetch-portal-assets/1.0"
+
+
 def _download(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310 — fixed https URLs above
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 — fixed https URLs above
         return response.read()
 
 
 def fetch(dest: Path = VENDOR, assets: Dict[str, Tuple[str, str]] = ASSETS,
-          download: Callable[[str], bytes] = _download, log: Callable[[str], None] = print) -> List[Path]:
+          download: Callable[[str], bytes] = _download, log: Callable[[str], None] = print,
+          mirrors: Optional[Dict[str, str]] = None) -> List[Path]:
     """Download what is missing or wrong. A file is written only after its hash matches.
-    Raises ValueError naming the file when a download does not match its recorded hash."""
+    Raises ValueError naming the file when a download does not match its recorded hash. When a download fails
+    (not when it mismatches, which could mean tampering), the file is taken from its mirror archive instead."""
+    mirrors = MIRRORS if mirrors is None else mirrors
+    archives: Dict[str, bytes] = {}
+
+    def get(rel: str, url: str) -> bytes:
+        try:
+            return download(url)
+        except OSError as err:
+            prefix = next((p for p in mirrors if rel.startswith(p)), None)
+            if prefix is None:
+                raise
+            log(f"mirror   {rel} ({err})")
+            if prefix not in archives:
+                archives[prefix] = download(mirrors[prefix])
+            return _from_archive(archives[prefix], Path(rel).name)
+
     written: List[Path] = []
     for rel, (url, expected) in assets.items():
         target = dest / rel
         if target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() == expected:
             log(f"ok       {rel}")
             continue
-        data = download(url)
+        data = get(rel, url)
         actual = hashlib.sha256(data).hexdigest()
         if actual != expected:
             raise ValueError(f"{rel}: the download's SHA-256 is {actual}, expected {expected}. Nothing was written "

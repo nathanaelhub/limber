@@ -28,7 +28,7 @@ cp "$REPO/deploy/vercel/.vercelignore" "$OUT/.vercelignore"
 rm -f "$OUT/railway.json"
 
 # The pose assets patients' browsers load from Limber: this machine's copies, re-checked against the pinned SHA-256
-# list in scripts/fetch_portal_assets.py (their original download site, tfhub.dev, now answers 404).
+# list in scripts/fetch_portal_assets.py (quicker than downloading them again, and works offline).
 "$PY" - "$REPO" "$OUT" <<'PYCODE'
 import hashlib, shutil, sys
 from pathlib import Path
