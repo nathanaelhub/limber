@@ -40,7 +40,7 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 - [x] T013 Routes and page: list, thread (`messages.thread(viewer="therapist", mark_read=False)`), explicit read,
       reply, attachments, voice notes, remove, messaging switch, reschedule answer
 - [x] T014 AI draft, withheld notice, mark handled by phone, and AI labels, with tests
-- [ ] T015 Test: opening the Inbox marks nothing read (FR-007); deploy and check
+- [x] T015 Test: opening the Inbox marks nothing read (FR-007); deploy and check
 
 ## Slice 3a: Patients (Story 3)
 
