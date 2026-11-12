@@ -232,3 +232,24 @@ def test_opening_an_up_to_date_record_writes_nothing(tmp_path, libsql_mode):
     finally:
         backend.Connection.execute = real_execute
     assert not [s for s in seen if s in backend._WRITES], seen
+
+
+def test_a_hosted_store_never_migrates(tmp_path, monkeypatch, libsql_mode):
+    """Schema changes on the hosted demo come only from a reset. A live instance that met a half-reset record once
+    ran every migration itself mid-reset, and the reset then failed on duplicate rows (found in the live check)."""
+    monkeypatch.setenv("LIMBER_DEMO", "1")
+    monkeypatch.setattr(backend, "hosted", lambda: True)
+    empty = tmp_path / "empty.db"
+    with pytest.raises(backend.HostedRecordRefused, match="reset"):
+        SessionStore(empty).open()
+    tables = backend.connect(empty).execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    assert tables == []                                                   # nothing was created
+
+
+def test_a_hosted_store_opens_an_up_to_date_demo(tmp_path, monkeypatch, libsql_mode):
+    path = tmp_path / "r.db"
+    with SessionStore(path).open() as s:                                  # built locally, as the reset does
+        backend.mark_simulated(s)
+    monkeypatch.setenv("LIMBER_DEMO", "1")
+    monkeypatch.setattr(backend, "hosted", lambda: True)
+    SessionStore(path).open().close()
