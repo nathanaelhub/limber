@@ -919,9 +919,10 @@ class SessionStore:
         if patient_id is not None:
             sql, args = sql + " AND patient_id = ?", (patient_id,)
         rows = self.conn.execute(sql, args).fetchall()
+        now = self._now()
         for row in rows:
-            if skip_living_owner and _owner_alive(row["source_extras"]):
-                continue   # still being recorded by a living process (live web session)
+            if skip_living_owner and _owner_alive(row["source_extras"], now):
+                continue   # still being recorded: by a living process here, or under a lease held elsewhere
             end_time = self._last_activity_time(row["id"]) or row["start_time"]
             self._finish_session(row["id"], status="interrupted", end_time=end_time, reason=reason)
 
@@ -1319,6 +1320,24 @@ class SessionStore:
             )
             for r in rows
         ]
+
+    def session_take_over(self, session_id: int, until: str) -> None:
+        """This process now records the running session (it resumed it, maybe on another hosted instance)."""
+        self.conn.execute(
+            "UPDATE sessions SET source_extras = json_set(COALESCE(source_extras, '{}'), '$.host', ?, '$.pid', ?, "
+            "'$.lease_until', ?) WHERE id = ? AND status = 'running'", (this_host(), os.getpid(), until, session_id))
+        self.conn.commit()
+
+    def session_open_set(self, session_id: int) -> Optional[int]:
+        row = self.conn.execute("SELECT id FROM exercise_sets WHERE session_id = ? AND end_time IS NULL "
+                                "ORDER BY ordinal DESC LIMIT 1", (session_id,)).fetchone()
+        return row[0] if row else None
+
+    def session_renew_lease(self, session_id: int, until: str) -> None:
+        """Extend a running session's lease (feature 020): whoever records it is still at work."""
+        self.conn.execute("UPDATE sessions SET source_extras = json_set(COALESCE(source_extras, '{}'), "
+                          "'$.lease_until', ?) WHERE id = ? AND status = 'running'", (until, session_id))
+        self.conn.commit()
 
     def session_ordinal(self, session_id: int) -> int:
         """1-based position of the session among its patient's sessions (PTA-Log file numbering)."""
@@ -2997,10 +3016,25 @@ class SessionStore:
             f"SELECT message_id FROM message_handled WHERE message_id IN ({marks})", [int(i) for i in message_ids])}
 
 
-def _owner_alive(source_extras: Optional[str]) -> bool:
-    """True when the session's extras name the process recording it and that process is alive."""
+def this_host() -> str:
+    """This machine or hosted instance, as a session's recorder names it (feature 020)."""
+    import socket
+    return socket.gethostname()
+
+
+def _owner_alive(source_extras: Optional[str], now: Optional[str] = None) -> bool:
+    """True while the session is still being recorded. A session recorded on another host is alive while its lease
+    runs (feature 020: hosted instances can't see each other's processes). On this host the recording process
+    must also exist, so a crash here is recovered at once. Older sessions without a lease keep the process rule."""
     try:
-        pid = int((json.loads(source_extras) if source_extras else {}).get("pid"))
+        extras = json.loads(source_extras) if source_extras else {}
+    except (TypeError, ValueError):
+        return False
+    host, lease = extras.get("host"), extras.get("lease_until")
+    if host and lease and host != this_host():
+        return now is not None and _ts_key(lease) > _ts_key(now)
+    try:
+        pid = int(extras.get("pid"))
     except (TypeError, ValueError):
         return False
     if pid <= 0:

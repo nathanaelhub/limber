@@ -122,6 +122,20 @@ class LiveSession:
                 self._started = True
             return self.recorder.session_id
 
+    def resume(self, session_id: int) -> int:
+        """Continue a running session from an earlier connection, in a new set of this exercise (feature 020)."""
+        with self._lock:
+            if not self._started:
+                self.recorder.resume(session_id, self.config, exercise_key=self.exercise_key)
+                self._started = True
+            return self.recorder.session_id
+
+    def detach(self) -> None:
+        """Write what is buffered and leave the session running for a later `resume` (feature 020)."""
+        with self._lock:
+            if self._active():
+                self.recorder.flush()
+
     def process(self, frame: np.ndarray, frame_num: Optional[int] = None) -> np.ndarray:
         """Run the engine on one frame, record what happened, and return the annotated frame."""
         with self._lock:

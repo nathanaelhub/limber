@@ -109,3 +109,9 @@ def test_a_visit_during_a_reset_gets_a_plain_503(monkeypatch, tmp_path):
     c = TestClient(app, base_url="https://limber-demo.vercel.app", raise_server_exceptions=False)
     r = c.get("/api/today")
     assert r.status_code == 503 and "being reset" in r.json()["error"]
+
+
+def test_hosted_live_sessions_end_each_connection_before_vercel_does():
+    """Vercel cuts a connection at 300 s; a segment ends by SEGMENT_SECONDS + 15 s (020 slice F)."""
+    from interfaces import vercel_app
+    assert vercel_app.SEGMENT_SECONDS + 15 < 300

@@ -82,17 +82,25 @@
     }).catch(function () { points = null; }).then(function () { busy = false; });
   }
 
-  function connect() {
+  // A hosted service may end a connection after a few minutes (feature 020). It says "segment" first, between
+  // reps; the page reconnects and resumes the same session, so the count and the camera carry on.
+  function connect(resumeId) {
     var scheme = window.location.protocol === "https:" ? "wss://" : "ws://";
+    var segmentId = null;
     socket = new WebSocket(scheme + window.location.host + "/ws/session");
-    socket.onopen = function () { socket.send(JSON.stringify({ type: "start", pose_model: MODEL })); };
+    socket.onopen = function () {
+      socket.send(JSON.stringify(resumeId ? { type: "resume", session_id: resumeId, pose_model: MODEL }
+                                          : { type: "start", pose_model: MODEL }));
+    };
     socket.onmessage = function (event) {
       var message = JSON.parse(event.data);
       if (message.type === "state") { if (!running) { running = true; show("live"); window.requestAnimationFrame(loop); } render(message); }
+      else if (message.type === "segment") { segmentId = message.session_id; }
       else if (message.type === "ended") { finish(message); }
       else if (message.type === "refused") { running = false; show("intro"); fail(message.message || "A session cannot start right now."); }
     };
     socket.onclose = function () {
+      if (segmentId && running) { connect(segmentId); return; }
       if (running) { running = false; show("intro"); fail("The connection was lost. What you did so far is saved. You can start again."); }
     };
   }

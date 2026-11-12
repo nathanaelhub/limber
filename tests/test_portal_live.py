@@ -165,3 +165,18 @@ class TestLimits:
         s.stop()
         with SessionStore(db).open() as store:
             assert "low_rate" in store.portal_audit_list("P-017")[0].detail
+
+
+class TestAcrossInstances:
+    """Feature 020 slice F (T033): on Vercel two devices can reach different instances, each with its own registry.
+    The record decides: a session still running after recovery belongs to a live owner."""
+
+    def test_a_second_device_is_refused_on_another_instance(self, db):
+        here, elsewhere = live.LiveRegistry(), live.LiveRegistry()
+        first = start(db, here)
+        with pytest.raises(live.LiveRefused) as second:
+            start(db, elsewhere)
+        assert second.value.reason == "second_device"
+        first.stop()
+        again = start(db, elsewhere)                          # the first device finished, so this one may start
+        again.stop()
