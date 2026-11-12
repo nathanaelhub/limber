@@ -68,11 +68,12 @@ hosted settings at each merge.
       door explains which clinic pages are online so far (Story 5, scenario 1)
 - [x] T025 Deploy to `limber-demo` (Python, not the container preset); settings in Vercel: Turso, R2,
       `PTASSIST_PORTAL_KEY`, `LIMBER_DEMO=1`, the AI key
-- [~] T026 (SC-001, SC-002 and the patient checks pass; photo upload waits for T016's CORS rule; SC-004 cold start not yet timed) Verify on the live site: 50 parallel signed-in requests (SC-001), a message written through one instance
+- [~] T026 (SC-001, SC-002 and SC-004 pass: the first page after idling took 5.6 s on 2026-11-11; photo upload
+      waits for T016's CORS rule) Verify on the live site: 50 parallel signed-in requests (SC-001), a message written through one instance
       read through another (SC-002), first page from scaled to zero within 15 s (SC-004), and the patient dry run
       on a phone-sized browser
-- [ ] T027 Remove the container-beta setup that 020 replaces (`Dockerfile.vercel`, the start-up seeding in demo
-      mode on hosted installs), keeping the one-port mode for self-hosting
+- [x] T027 Removed `Dockerfile.vercel` (a test now checks no container file is at the root). The entrypoint's
+      demo mode stays: it serves one-port self-hosted demos and never runs on Vercel
 
 ## Slice F: the patient live session on Vercel (before the clinic app)
 
