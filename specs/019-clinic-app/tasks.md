@@ -48,7 +48,7 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
       home-access display, with tests
 - [x] T017 Patient list and detail; register; Overview; Exercises (program, questionnaires); Details (plans of care,
       visits, what the patient can log, home access, caseload status, label and notes, delete)
-- [ ] T018 Tests for each behaviour pinned in `tests/test_app_pages.py`, `test_app_layout.py` (patient tabs), and
+- [x] T018 Tests for each behaviour pinned in `tests/test_app_pages.py`, `test_app_layout.py` (patient tabs), and
       `test_app_plans.py`; deploy and check
 
 ## Slice 3b: Notes and AI (Story 3)
