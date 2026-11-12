@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import io
-import os
-import shutil
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +22,7 @@ from typing import List, Optional, Sequence, Tuple
 
 from PIL import Image, ImageOps
 
+from src.media import files
 from src.ptlog.models import Attachment, Message, PortalError
 from src.ptlog.store import SessionStore
 
@@ -132,33 +132,106 @@ def prepare(files: Sequence[Tuple[str, bytes]]) -> List[Prepared]:
     return ready
 
 
+# ---- uploads straight to the hosted demo's bucket (feature 020, FR-006) --------------------------------------
+# Vercel refuses a request body over 4.5 MB, and a message may carry four 15 MB photos. On the hosted demo the
+# browser uploads each file to the R2 bucket with a signed link, then sends the message naming those uploads.
+# Limber fetches them and runs exactly the checks above (type sniffing, size, stripping location data).
+
+INCOMING = ".incoming/attachments"
+_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/heic": "heic", "application/pdf": "pdf"}
+_EXT_TYPE = {v: k for k, v in _EXT.items()}
+_UPLOAD_NAME = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|heic|pdf)$")
+
+
+def check_declared(declared: Sequence[Tuple[str, int]]) -> List[str]:
+    """Refuse, before anything is uploaded, what `prepare` would refuse: the types, the count, and each size.
+    Returns the normalised types."""
+    if not declared:
+        raise AttachmentRejected("Choose a photo or a PDF first.")
+    stated = [STATED.get((t or "").split(";")[0].strip().lower()) if isinstance(t, str) else None for t, _ in declared]
+    if any(x is None for x in stated):
+        raise AttachmentRejected("You can attach photos (JPEG, PNG, HEIC) or a PDF.")
+    if "application/pdf" in stated and len(stated) > 1:
+        raise AttachmentRejected("Attach one PDF on its own, or up to 4 photos.")
+    if len(stated) > MAX_PHOTOS:
+        raise AttachmentRejected(f"You can attach up to {MAX_PHOTOS} photos to a message.")
+    for (_, size), mime in zip(declared, stated):
+        limit = PDF_MAX if mime == "application/pdf" else PHOTO_MAX
+        if not isinstance(size, int) or isinstance(size, bool) or not 0 < size <= limit:
+            raise AttachmentRejected(f"Each {'PDF' if mime == 'application/pdf' else 'photo'} can be up to "
+                                     f"{limit // (1024 * 1024)} MB.")
+    return stated
+
+
+def upload_key(patient_id: str, mime: str) -> str:
+    """Where one direct upload goes: under the patient, with its declared type in the name."""
+    return f"{INCOMING}/{patient_id}/{uuid.uuid4()}.{_EXT[mime]}"
+
+
+def _own_upload_key(patient_id: str, key) -> str:
+    if not isinstance(key, str):
+        raise AttachmentRejected("That upload wasn't found. Please attach the file again.")
+    prefix = f"{INCOMING}/{patient_id}/"
+    if not key.startswith(prefix) or not _UPLOAD_NAME.match(key[len(prefix):]):
+        raise AttachmentRejected("That upload wasn't found. Please attach the file again.")
+    return key
+
+
+def take_uploaded(media_dir: Path, patient_id: str, keys) -> List[Tuple[str, bytes]]:
+    """The patient's own direct uploads as (declared type, bytes), ready for `prepare`."""
+    if not isinstance(keys, list) or not keys:
+        raise AttachmentRejected("That upload wasn't found. Please attach the file again.")
+    fs = files.at(media_dir)
+    taken = []
+    for key in keys:
+        key = _own_upload_key(patient_id, key)
+        try:
+            data = fs.get_bytes(key)
+        except files.NotFound:
+            raise AttachmentRejected("That upload wasn't found. Please attach the file again.") from None
+        taken.append((_EXT_TYPE[key.rsplit(".", 1)[1]], data))
+    return taken
+
+
+def discard_uploaded(media_dir: Path, patient_id: str, keys) -> None:
+    """Remove the raw uploads once the message is sent or refused; only the patient's own are touched."""
+    fs = files.at(media_dir)
+    for key in keys if isinstance(keys, list) else []:
+        try:
+            fs.delete(_own_upload_key(patient_id, key))
+        except AttachmentRejected:
+            pass
+
+
+def rel(a: Attachment) -> str:
+    """The file's path inside the file store (feature 020)."""
+    return f"{a.patient_id}/{FOLDER}/{a.id}.{a.ext}"
+
+
 def path(media_dir: Path, a: Attachment) -> Path:
-    return Path(media_dir) / a.patient_id / FOLDER / f"{a.id}.{a.ext}"
+    """The file on a local install (the Streamlit app uses it; the hosted demo has no local file)."""
+    return Path(media_dir) / rel(a)
 
 
 def attach(store: SessionStore, media_dir: Path, message: Message, ready: List[Prepared]) -> List[Attachment]:
     """Write the files, then their rows, and commit with the message. On failure nothing is left behind."""
-    written: List[Path] = []
+    fs = files.at(media_dir)
+    written: List[str] = []
     try:
         rows = []
         for p in ready:
             a = Attachment(id=str(uuid.uuid4()), patient_id=message.patient_id, message_id=message.id,
                            plan_id=message.plan_id, kind=p.kind, ext=p.ext, mime=p.mime, bytes=len(p.data),
                            width=p.width, height=p.height, sha256=hashlib.sha256(p.data).hexdigest(), created_at="")
-            target = path(media_dir, a)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.chmod(target.parent.parent, 0o700)
-            os.chmod(target.parent, 0o700)
-            target.write_bytes(p.data)
-            os.chmod(target, 0o600)
-            written.append(target)
+            fs.put_bytes(rel(a), p.data)
+            written.append(rel(a))
             rows.append(store.attachment_add(a, commit=False))
         store.conn.commit()
         return rows
     except Exception:
         store.conn.rollback()
-        for f in written:
-            f.unlink(missing_ok=True)
+        for r in written:
+            fs.delete(r)
         raise
 
 
@@ -182,13 +255,13 @@ def delete(store: SessionStore, media_dir: Path, patient_id: Optional[str], atta
     a = get(store, patient_id, attachment_id)
     if a is None or a.deleted_at is not None:
         return False
-    path(media_dir, a).unlink(missing_ok=True)
+    files.at(media_dir).delete(rel(a))
     store.attachment_mark_deleted(a.id, by)
     return True
 
 
 def remove_all(media_dir: Path, patient_id: str) -> None:
-    shutil.rmtree(Path(media_dir) / patient_id / FOLDER, ignore_errors=True)
+    files.at(media_dir).delete_prefix(f"{patient_id}/{FOLDER}/")
 
 
 def run_retention(store: SessionStore, media_dir: Path) -> int:
@@ -203,7 +276,7 @@ def run_retention(store: SessionStore, media_dir: Path) -> int:
     for r in rows:
         a = store.attachment_get(r["id"])
         if a is not None:
-            path(media_dir, a).unlink(missing_ok=True)
+            files.at(media_dir).delete(rel(a))
             store.attachment_mark_deleted(a.id, "retention")
             deleted += 1
     return deleted

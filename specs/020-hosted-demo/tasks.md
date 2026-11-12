@@ -32,16 +32,16 @@ hosted settings at each merge.
 
 ## Slice B: Files on Cloudflare R2 (Story 2; FR-004 to FR-006)
 
-- [ ] T011 `src/media/files.py`: put, get, delete, delete-everything-for-a-patient; the local folder by default,
+- [x] T011 `src/media/files.py`: put, get, delete, delete-everything-for-a-patient; the local folder by default,
       R2 when the `LIMBER_R2_*` settings are set; every write of an uploaded file goes through it (test: nothing
       else writes under the media folder)
-- [ ] T012 Signed links: upload and download links for one file, valid for minutes, issued only after the existing
+- [x] T012 Signed links: upload and download links for one file, valid for minutes, issued only after the existing
       route checks; never logged or stored (FR-005); test that the bucket address never appears in a response body
-- [ ] T013 Clips and voice notes: parts stored through the interface, so consecutive parts may reach different
+- [x] T013 Clips and voice notes: parts stored through the interface, so consecutive parts may reach different
       instances (FR-006)
-- [ ] T014 Message attachments on hosted installs: the browser uploads each file straight to R2 with a signed
+- [x] T014 Message attachments on hosted installs: the browser uploads each file straight to R2 with a signed
       link; Limber then checks size, type, and the media probe before attaching it; a file that fails is deleted
-- [ ] T015 Deleting a patient deletes their files in R2 (test against a fake bucket)
+- [x] T015 Deleting a patient deletes their files in R2 (test against a fake bucket)
 - [ ] T016 **Owner step**: add the bucket's CORS rule (uploads from the demo's address only); the exact rule is
       written in the slice's pull request
 

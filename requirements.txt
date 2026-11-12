@@ -121,3 +121,5 @@ anthropic>=2.3.0
 
 # Feature 020: the hosted demo's record on Turso (libSQL). Unused unless TURSO_DATABASE_URL is set.
 libsql>=0.1.11
+# Feature 020: the hosted demo's files in a Cloudflare R2 bucket (S3 API). Unused unless LIMBER_R2_* is set.
+boto3>=1.35.0

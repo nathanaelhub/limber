@@ -176,13 +176,16 @@ def run_one(store, media_dir: Path, transcriber: Opt[Callable] = None,
     media = store.media_get(job.media_id)
     if media is None or media.deleted_at is not None:
         return store.transcription_fail(job.id, reason="missing")
-    path = media_files.media_path(media_dir, media)
-    if not path.is_file():
+    from src.media import files
+    fs = files.at(media_dir)
+    rel = media_files.media_rel(media)
+    if not fs.exists(rel):
         return store.transcription_fail(job.id, reason="missing")
 
     started = time.monotonic()
     try:
-        text = (runner(path) or "").strip()
+        with fs.local_path(rel) as path:          # a temporary copy on the hosted demo (feature 020)
+            text = (runner(path) or "").strip()
     except TranscriberTimeout:
         return store.transcription_fail(job.id, reason="timeout")
     except Unreadable:

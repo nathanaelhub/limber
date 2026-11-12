@@ -1242,7 +1242,8 @@ class SessionStore:
         self.conn.execute("DELETE FROM patients WHERE id = ?", (pid,))   # cascades through every child table
         self.conn.commit()
         import shutil
-        shutil.rmtree(self.media_dir / pid, ignore_errors=True)         # the patient's uploaded files (feature 011)
+        from src.media import files
+        files.at(self.media_dir).delete_prefix(f"{pid}/")              # the patient's uploaded files (011, 020)
         removed_files = 0
         for path in export_paths:
             try:

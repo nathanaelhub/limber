@@ -2,22 +2,23 @@
 Uploads from the patient's phone (feature 011): a chunked, resumable transfer into a per-upload
 folder, then assembly, hash check, isolated inspection, and a move into `data/media/<patient>/`.
 Limits per patient, expiry of unfinished uploads, patient and therapist deletion (a marker stays),
-retention, and reconciliation of rows against files. Pure rules over SessionStore and the disk.
+retention, and reconciliation of rows against files. Pure rules over SessionStore and the file store
+(`src/media/files.py`: the media folder, or the hosted demo's R2 bucket, feature 020).
 """
 
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import shutil
+import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
-from src.media import probe
+from src.media import files, probe
 from src.portal import messages
 from src.ptlog.models import Media, PortalError
 from src.ptlog.store import SessionStore
@@ -46,12 +47,18 @@ class UploadStatus:
     received: List[int]
 
 
-def _incoming(media_dir: Path, upload_id: str) -> Path:
-    return Path(media_dir) / ".incoming" / upload_id
+def _incoming(upload_id: str) -> str:
+    return f".incoming/{upload_id}/"
+
+
+def media_rel(media: Media) -> str:
+    """The file's path inside the file store."""
+    return f"{media.patient_id}/{media.id}.{media.ext}"
 
 
 def media_path(media_dir: Path, media: Media) -> Path:
-    return Path(media_dir) / media.patient_id / f"{media.id}.{media.ext}"
+    """The file on a local install (the Streamlit app and backups use it; the hosted demo has no local file)."""
+    return Path(media_dir) / media_rel(media)
 
 
 def _own_upload(store: SessionStore, patient_id: str, upload_id: str) -> dict:
@@ -93,17 +100,14 @@ def begin(store: SessionStore, media_dir: Path, patient_id: str, kind: str, tota
         raise PortalError(f"You can send up to {count_limit} clips a day. Please try again tomorrow.")
     upload_id = str(uuid.uuid4())
     store.upload_add(upload_id, patient_id, kind, total_bytes, chunk_bytes, sha256.lower(), store.clock() + UPLOAD_LIFETIME)
-    folder = _incoming(media_dir, upload_id)
-    folder.mkdir(parents=True, exist_ok=True)
-    os.chmod(folder, 0o700)
     store.portal_audit_add("upload_started", patient_id, None, kind)
     return status(store, media_dir, patient_id, upload_id)
 
 
 def status(store: SessionStore, media_dir: Path, patient_id: str, upload_id: str) -> UploadStatus:
     up = _own_upload(store, patient_id, upload_id)
-    folder = _incoming(media_dir, upload_id)
-    received = sorted(int(p.name[5:]) for p in folder.glob("part-*")) if folder.exists() else []
+    names = [PurePosixPath(rel).name for rel in files.at(media_dir).list(_incoming(upload_id))]
+    received = sorted(int(n[5:]) for n in names if n.startswith("part-") and n[5:].isdigit())
     total_parts = -(-up["total_bytes"] // up["chunk_bytes"])
     return UploadStatus(upload_id, up["kind"], up["total_bytes"], up["chunk_bytes"], total_parts, received)
 
@@ -116,19 +120,14 @@ def put_part(store: SessionStore, media_dir: Path, patient_id: str, upload_id: s
     expected = up["chunk_bytes"] if index < total_parts - 1 else up["total_bytes"] - up["chunk_bytes"] * (total_parts - 1)
     if len(data) != expected:
         raise PortalError("This part does not have the expected size.")
-    folder = _incoming(media_dir, upload_id)
-    folder.mkdir(parents=True, exist_ok=True)
-    part = folder / f"part-{index}"
-    tmp = folder / f"part-{index}.tmp"
-    tmp.write_bytes(data)
-    os.chmod(tmp, 0o600)
-    tmp.replace(part)
+    # Each part is stored on its own, so consecutive parts may reach different hosted instances (FR-006).
+    files.at(media_dir).put_bytes(f"{_incoming(upload_id)}part-{index}", data)
     return status(store, media_dir, patient_id, upload_id)
 
 
 def abandon(store: SessionStore, media_dir: Path, patient_id: str, upload_id: str) -> None:
     _own_upload(store, patient_id, upload_id)
-    shutil.rmtree(_incoming(media_dir, upload_id), ignore_errors=True)
+    files.at(media_dir).delete_prefix(_incoming(upload_id))
     store.upload_delete(upload_id)
 
 
@@ -147,12 +146,16 @@ def finish(store: SessionStore, media_dir: Path, patient_id: str, upload_id: str
     reasons = messages.check_text(caption) if caption else []
     if reasons and not confirm:
         raise messages.NeedsConfirmation(reasons)
-    folder = _incoming(media_dir, upload_id)
-    assembled = folder / "assembled"
+    fs = files.at(media_dir)
+    # Assemble where the probe can read it: inside the media folder locally (then a rename), a temporary folder
+    # on the hosted demo.
+    work = Path(tempfile.mkdtemp(prefix="limber-upload-")) if fs.remote else fs.path(f".incoming/{upload_id}")
+    work.mkdir(parents=True, exist_ok=True)
+    assembled = work / "assembled"
     digest = hashlib.sha256()
     with assembled.open("wb") as out:
         for n in range(st.total_parts):
-            chunk = (folder / f"part-{n}").read_bytes()
+            chunk = fs.get_bytes(f"{_incoming(upload_id)}part-{n}")
             digest.update(chunk)
             out.write(chunk)
     try:
@@ -167,16 +170,14 @@ def finish(store: SessionStore, media_dir: Path, patient_id: str, upload_id: str
         media = Media(id=media_id, patient_id=patient_id, kind=up["kind"], ext=info.ext, container=info.container,
                       codec=info.codec, bytes=info.bytes, duration=info.duration, width=info.width, height=info.height,
                       sha256=up["sha256"], caption=caption, warned=bool(reasons), message_id=message_id)
-        target = media_path(media_dir, media)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        os.chmod(target.parent, 0o700)
-        os.chmod(assembled, 0o600)
-        assembled.replace(target)
+        fs.put_file(media_rel(media), assembled)
         stored = store.media_add(media)
         store.portal_audit_add("upload_stored", patient_id, None, up["kind"])
         return stored
     finally:
-        shutil.rmtree(folder, ignore_errors=True)
+        fs.delete_prefix(_incoming(upload_id))
+        if fs.remote:
+            shutil.rmtree(work, ignore_errors=True)
         store.upload_delete(upload_id)
 
 
@@ -185,7 +186,7 @@ def clean_expired(store: SessionStore, media_dir: Path) -> int:
     removed = 0
     for up in store.uploads_open():
         if now >= up["expires_at"]:
-            shutil.rmtree(_incoming(media_dir, up["id"]), ignore_errors=True)
+            files.at(media_dir).delete_prefix(_incoming(up["id"]))
             store.upload_delete(up["id"])
             removed += 1
     return removed
@@ -204,10 +205,7 @@ def get_media(store: SessionStore, patient_id: str, media_id: str) -> Optional[M
 
 
 def _remove_file(media_dir: Path, media: Media) -> None:
-    try:
-        media_path(media_dir, media).unlink()
-    except FileNotFoundError:
-        pass
+    files.at(media_dir).delete(media_rel(media))
 
 
 def delete_media(store: SessionStore, media_dir: Path, patient_id: Optional[str], media_id: str, by: str) -> bool:
@@ -256,22 +254,20 @@ def run_retention(store: SessionStore, media_dir: Path) -> Dict[str, int]:
 
 def reconcile(store: SessionStore, media_dir: Path) -> Dict[str, int]:
     """Rows without a file are marked missing; files without a row are removed."""
-    media_dir = Path(media_dir)
-    known = {}
+    fs = files.at(media_dir)
+    stored = set(fs.list(""))
+    known = set()
     rows_without_file = 0
     for m in store.media_list(live_only=True):
-        p = media_path(media_dir, m)
-        known[p] = m
-        if not p.exists():
+        rel = media_rel(m)
+        known.add(rel)
+        if rel not in stored:
             store.media_update(m.id, deleted_at=store.clock().isoformat(), deleted_by="missing")
             rows_without_file += 1
     files_without_row = 0
-    if media_dir.exists():
-        for patient_dir in media_dir.iterdir():
-            if patient_dir.name.startswith(".") or not patient_dir.is_dir():
-                continue
-            for f in patient_dir.iterdir():
-                if f.is_file() and f not in known:
-                    f.unlink()
-                    files_without_row += 1
+    for rel in stored:                      # a patient's own files only: not uploads in progress, not attachments
+        parts = PurePosixPath(rel).parts
+        if len(parts) == 2 and not parts[0].startswith(".") and rel not in known and not rel.endswith(".tmp"):
+            fs.delete(rel)
+            files_without_row += 1
     return {"rows_without_file": rows_without_file, "files_without_row": files_without_row}
