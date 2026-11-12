@@ -1,4 +1,5 @@
-# What `vercel deploy` uploads to build Dockerfile.vercel. Keep secrets, records and local tooling out.
+# What a `vercel deploy` from the repository root would upload. The hosted demo deploys with
+# scripts/deploy_vercel.sh, which uses deploy/vercel/.vercelignore; this one keeps secrets out either way.
 .env
 .env.*
 data/

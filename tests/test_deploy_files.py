@@ -93,18 +93,14 @@ def test_railway_builds_this_dockerfile_with_one_replica():
     assert cfg["deploy"]["healthcheckPath"] == "/api/health" and cfg["deploy"]["numReplicas"] == 1
 
 
-# ---- the hosted demo on Vercel (container image) ----------------------------------------------------------
+# ---- the hosted demo on Vercel (Python functions since 020 slice D) ------------------------------------------
 
-def test_vercel_image_is_the_demo_and_keeps_the_safety_properties():
-    text = (DEPLOY.parent / "Dockerfile.vercel").read_text()
-    assert re.search(r"^USER limber", text, re.M) and "entrypoint.sh" in text
-    assert "COPY --from=caddy:2" in text and "sha256sum -c" in text and "fetch_portal_assets.py" in text
-    assert re.search(r"^ENV [^\n]*(\\\n[^\n]*)*LIMBER_DEMO=1", text, re.M) and "PORT=8080" in text   # not 80: the user isn't root
-    assert "LIMBER_DEMO_DB=/tmp/limber/demo.db" in text                              # the image's disk is temporary
-    for forbidden in ("PASSWORD=", "PTASSIST_PORTAL_KEY=", "LIMBER_ANTHROPIC_API_KEY=", "secrets/"):
-        assert forbidden not in text, forbidden
-    # torch in its own layer: the registry refuses a compressed layer over 500 MB
-    assert re.search(r"RUN pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision\s*\n", text)
+def test_no_container_file_switches_vercel_to_its_container_runtime():
+    """A Dockerfile.vercel at the root makes Vercel build a container, which keeps one record per instance and
+    signs people out (020). The hosted demo runs as Python functions from deploy/vercel/."""
+    root = DEPLOY.parent
+    assert not (root / "Dockerfile.vercel").exists() and not (root / "Containerfile.vercel").exists()
+    assert (DEPLOY / "vercel" / "index.py").exists() and (DEPLOY / "vercel" / "requirements.txt").exists()
 
 
 def test_vercel_upload_leaves_secrets_and_records_behind():
