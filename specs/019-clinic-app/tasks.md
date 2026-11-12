@@ -30,16 +30,16 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 - [x] T009 Route-table test (SC-004): every route declares its role; `rivera` gets 404 for another therapist's
       patient, plan, visit or file on every route; admin-only accounts get 403 on clinical routes
 - [x] T010 The portal's service worker never handles `/therapist` (FR-016), with a test
-- [ ] T011 `interfaces/cli.py clinic` (port 8502); the hosted demo mounts the clinic at `/therapist` in
+- [x] T011 `interfaces/cli.py clinic` (port 8502); the hosted demo mounts the clinic at `/therapist` in
       `interfaces/vercel_app.py`; importing the clinic loads nothing heavy (test); deploy and check
 
 ## Slice 2: Inbox (Story 2; FR-007 to FR-009) → milestone M2
 
-- [ ] T012 `src/clinic/inbox.py`: "Needs you" (unread by plan, reschedule requests, red flags), plan summary,
+- [x] T012 `src/clinic/inbox.py`: "Needs you" (unread by plan, reschedule requests, red flags), plan summary,
       send-anyway as a confirm round trip, the draft guard, read-only precedence, voice-note states, with tests
-- [ ] T013 Routes and page: list, thread (`messages.thread(viewer="therapist", mark_read=False)`), explicit read,
+- [x] T013 Routes and page: list, thread (`messages.thread(viewer="therapist", mark_read=False)`), explicit read,
       reply, attachments, voice notes, remove, messaging switch, reschedule answer
-- [ ] T014 AI draft, withheld notice, mark handled by phone, and AI labels, with tests
+- [x] T014 AI draft, withheld notice, mark handled by phone, and AI labels, with tests
 - [ ] T015 Test: opening the Inbox marks nothing read (FR-007); deploy and check
 
 ## Slice 3a: Patients (Story 3)

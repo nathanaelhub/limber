@@ -73,6 +73,15 @@ def refused(account: Account, classes: str) -> str:
     return page(account, "Not part of your role", content, classes, width="mid")
 
 
+def not_found(account: Optional[Account], classes: str) -> str:
+    content = ('<div class="stack tight"><h1>Not found</h1>'
+               '<p class="dim">This is not on your caseload, or it was removed.</p>'
+               f'<p><a href="{nav.home(account)}">Back to your start page</a></p></div>')
+    if account is None:
+        return document("Not found", f'<main class="page mid">{content}</main>', classes)
+    return page(account, "Not found", content, classes, width="mid")
+
+
 def settings(account: Account, prefs: dict, classes: str) -> str:
     from src.clinic.prefs import HINTS, LABELS
     rows = []
