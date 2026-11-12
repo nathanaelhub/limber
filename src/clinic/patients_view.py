@@ -117,7 +117,9 @@ def _tabs(pid: str, active: str, unread: int, ai: bool) -> str:
 
 def patient_pane(pid: str, subtitle: str, tab: str, unread: int, body: str, ai: bool = False) -> str:
     return (f'<main class="pane" id="main"><div class="pane-head"><div class="stack tight"><h1>{_e(pid)}</h1>'
-            f'<p class="dim">{_e(subtitle)}</p></div><span class="sp"></span></div>{_tabs(pid, tab, unread, ai)}'
+            f'<p class="dim">{_e(subtitle)}</p></div><a class="btn quiet small sp" href="/therapist/review/{_e(pid)}/trends">'
+            f'Review</a><a class="btn quiet small" href="/therapist/sessions?patient={_e(pid)}">Sessions</a></div>'
+            f'{_tabs(pid, tab, unread, ai)}'
             f'<div class="pane-body roomy">{body}</div></main>')
 
 

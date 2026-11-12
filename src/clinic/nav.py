@@ -32,7 +32,7 @@ PAGES = (
     Page("video", "Video analysis", "/video", "therapist"),
     Page("sessions", "Sessions", "/sessions", "therapist", online=True),
     Page("logs", "Observation logs", "/logs", "therapist", online=True),
-    Page("review", "Review", "/review", "therapist"),
+    Page("review", "Review", "/review", "therapist", online=True),
     Page("tracker", "Tracker", "/tracker", "therapist"),
     Page("how", "How it works", "/how-it-works", "therapist"),
     Page("people", "People", "/people", "admin", online=True),

@@ -37,6 +37,7 @@ from src.clinic import inbox as clinic_inbox, inbox_view  # noqa: E402
 from src.clinic import assist_view, patients as clinic_patients, patients_view  # noqa: E402
 from src.clinic import people as clinic_people, schedule as clinic_schedule, schedule_people_view  # noqa: E402
 from src.clinic import records as clinic_records, records_view  # noqa: E402
+from src.clinic import review as clinic_review, review_view  # noqa: E402
 from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
@@ -846,6 +847,158 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/logs/{session_id:int}", logs_page, "therapist")
     clinic_route("/logs/{session_id:int}/reps.csv", log_download("csv"), "therapist", kind="api")
     clinic_route("/logs/{session_id:int}/log.json", log_download("json"), "therapist", kind="api")
+
+    # ------------------------------------------------------------------ Review (slice 5b)
+
+    def review_index(ctx: Ctx) -> Response:
+        patients = [p.id for p in ctx.store.list_patients() if not p.is_builtin]
+        return html(review_view.page(ctx.account, ctx.classes, "Review", review_view.picker(patients)))
+
+    def review_section(ctx: Ctx) -> Response:
+        from src.ptlog import entries as entry_rules, instruments, questionnaires as qrules, review as ptreview, views
+        from src.portal import uploads
+        store, q = ctx.store, ctx.request.query_params
+        pid = own_real_patient(store, ctx.request.path_params["patient_id"]).id
+        section = ctx.request.path_params["section"]
+        if section not in clinic_review.SECTION_KEYS:
+            raise NotYours()
+        period = clinic_review.period(q.get("period"))
+        if section == "trends":
+            names = ptreview.exercise_names(store, pid)
+            exercise = q.get("exercise") if q.get("exercise") in names else (names[0] if names else None)
+            trend = ptreview.trend(store, pid, exercise, period) if exercise else None
+            logged = ptreview.self_reported_count(store, pid, exercise, period) if trend and not trend.points else 0
+            body = review_view.trends(pid, names, exercise, period, trend, logged)
+        elif section == "flags":
+            body = review_view.flags(pid, period, ptreview.flags_for(store, pid, period))
+        elif section == "compare":
+            choices = clinic_review.session_choices(store, pid)
+            if len(choices) < 2:
+                body = review_view.compare(pid, choices, None, None, [], None, None, None)
+            else:
+                a = clinic_review.own_session(store, pid, q.get("a") or choices[1][0])
+                b = clinic_review.own_session(store, pid, q.get("b") or choices[0][0])
+                shared = clinic_review.shared_exercises(store, a, b)
+                exercise = q.get("exercise") if q.get("exercise") in shared else (shared[0] if len(shared) > 1 else None)
+                comparison, error = None, None
+                try:
+                    comparison = ptreview.compare(store, a, b, exercise)
+                except PTLogError as err:
+                    error = str(err)
+                body = review_view.compare(pid, choices, a, b, shared, exercise, comparison, error)
+        elif section == "session":
+            choices = clinic_review.session_choices(store, pid)
+            sid = clinic_review.own_session(store, pid, q.get("session") or choices[0][0]) if choices else None
+            body = review_view.session(pid, choices, sid, ptreview.session_review_view(store, sid) if sid else None)
+        elif section == "goals":
+            scopes = clinic_review.threshold_scopes(store, pid)
+            scope = q.get("scope") if q.get("scope") in scopes else clinic_review.WHOLE_PATIENT
+            exercise = None if scope == clinic_review.WHOLE_PATIENT else scope
+            effective, inherited, _overrides, keys = clinic_review.threshold_context(store, pid, exercise)
+            body = review_view.goals(pid, scopes, scope, views.threshold_rows(effective, inherited, keys),
+                                     store.threshold_history(pid, limit=50), store.list_goals(pid),
+                                     ptreview.exercise_names(store, pid))
+        elif section == "from-patient":
+            groups = clinic_review.questionnaire_groups(
+                store.entries(pid, "questionnaire", newest_first=True, limit=200), instruments.load().by_key)
+            chosen, detail = {}, {}
+            for g in groups:
+                wanted = q.get(f"answers_{g['key']}")
+                entry = next((e for e in g["answers"] if str(e.id) == wanted), g["answers"][0])
+                chosen[g["key"]] = entry.id
+                detail[g["key"]] = qrules.answer_rows(entry.payload.get("snapshot") or {})
+            checkins = store.entries(pid, "checkin", newest_first=True, limit=200)
+            body = review_view.from_patient(
+                pid, uploads.list_media(store, pid), groups, chosen, detail, clinic_review.diary_rows(store, pid),
+                store.diary_enabled(pid), store.entries(pid, "medication", newest_first=True, limit=200),
+                store.medication_list(pid),
+                entry_rules.nightly(store.entries(pid, "sleep", newest_first=True, limit=200)),
+                clinic_review.pain_flags(store, pid), checkins, entry_rules.pain_series(checkins))
+        else:
+            from src.ptlog.exports import to_review_report
+            summary = ptreview.review_summary(store, pid, period)
+            body = review_view.export(pid, period, bool(summary.questionnaires), to_review_report(summary))
+        content = review_view.frame(pid, section, clinic_patients.header(store, pid, clock().date()), body)
+        return html(review_view.page(ctx.account, ctx.classes, f"Review · {pid}", content))
+
+    def review_download(ctx: Ctx) -> Response:
+        from src.ptlog import review as ptreview
+        from src.ptlog.exports import to_review_csv, to_review_report
+        from src.ptlog.exports.review_csv import to_questionnaire_csv
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        kind = ctx.request.path_params["kind"]
+        period = clinic_review.period(ctx.request.query_params.get("period"))
+        summary = ptreview.review_summary(ctx.store, pid, period)
+        names = clinic_review.export_names(pid, period, summary.generated_at)
+        made = {"report": (to_review_report, names["report"], "text/plain"),
+                "csv": (to_review_csv, names["csv"], "text/csv"),
+                "questionnaires": (to_questionnaire_csv, names["questionnaires"], "text/csv")}.get(kind)
+        if made is None:
+            raise NotYours()
+        return Response(made[0](summary), media_type=made[2], headers={
+            "Content-Disposition": f'attachment; filename="{made[1]}"', "Cache-Control": "no-store"})
+
+    def review_api(action: str) -> Callable[[Ctx], Response]:
+        def run(ctx: Ctx) -> Response:
+            from src.portal import uploads
+            from src.ptlog import views
+            store, body, params = ctx.store, _body(ctx), ctx.request.path_params
+            pid = own_real_patient(store, params["patient_id"]).id
+            if action == "session-review":
+                sid = clinic_review.own_session(store, pid, params["session_id"])
+                store.set_review(sid, _text(body, "next_step") or "", _text(body, "notes") or "")
+            elif action in ("thresholds", "thresholds-reset"):
+                scope = _text(body, "scope")
+                if scope not in clinic_review.threshold_scopes(store, pid):
+                    return json_response({"error": "Choose what the thresholds apply to."}, 400)
+                exercise = None if scope == clinic_review.WHOLE_PATIENT else scope
+                if action == "thresholds-reset":
+                    (store.reset_exercise_thresholds(pid, exercise) if exercise else store.reset_patient_thresholds(pid))
+                    return json_response({"ok": True, "notice": "Overrides removed; the inherited values apply."})
+                effective, inherited, overrides, keys = clinic_review.threshold_context(store, pid, exercise)
+                rows = views.threshold_rows(effective, inherited, keys)
+                changed = clinic_review.thresholds_to_store(clinic_review.threshold_values(body, rows), inherited,
+                                                            overrides)
+                (store.set_exercise_thresholds(pid, exercise, changed) if exercise
+                 else store.set_patient_thresholds(pid, changed))
+                return json_response({"ok": True, "notice": clinic_review.saved_message(changed)})
+            elif action == "goal":
+                clinic_review.update_goal(store, pid, _text(body, "exercise") or "", body.get("target_rom"),
+                                          body.get("target_reps"))
+            elif action in ("clip-reviewed", "clip-delete"):
+                clip = clinic_review.own_clip(store, pid, params["media_id"])
+                if action == "clip-reviewed":
+                    uploads.mark_reviewed(store, clip.id)
+                else:
+                    uploads.delete_media(store, media_dir, pid, clip.id, by="therapist")
+            elif action == "remove-note":
+                entry = clinic_review.own_entry(store, pid, params["entry_id"])
+                store.entry_remove_note(entry.id)
+            return ok()
+        return run
+
+    def clip_file(ctx: Ctx) -> Response:
+        from src.portal import uploads
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        m = clinic_review.own_clip(ctx.store, pid, ctx.request.path_params["media_id"])
+        if m.deleted_at is not None:
+            raise NotYours()
+        served = media_files.at(media_dir).response(uploads.media_rel(m), web_common.media_mime(m), f"clip.{m.ext}",
+                                                    {"Cache-Control": "no-store"})
+        if served is None:
+            raise NotYours()
+        return served
+
+    rv = "/api/review/{patient_id}"
+    clinic_route("/review", review_index, "therapist")
+    clinic_route("/review/{patient_id}/{section}", review_section, "therapist")
+    clinic_route("/review/{patient_id}/export/{kind}", review_download, "therapist", kind="api")
+    clinic_route("/files/{patient_id}/clips/{media_id}", clip_file, "therapist", kind="api")
+    for path, action in (("/sessions/{session_id:int}/review", "session-review"), ("/thresholds", "thresholds"),
+                         ("/thresholds/reset", "thresholds-reset"), ("/goals", "goal"),
+                         ("/clips/{media_id}/reviewed", "clip-reviewed"), ("/clips/{media_id}/delete", "clip-delete"),
+                         ("/checkins/{entry_id:int}/remove-note", "remove-note")):
+        clinic_route(rv + path, review_api(action), "therapist", methods=("POST",), kind="api")
 
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")
