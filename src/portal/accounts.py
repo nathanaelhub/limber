@@ -278,12 +278,23 @@ def assign(store: SessionStore, patient_id: str, therapist_id: int) -> None:
 
 def add_patient(store: SessionStore, therapist: Optional[Account], patient_id: str, label: Optional[str] = None,
                 notes: Optional[str] = None):
-    """Register a patient and put them in this therapist's caseload (no account: an open installation)."""
-    patient = store.add_patient(patient_id, label=label, notes=notes)
+    """Register a patient and put them in this therapist's caseload (no account: an open installation).
+
+    On a store limited to a caseload (the clinic app), the new patient is made visible first: registering reads
+    the patient back and opens its first plan, and both go through the caseload check (feature 019)."""
+    from src.ptlog.privacy import validate_patient_id
+    pid = validate_patient_id(patient_id)
+    widened = store.visible is not None and pid not in store.visible
+    if widened:
+        store.visible.add(pid)
+    try:
+        patient = store.add_patient(pid, label=label, notes=notes)
+    except Exception:
+        if widened:
+            store.visible.discard(pid)
+        raise
     if therapist is not None and therapist.is_therapist:
         store.caseload_set(patient.id, therapist.id)
-        if store.visible is not None:
-            store.visible.add(patient.id)
     return patient
 
 

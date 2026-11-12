@@ -347,3 +347,24 @@ html,body{margin:0;background:#FAF8F4}
 .lb .btn[disabled]{color:var(--muted-text)}
 .lb .menu button{color:var(--ink)}
 .reply.ai textarea{min-height:150px}
+/* Patients (slice 3a) */
+.warn-text{color:var(--warning)}
+.l2.warn-text{color:var(--warning);font-weight:700}
+.btn.full{width:100%}
+.pad-top{padding:16px 8px 0}
+.pad-bottom{padding-bottom:12px}
+.narrow-body{max-width:640px}
+.pane-body.roomy{gap:32px}
+.inline-form{display:inline-flex;align-items:center;gap:8px}
+.inline-form .error-text{flex-basis:100%}
+details.edit{margin-top:8px}
+details.edit>summary{list-style:none;cursor:pointer;width:max-content}
+details.edit>summary::-webkit-details-marker{display:none}
+details.edit[open]>form,details.edit[open]>form+form{margin-top:12px}
+details.edit>form{padding:16px;border:1px solid var(--line);border-radius:var(--radius-card);background:var(--background)}
+.field.w-wide{min-width:240px;flex:1}
+.danger-zone .btn{background:transparent;border-color:currentColor;color:var(--warning)}
+.big-code{font-size:var(--fs-figure);font-weight:800;letter-spacing:.08em}
+.lines>li.top{align-items:flex-start}
+select.input[multiple]{height:auto;min-height:140px}
+.inline-form.wide{flex-basis:100%;flex-direction:column;align-items:stretch}

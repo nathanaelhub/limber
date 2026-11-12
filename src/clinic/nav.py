@@ -25,7 +25,7 @@ class Page:
 
 PAGES = (
     Page("inbox", "Inbox", "/inbox", "therapist", online=True),
-    Page("patients", "Patients", "/patients", "therapist"),
+    Page("patients", "Patients", "/patients", "therapist", online=True),
     Page("schedule", "Schedule", "/schedule", "therapist"),
     Page("dashboard", "Dashboard", "/dashboard", "therapist"),
     Page("live", "Live session", "/live", "therapist"),
