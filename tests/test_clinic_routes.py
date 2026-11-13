@@ -103,9 +103,14 @@ def test_every_request_store_is_limited_to_the_caseload(tmp_db, fake_clock):
     assert s.require(made["sam"], "therapist") == 403 and s.require(made["sam"], "admin") is None
 
 
-def test_unbuilt_pages_say_so_and_list_what_works(tmp_db, fake_clock):
+def test_every_page_in_the_menus_is_online(tmp_db, fake_clock):
+    """019 slice 7: with the live session, every Streamlit page has a clinic equivalent (SC-003)."""
+    from src.clinic import nav
+    assert [p.key for p in nav.PAGES if not p.online] == []
     seed(tmp_db, fake_clock)
     with client(tmp_db, fake_clock) as c:
         sign_in(c)
-        page = c.get("/therapist/live").text
-        assert "not online yet" in page and 'href="/therapist/settings"' in page
+        for page in nav.PAGES:
+            r = c.get(page.href)
+            assert r.status_code == 200 and "not online yet" not in r.text, page.key
+

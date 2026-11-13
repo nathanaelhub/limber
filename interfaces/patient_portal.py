@@ -920,8 +920,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     current = session.state()
                     if over > 0 and reps_when_due is None:
                         reps_when_due = current.get("rep_count", 0)
-                    if over > 0 and (over > 15 or current.get("phase") == "neutral"
-                                     or current.get("rep_count", 0) > reps_when_due):
+                    if frames.segment_due(over, current.get("phase"), current.get("rep_count", 0), reps_when_due):
                         # End this connection as a rep completes, never mid-rep (at most 15 s late), and keep the
                         # session running; the browser resumes it on a new connection.
                         await ws.send_json(await run_in_threadpool(session.detach))

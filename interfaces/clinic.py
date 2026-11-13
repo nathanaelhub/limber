@@ -12,6 +12,7 @@ opens one store that is limited to the signed-in person's patients before any ha
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -27,7 +28,8 @@ from starlette.applications import Starlette  # noqa: E402
 from starlette.concurrency import run_in_threadpool  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import HTMLResponse, RedirectResponse, Response  # noqa: E402
-from starlette.routing import Mount, Route  # noqa: E402
+from starlette.routing import Mount, Route, WebSocketRoute  # noqa: E402
+from starlette.websockets import WebSocket, WebSocketDisconnect  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
 from interfaces import web_common  # noqa: E402
@@ -40,6 +42,8 @@ from src.clinic import records as clinic_records, records_view  # noqa: E402
 from src.clinic import review as clinic_review, review_view  # noqa: E402
 from src.clinic import tracker as clinic_tracker, tracker_view  # noqa: E402
 from src.clinic import howto_view, video as clinic_video, video_view  # noqa: E402
+from src.clinic import live as clinic_live, live_view  # noqa: E402
+from src.portal import frames  # noqa: E402
 from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
@@ -50,6 +54,8 @@ from src.ptlog.models import (Account, PatientNotFoundError, PlanNotFound, PTLog
 from src.ptlog.store import SessionStore, default_db_path  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "clinic_static"
+LIVE_IDLE_SECONDS = 60          # no message for this long ends a live session
+LIVE_MAX_SECONDS = 60 * 60      # one connection's longest run
 PREFIX = signin.PREFIX
 
 
@@ -91,7 +97,7 @@ class ClinicRoute:
 def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                allowed_origins: Iterable[str] = (), clock: Callable[[], datetime] = datetime.now,
                static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False,
-               portal_url: str = "http://localhost:8600") -> Starlette:
+               portal_url: str = "http://localhost:8600", ws_segment_seconds: Optional[float] = None) -> Starlette:
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
     origins = {o.rstrip("/") for o in allowed_origins}
@@ -1093,6 +1099,140 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/video", video_page, "therapist")
     clinic_route("/api/video", video_analyze, "therapist", methods=("POST",), kind="api",
                  max_body=clinic_video.MAX_BODY)
+
+    # ------------------------------------------------------------------ Live session (slice 7)
+
+    def live_page(ctx: Ctx) -> Response:
+        patients = [p.id for p in ctx.store.list_patients() if not p.is_builtin]
+        chosen = ctx.request.query_params.get("patient")
+        return html(live_view.page(ctx.account, ctx.classes, patients, chosen if chosen in patients else None,
+                                   clinic_video.exercises()))
+
+    def _staff_for(token: Optional[str]) -> Optional[Account]:
+        with open_store() as store:
+            account = signin.account_for(store, token, clock)
+        return account if signin.require(account, "therapist") is None else None
+
+    def _may_see(account: Account, patient_id: Any) -> bool:
+        if not isinstance(patient_id, str):
+            return False
+        with open_store() as store:
+            ptaccounts.restrict(store, account)
+            try:
+                own_real_patient(store, patient_id)
+            except NotYours:
+                return False
+        return True
+
+    async def live_socket(ws: WebSocket):
+        """The therapist's browser sends body points; the engine answers with what it sees (019 slice 7)."""
+        token = ws.cookies.get(signin.COOKIE)
+        origin_ok = (ws.headers.get("origin") or "").rstrip("/") in origins
+        account = await run_in_threadpool(_staff_for, token) if origin_ok else None
+        if account is None:                                     # refused before the connection is accepted
+            await ws.close(code=1008)
+            return
+        await ws.accept()
+        session, patient_id, bad, accepted = None, None, 0, 0
+        last_sent, last_sent_at, started_at = None, 0.0, asyncio.get_running_loop().time()
+        segment_start, reps_when_due = clock(), None
+
+        async def send_state(state, force=False):
+            nonlocal last_sent, last_sent_at
+            if state is None:
+                return
+            now = asyncio.get_running_loop().time()
+            key = tuple(str(state.get(k)) for k in ("rep_count", "phase", "exercise_key", "target_reps", "notice",
+                                                     "form_status", "seen"))
+            if force or key != last_sent or now - last_sent_at >= 0.2:
+                last_sent, last_sent_at = key, now
+                await ws.send_json(state)
+
+        async def refuse(message: str, reason: str):
+            await ws.send_json({"type": "refused", "reason": reason, "message": message})
+            await ws.close(code=1000)
+
+        try:
+            while True:
+                try:
+                    text = await asyncio.wait_for(ws.receive_text(), timeout=LIVE_IDLE_SECONDS)
+                except asyncio.TimeoutError:
+                    if session is not None:
+                        await ws.send_json(await run_in_threadpool(session.stop))
+                    await ws.close(code=1000)
+                    return
+                try:
+                    message = frames.parse(text, clinic_live.MESSAGE_TYPES)
+                    kind = message["type"]
+                    if kind in ("start", "resume"):
+                        if session is None:
+                            patient_id = message.get("patient_id")
+                            if not await run_in_threadpool(_may_see, account, patient_id):
+                                await refuse("That patient is not on your caseload.", "not_found")
+                                return
+                            try:
+                                if kind == "start":
+                                    session = await run_in_threadpool(lambda: clinic_live.ClinicLiveSession.start(
+                                        db_path, patient_id, message.get("exercise"), message.get("target_reps"),
+                                        message.get("pose_model"), clock=clock))
+                                else:
+                                    session = await run_in_threadpool(lambda: clinic_live.ClinicLiveSession.resume(
+                                        db_path, patient_id, message.get("session_id"), message.get("pose_model"),
+                                        clock=clock))
+                            except clinic_live.LiveRefused as refused:
+                                await refuse(str(refused), refused.reason)
+                                return
+                        await send_state(session.state(), force=True)
+                    elif session is None:
+                        raise frames.FrameError("start first")
+                    elif kind == "frame":
+                        state = await run_in_threadpool(session.handle_frame, message)
+                        if state is not None:
+                            accepted += 1
+                            await send_state(state)
+                            if accepted % 15 == 0 and await run_in_threadpool(_staff_for, token) is None:
+                                await ws.send_json(await run_in_threadpool(session.interrupt, "signed_out"))
+                                await ws.close(code=1008)
+                                return
+                    elif kind == "switch":
+                        await send_state(await run_in_threadpool(session.switch, message.get("exercise"),
+                                                                 message.get("target_reps")), force=True)
+                    elif kind == "reset":
+                        await send_state(await run_in_threadpool(session.reset), force=True)
+                    elif kind == "target":
+                        await send_state(await run_in_threadpool(session.set_target, message.get("target_reps")),
+                                         force=True)
+                    elif kind == "stop":
+                        await ws.send_json(await run_in_threadpool(session.stop))
+                        await ws.close(code=1000)
+                        return
+                except frames.FrameError:
+                    bad += 1
+                    if bad >= 10:
+                        if session is not None:
+                            await run_in_threadpool(session.interrupt, "bad_frames")
+                        await ws.close(code=1008)
+                        return
+                if session is not None and ws_segment_seconds:
+                    over = (clock() - segment_start).total_seconds() - ws_segment_seconds
+                    current = session.state()
+                    if over > 0 and reps_when_due is None:
+                        reps_when_due = current.get("rep_count", 0)
+                    if frames.segment_due(over, current.get("phase"), current.get("rep_count", 0), reps_when_due):
+                        await ws.send_json(await run_in_threadpool(session.detach))
+                        await ws.close(code=1000)
+                        return
+                if session is not None and asyncio.get_running_loop().time() - started_at > LIVE_MAX_SECONDS:
+                    await ws.send_json(await run_in_threadpool(session.stop))
+                    await ws.close(code=1000)
+                    return
+        except WebSocketDisconnect:
+            if session is not None:
+                await run_in_threadpool(session.interrupt, "clinic_disconnected")
+
+    clinic_route("/live", live_page, "therapist")
+    registry.append(ClinicRoute(PREFIX + "/ws/live", "therapist", ("WS",), "socket", "ws.live"))
+    routes.append(WebSocketRoute(PREFIX + "/ws/live", live_socket))
 
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")
