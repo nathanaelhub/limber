@@ -35,7 +35,7 @@ def test_every_route_declares_a_known_need(tmp_db, fake_clock):
 def test_only_the_sign_in_routes_health_and_files_are_public(tmp_db, fake_clock):
     public = {r.path for r in _app(tmp_db, fake_clock).state.registry if r.need == "public"}
     assert public == {"/therapist/", "/therapist/signin", "/therapist/api/login", "/therapist/api/health",
-                      "/therapist/static"}
+                      "/therapist/static", "/therapist/static/vendor"}
 
 
 def test_a_route_without_a_known_need_cannot_be_added():
@@ -107,5 +107,5 @@ def test_unbuilt_pages_say_so_and_list_what_works(tmp_db, fake_clock):
     seed(tmp_db, fake_clock)
     with client(tmp_db, fake_clock) as c:
         sign_in(c)
-        page = c.get("/therapist/how-it-works").text
+        page = c.get("/therapist/live").text
         assert "not online yet" in page and 'href="/therapist/settings"' in page

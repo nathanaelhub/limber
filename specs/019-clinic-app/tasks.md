@@ -84,10 +84,10 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 6: Video analysis and How it works (Story 5, scenario 3; FR-014) → milestone M4
 
-- [ ] T028 `src/clinic/video.py`: count and score browser body points with the engine's rules (a `source` parameter
+- [x] T028 `src/clinic/video.py`: count and score browser body points with the engine's rules (a `source` parameter
       on `LiveSession`); `video.js` runs MoveNet over the clip and sends one request; results, rep chart, downloads
-- [ ] T029 How it works, without the placeholder images or the made-up formula
-- [ ] T030 **G2** comparison: MoveNet and YOLO11 on the three Ultralytics clips (rep count, range of motion, form
+- [x] T029 How it works, without the placeholder images or the made-up formula
+- [x] T030 **G2** comparison: MoveNet and YOLO11 on the three Ultralytics clips (rep count, range of motion, form
       score), a regression test on saved fixtures, the owner's decision
 
 ## Slice 7: Live session (Story 5, scenario 4; FR-013)

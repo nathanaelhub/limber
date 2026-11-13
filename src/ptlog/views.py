@@ -266,8 +266,8 @@ def goal_line(goal, rom_progress_pct) -> Optional[str]:
     return "Goal: " + " | ".join(parts)
 
 
-ORIGIN_NOTE = ("Home and clinic sessions use different pose models, so their numbers are not compared "
-               "with each other.")
+ORIGIN_NOTE = ("Sessions recorded in different ways (in the clinic, by browser pose from a video, or at home) use "
+               "different pose models, so their numbers are not compared with each other.")
 
 
 def trend_summary_lines(trend) -> List[str]:
