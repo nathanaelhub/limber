@@ -80,7 +80,7 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 5c: Tracker (Story 5)
 
-- [ ] T027 Roster, queue, adherence (line filter moved), discharged, export, installation thresholds; deploy and check
+- [x] T027 Roster, queue, adherence (line filter moved), discharged, export, installation thresholds; deploy and check
 
 ## Slice 6: Video analysis and How it works (Story 5, scenario 3; FR-014) → milestone M4
 

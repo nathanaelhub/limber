@@ -38,6 +38,7 @@ from src.clinic import assist_view, patients as clinic_patients, patients_view  
 from src.clinic import people as clinic_people, schedule as clinic_schedule, schedule_people_view  # noqa: E402
 from src.clinic import records as clinic_records, records_view  # noqa: E402
 from src.clinic import review as clinic_review, review_view  # noqa: E402
+from src.clinic import tracker as clinic_tracker, tracker_view  # noqa: E402
 from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
@@ -999,6 +1000,72 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                          ("/clips/{media_id}/reviewed", "clip-reviewed"), ("/clips/{media_id}/delete", "clip-delete"),
                          ("/checkins/{entry_id:int}/remove-note", "remove-note")):
         clinic_route(rv + path, review_api(action), "therapist", methods=("POST",), kind="api")
+
+    # ------------------------------------------------------------------ Tracker (slice 5c)
+
+    def tracker_page(ctx: Ctx) -> Response:
+        from src.ptlog import programs, thresholds as ptthresholds, tracker as pttracker, views
+        store, q = ctx.store, ctx.request.query_params
+        section = ctx.request.path_params.get("section", "roster")
+        if section not in clinic_tracker.SECTION_KEYS:
+            raise NotYours()
+        if section == "roster":
+            sort = q.get("sort") if q.get("sort") in dict(clinic_tracker.SORTS) else "attention"
+            filters = clinic_tracker.program_filters(programs.list_programs())
+            program = q.get("program") if q.get("program") in dict(filters) else "all"
+            only = q.get("only") == "1"
+            rows = pttracker.roster(store, sort=sort, program=None if program == "all" else program,
+                                    needs_attention=only)
+            body = tracker_view.roster(rows, sort, program, only, filters)
+        elif section == "queue":
+            body = tracker_view.queue(pttracker.queue(store), store.get_adherence_threshold())
+        elif section == "adherence":
+            patients = [p.id for p in store.list_patients() if not p.is_builtin]
+            chosen = q.get("patient") or (patients[0] if patients else None)
+            adh, line = None, ""
+            if chosen is not None:
+                own_real_patient(store, chosen)
+                adh = pttracker.adherence_for(store, chosen)
+                line = views.adherence_threshold_line(store.effective_thresholds(chosen))
+            body = tracker_view.adherence(patients, chosen, adh, line)
+        elif section == "discharged":
+            body = tracker_view.discharged(store.discharged_patients())
+        elif section == "export":
+            body = tracker_view.export(len(pttracker.roster(store)))
+        else:
+            effective = ptthresholds.resolve(None, store.get_installation_thresholds())
+            body = tracker_view.settings(views.threshold_rows(effective), store.threshold_history(None, limit=50),
+                                         ctx.account.is_admin)
+        return html(tracker_view.page(ctx.account, ctx.classes, tracker_view.frame(section, body)))
+
+    def tracker_roster_csv(ctx: Ctx) -> Response:
+        from src.ptlog import tracker as pttracker
+        from src.ptlog.exports import to_roster_csv
+        now = clock()
+        return Response(to_roster_csv(pttracker.roster(ctx.store), now), media_type="text/csv", headers={
+            "Content-Disposition": f'attachment; filename="roster_{now:%Y%m%d_%H%M%S}.csv"', "Cache-Control": "no-store"})
+
+    def tracker_thresholds(action: str) -> Callable[[Ctx], Response]:
+        def run(ctx: Ctx) -> Response:
+            from src.ptlog import thresholds as ptthresholds, views
+            store = ctx.store
+            if action == "restore":
+                store.restore_builtin_thresholds()
+                return json_response({"ok": True, "notice": "Built-in defaults restored."})
+            stored = store.get_installation_thresholds()
+            rows = views.threshold_rows(ptthresholds.resolve(None, stored))
+            changed = clinic_tracker.installation_to_store(clinic_review.threshold_values(_body(ctx), rows), stored)
+            store.set_installation_thresholds(changed)
+            return json_response({"ok": True, "notice": "Clinic thresholds saved." if changed else
+                                  "Nothing to save: every value is the built-in default."})
+        return run
+
+    clinic_route("/tracker", tracker_page, "therapist")
+    clinic_route("/tracker/{section}", tracker_page, "therapist")
+    clinic_route("/tracker/export/roster.csv", tracker_roster_csv, "therapist", kind="api")
+    clinic_route("/api/tracker/thresholds", tracker_thresholds("save"), "admin", methods=("POST",), kind="api")
+    clinic_route("/api/tracker/thresholds/restore", tracker_thresholds("restore"), "admin", methods=("POST",),
+                 kind="api")
 
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")

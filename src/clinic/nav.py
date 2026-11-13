@@ -33,7 +33,7 @@ PAGES = (
     Page("sessions", "Sessions", "/sessions", "therapist", online=True),
     Page("logs", "Observation logs", "/logs", "therapist", online=True),
     Page("review", "Review", "/review", "therapist", online=True),
-    Page("tracker", "Tracker", "/tracker", "therapist"),
+    Page("tracker", "Tracker", "/tracker", "therapist", online=True),
     Page("how", "How it works", "/how-it-works", "therapist"),
     Page("people", "People", "/people", "admin", online=True),
     Page("settings", "My settings", "/settings", "any", online=True),
