@@ -49,3 +49,10 @@ demo's video analysis, and how should its sessions sit beside YOLO sessions?
 - **Tell the therapist when a clip can't be measured well** (issue #23's second acceptance option): when a set has
   more partial reps than full ones, the result says the camera angle may have hidden the movement, rather than
   reporting the count as fact. For both models.
+
+## Decision (owner, 13 November 2026)
+- **Pose model:** MoveNet in the browser for the hosted demo's video analysis; local installs keep YOLO.
+- **Trends:** browser-pose sessions get their own measurement origin and are never compared with YOLO sessions.
+- **Camera-angle warning:** when a set has more partial reps than full ones, the result says the camera angle may
+  have hidden the movement. Both models.
+- **Annotated video:** not offered on the browser path; results, rep chart, report JSON and rep CSV only.
