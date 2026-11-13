@@ -107,5 +107,5 @@ def test_unbuilt_pages_say_so_and_list_what_works(tmp_db, fake_clock):
     seed(tmp_db, fake_clock)
     with client(tmp_db, fake_clock) as c:
         sign_in(c)
-        page = c.get("/therapist/tracker").text
+        page = c.get("/therapist/how-it-works").text
         assert "not online yet" in page and 'href="/therapist/settings"' in page
