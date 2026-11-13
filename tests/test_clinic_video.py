@@ -88,3 +88,13 @@ def test_how_it_works_is_real(tmp_db, fake_clock):
         assert "placeholder" not in main and "<img" not in main and "MoveNet Lightning" in main
         from tests.test_clinic_static import _checked
         _checked(page, "how")
+
+
+def test_a_session_with_no_reps_shows_no_average(tmp_db, fake_clock):
+    seed(tmp_db, fake_clock)
+    with SessionStore(tmp_db, clock=fake_clock).open() as s:
+        sid = video.analyze_points(s, "P-001", "knee_extension", None, points("Legextension"))["session_id"]
+    with client(tmp_db, fake_clock) as c:
+        sign_in(c)
+        page = c.get(f"/therapist/logs/{sid}").text
+        assert "Not measured" in page and "camera angle" in page and ">0<small> of 100" not in page
