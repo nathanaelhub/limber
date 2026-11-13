@@ -173,7 +173,7 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
     own overrides; both are resolved from the store when not supplied."""
     from . import flags as rules
     from .models import FlagResult, NotEvaluated
-    from .origin import HOME, MEASURED_ORIGINS, split_by_origin
+    from .origin import CLINIC, HOME, MEASURED_ORIGINS, split_by_origin
     goals = {g.exercise_name: g for g in store.list_goals(patient_id)}
     if thresholds is None:
         thresholds = store.effective_thresholds(patient_id)
@@ -188,11 +188,13 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
         names = _exercise_order(own)
         series_by_exercise = {name: measure_series(own, name) for name in names}
         part = rules.evaluate(series_by_exercise, goals, [], thresholds, now, per_exercise=per_exercise)
-        if origin == HOME:
+        if origin != CLINIC:                          # home, or browser-pose video in the clinic (019 G2)
+            label = "home sessions" if origin == HOME else "browser video sessions"
+            short = "home" if origin == HOME else "browser video"
             for f in part.flags:
-                f.values["origin"] = HOME
-                f.message = f"{f.message} [home sessions]"
-            part.not_evaluated = [NotEvaluated(n.rule, f"{n.exercise} (home)" if n.exercise else n.exercise,
+                f.values["origin"] = origin
+                f.message = f"{f.message} [{label}]"
+            part.not_evaluated = [NotEvaluated(n.rule, f"{n.exercise} ({short})" if n.exercise else n.exercise,
                                                n.needed, n.have) for n in part.not_evaluated]
         result.flags.extend(part.flags)
         result.not_evaluated.extend(part.not_evaluated)
@@ -211,6 +213,9 @@ def _flags_from_sessions(store: SessionStore, patient_id: str, sessions, now: da
 BETTER = {"reps_completed": "higher", "avg_form": "higher", "avg_rom": "higher",
           "avg_duration": "informational", "tempo_sd": "lower", "partial_share": "lower"}
 PCT_MEASURES = ("reps_completed", "avg_form", "avg_rom")
+
+
+_ORIGIN_WORDS = {"clinic": "in the clinic", "home": "at home", "browser": "in the clinic from a video, by browser pose"}
 
 
 def compare(store: SessionStore, session_a: int, session_b: int, exercise: Optional[str] = None):
@@ -238,9 +243,9 @@ def compare(store: SessionStore, session_a: int, session_b: int, exercise: Optio
     a, b = ma[exercise], mb[exercise]
     if a.origin != b.origin:
         raise ComparisonError(
-            f"Session {session_a} was recorded at the {a.origin} and session {session_b} at {b.origin}. "
-            f"Home and clinic sessions use different pose models, so their numbers are not compared; "
-            f"choose two sessions recorded in the same place.".replace("at the home", "at home").replace("at clinic", "in the clinic").replace("at the clinic", "in the clinic"))
+            f"Session {session_a} was recorded {_ORIGIN_WORDS.get(a.origin, a.origin)} and session {session_b} "
+            f"{_ORIGIN_WORDS.get(b.origin, b.origin)}. They use different pose models, so their numbers are not "
+            f"compared; choose two sessions recorded the same way.")
     rows = []
     for name in MEASURES:
         va, vb = getattr(a, name), getattr(b, name)

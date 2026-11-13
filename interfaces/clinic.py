@@ -39,6 +39,7 @@ from src.clinic import people as clinic_people, schedule as clinic_schedule, sch
 from src.clinic import records as clinic_records, records_view  # noqa: E402
 from src.clinic import review as clinic_review, review_view  # noqa: E402
 from src.clinic import tracker as clinic_tracker, tracker_view  # noqa: E402
+from src.clinic import howto_view, video as clinic_video, video_view  # noqa: E402
 from src.assist import assistant, config as ai_config  # noqa: E402
 from src.clinic.inbox import NotYours  # noqa: E402
 from src.media import files as media_files  # noqa: E402
@@ -129,7 +130,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         return json_response({"error": "Not found."}, 404)
 
     def clinic_route(path: str, handler: Callable[[Ctx], Response], need: str, methods=("GET",),
-                     kind: str = "page", files: bool = False) -> None:
+                     kind: str = "page", files: bool = False, max_body: Optional[int] = None) -> None:
         """Register a route under /therapist with the role it needs. The only way a route is added."""
         if need not in signin.NEEDS:
             raise ValueError(f"{path}: a route needs one of {', '.join(signin.NEEDS)}")
@@ -165,6 +166,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                                 else "application/json", page_name="Limber clinic")
                 if refused:
                     return refused
+                if max_body is not None and int(request.headers.get("content-length") or 0) > max_body:
+                    return json_response({"error": "This is too large to send in one go."}, 413)
                 if multipart:
                     if int(request.headers.get("content-length") or 0) > FILES_REQUEST_MAX:
                         return json_response({"error": "These files are too large to send together."}, 413)
@@ -1067,6 +1070,30 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/api/tracker/thresholds/restore", tracker_thresholds("restore"), "admin", methods=("POST",),
                  kind="api")
 
+    # ------------------------------------------------------------------ Video analysis (slice 6)
+
+    def video_page(ctx: Ctx) -> Response:
+        patients = [p.id for p in ctx.store.list_patients() if not p.is_builtin]
+        return html(video_view.page(ctx.account, ctx.classes, patients, clinic_video.exercises()))
+
+    def video_analyze(ctx: Ctx) -> Response:
+        body = _body(ctx)
+        pid = own_real_patient(ctx.store, _text(body, "patient_id") or "").id
+        target = body.get("target_reps") if isinstance(body.get("target_reps"), int) else None
+        result = clinic_video.analyze_points(ctx.store, pid, _text(body, "exercise") or "", target, body,
+                                             label=body.get("label"))
+        return json_response({"redirect": f"{PREFIX}/logs/{result['session_id']}", **{
+            k: result[k] for k in ("reps", "rom", "form", "warnings")}}, 201)
+
+    def how_page(ctx: Ctx) -> Response:
+        from analyze import load_config
+        return html(howto_view.page(ctx.account, ctx.classes, load_config("config.yaml")))
+
+    clinic_route("/how-it-works", how_page, "therapist")
+    clinic_route("/video", video_page, "therapist")
+    clinic_route("/api/video", video_analyze, "therapist", methods=("POST",), kind="api",
+                 max_body=clinic_video.MAX_BODY)
+
     clinic_route("/", start, "public")
     clinic_route("/signin", sign_in_page, "public")
     clinic_route("/api/login", login, "public", methods=("POST",), kind="api")
@@ -1084,6 +1111,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         query = f"?{request.url.query}" if request.url.query else ""
         return RedirectResponse(f"{PREFIX}/{query}", status_code=308, headers={"Cache-Control": "no-store"})
 
+    # The pose model and its scripts are the portal's (fetched once by scripts/fetch_portal_assets.py); the clinic
+    # serves the same files under its own prefix, so local installs (a different port) find them too.
+    vendor = Path(__file__).resolve().parent / "portal_static" / "vendor"
+    registry.append(ClinicRoute(PREFIX + "/static/vendor", "public", ("GET",), "static", "vendor"))
+    routes.append(Mount(PREFIX + "/static/vendor", StaticFiles(directory=str(vendor), check_dir=False), name="vendor"))
     registry.append(ClinicRoute(PREFIX + "/static", "public", ("GET",), "static", "static"))
     routes.append(Route(PREFIX, bare_prefix))
     routes.append(Mount(PREFIX + "/static", StaticFiles(directory=str(static_dir)), name="static"))
@@ -1092,7 +1124,6 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     app.state.registry = registry
     app.state.db_path, app.state.key, app.state.origins, app.state.clock = db_path, key, origins, clock
     app.state.open_store = open_store
-    # The clinic needs no camera or microphone yet; slice 7 (live session) widens this for its own page.
     app.add_middleware(web_common.SecurityHeaders, hsts=secure_cookie)
     return app
 

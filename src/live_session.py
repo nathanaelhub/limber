@@ -61,8 +61,10 @@ class LiveSession:
                  infer: Callable[[np.ndarray], Any], fps: float = 30.0,
                  config_path: str = "config.yaml", imgsz: int = 320,
                  form_analyzer_factory: Optional[Callable[[str], Any]] = None, draw: bool = True,
-                 clock: Callable[[], datetime] = datetime.now, extras: Optional[Dict[str, Any]] = None):
+                 clock: Callable[[], datetime] = datetime.now, extras: Optional[Dict[str, Any]] = None,
+                 source: str = "webcam"):
         self.store = store
+        self.source = source                  # "webcam", or "video" for a clip analysed from its points (019 slice 6)
         self.patient_id = patient_id or UNASSIGNED
         self.source_ref = str(source_ref)
         self.infer = infer
@@ -116,7 +118,7 @@ class LiveSession:
         with self._lock:
             if not self._started:
                 self.recorder.start(
-                    self.patient_id, "webcam", self.source_ref, self.config, exercise_key=self.exercise_key,
+                    self.patient_id, self.source, self.source_ref, self.config, exercise_key=self.exercise_key,
                     extras={"camera_id": self.source_ref, "imgsz": self.imgsz, "frame_skip": 1,
                             "origin": "web", "pid": os.getpid(), **self.extras})
                 self._started = True

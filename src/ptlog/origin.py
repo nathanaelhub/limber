@@ -14,17 +14,20 @@ from typing import Dict, Iterable, List
 from .models import Session
 
 CLINIC = "clinic"
+BROWSER = "browser"              # measured in the clinic app by browser pose (019 G2 decision): its own origin
 HOME = "home"
 DIARY = "self-reported"          # the patient logged it without the camera (feature 012)
-ORIGINS = (CLINIC, HOME, DIARY)
-MEASURED_ORIGINS = (CLINIC, HOME)   # only these carry angles, so only these are ever compared
+ORIGINS = (CLINIC, BROWSER, HOME, DIARY)
+MEASURED_ORIGINS = (CLINIC, BROWSER, HOME)   # only these carry angles, so only these are ever compared
 
 
 def capture_origin(session: Session) -> str:
     if session.source == "diary":
         return DIARY
     extras = session.source_extras or {}
-    return HOME if extras.get("origin") == "portal" else CLINIC
+    if extras.get("origin") == "portal":
+        return HOME
+    return BROWSER if extras.get("pose_source") == "browser" else CLINIC
 
 
 def split_by_origin(sessions: Iterable[Session]) -> Dict[str, List[Session]]:

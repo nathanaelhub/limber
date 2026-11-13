@@ -1326,7 +1326,8 @@ class SessionStore:
                 source=r["source"], status=r["status"], exercises=names.get(r["id"], []),
                 total_reps=r["total_reps"], avg_form_score=r["avg_form_score"],
                 origin=("self-reported" if r["source"] == "diary"
-                        else "home" if '"origin": "portal"' in (r["source_extras"] or "") else "clinic"),
+                        else "home" if '"origin": "portal"' in (r["source_extras"] or "")
+                        else "browser" if '"pose_source": "browser"' in (r["source_extras"] or "") else "clinic"),
             )
             for r in rows
         ]

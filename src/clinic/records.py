@@ -76,7 +76,7 @@ def session_rows(store: SessionStore, patient_id: Optional[str] = None) -> List[
         rows.append({"id": r.id, "when": datetime.fromisoformat(r.start_time[:19]).strftime("%a %-d %b %Y, %H:%M"),
                      "patient_id": r.patient_id, "exercises": ", ".join(r.exercises) or "Session",
                      "kind": "Video analysis" if r.source == "video" else "Live session",
-                     "where": "at home" if r.origin == "home" else "in the clinic",
+                     "where": {"home": "at home", "browser": "in the clinic, browser pose"}.get(r.origin, "in the clinic"),
                      "reps": r.total_reps or 0, "form": r.avg_form_score, "status": r.status})
     return rows
 
@@ -88,6 +88,8 @@ def log_data(store: SessionStore, session_id: int) -> dict:
     data = to_observation_dict(session)
     reps = [e for e in data["events"] if e["type"] == "rep"]
     summary = data["summary"]
+    from src.clinic.video import camera_warnings
+    summary["warnings"] = list(summary.get("warnings") or []) + camera_warnings(session)
     target = data.get("target_reps") or 0
     return {"session": session, "data": data, "reps": reps, "summary": summary, "target": target,
             "completion": round(summary["total_reps"] / target * 100) if target else None,
