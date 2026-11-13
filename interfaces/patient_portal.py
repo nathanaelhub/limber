@@ -64,7 +64,7 @@ def pose_assets_present(static_dir: Path) -> bool:
 def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                allowed_origins: Iterable[str] = (), clock: Callable[[], datetime] = datetime.now,
                static_dir: Path = STATIC_DIR, trust_proxy: bool = False, secure_cookie: bool = False,
-               therapist_url: str = "http://localhost:8501", frame_rate_cap: int = 20,
+               therapist_url: str = "http://localhost:8501/therapist", frame_rate_cap: int = 20,
                max_live_sessions: int = 8, ws_segment_seconds: Optional[float] = None) -> Starlette:
     db_path = Path(db_path) if db_path else default_db_path()
     key = key or access.load_key(access.default_key_path(db_path))
@@ -1045,7 +1045,7 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--certfile")
     parser.add_argument("--keyfile")
     parser.add_argument("--insecure-http", action="store_true")
-    parser.add_argument("--therapist-url", default="http://localhost:8501",
+    parser.add_argument("--therapist-url", default="http://localhost:8501/therapist",
                         help="Where the therapist app runs; the front page's therapist door hands over to it")
     args = parser.parse_args(argv)
 

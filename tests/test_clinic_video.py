@@ -98,3 +98,39 @@ def test_a_session_with_no_reps_shows_no_average(tmp_db, fake_clock):
         sign_in(c)
         page = c.get(f"/therapist/logs/{sid}").text
         assert "Not measured" in page and "camera angle" in page and ">0<small> of 100" not in page
+
+
+def test_a_local_install_with_the_clinic_model_analyses_with_yolo(tmp_db, fake_clock, monkeypatch):
+    """Owner's G2 decision: local installs keep YOLO. The route runs the clinic model over the uploaded clip (faked
+    here: the real model is tested by the engine's own tests) and opens the session's log."""
+    seed(tmp_db, fake_clock)
+    calls = []
+
+    def fake_run(path, exercise, patient, db_path, label, weights):
+        calls.append((Path(path).exists(), exercise, patient, label))
+        with SessionStore(db_path, clock=fake_clock).open() as s:
+            sid = s.start_session(patient, "video", label, {"pose_model": "yolo11m-pose"})
+            s.end_session(sid)
+    monkeypatch.setattr(video, "yolo_available", lambda weights=video.YOLO_WEIGHTS: True)
+    monkeypatch.setattr(video, "run_yolo", fake_run)
+    with client(tmp_db, fake_clock) as c:
+        sign_in(c)
+        assert 'value="yolo" checked' in c.get("/therapist/video").text
+        r = c.post("/therapist/api/video/yolo", data={"patient_id": "P-001", "exercise": "squat", "label": "Side view"},
+                   files=[("files", ("clip.mp4", b"not really a video", "video/mp4"))], headers=H)
+        assert r.status_code == 201 and r.json()["redirect"].startswith("/therapist/logs/"), r.text
+        assert calls == [(True, "squat", "P-001", "Side view")]
+        with SessionStore(tmp_db, clock=fake_clock).open() as s:
+            assert s.list_sessions("P-001")[0].origin == "clinic"          # the clinic model's own origin
+        assert c.post("/therapist/api/video/yolo", data={"patient_id": "P-002", "exercise": "squat"},
+                      files=[("files", ("c.mp4", b"x", "video/mp4"))], headers=H).status_code == 404
+
+
+def test_hosted_or_without_the_model_there_is_no_yolo(tmp_db, fake_clock, monkeypatch):
+    seed(tmp_db, fake_clock)
+    monkeypatch.setattr(video, "yolo_available", lambda weights=video.YOLO_WEIGHTS: False)
+    with client(tmp_db, fake_clock) as c:
+        sign_in(c)
+        assert 'name="mode" value="browser"' in c.get("/therapist/video").text
+        assert c.post("/therapist/api/video/yolo", data={"patient_id": "P-001", "exercise": "squat"},
+                      files=[("files", ("c.mp4", b"x", "video/mp4"))], headers=H).status_code == 404

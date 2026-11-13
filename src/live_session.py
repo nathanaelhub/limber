@@ -13,7 +13,6 @@ import dataclasses
 import os
 import threading
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import cv2
@@ -23,7 +22,6 @@ from analyze import (ExerciseTracker, draw_angle_visualization, draw_metrics_pan
                      get_angle_from_keypoints, load_config)
 from src.form_assessment import FormAnalyzer
 from src.ptlog.models import Session
-from src.ptlog.privacy import validate_patient_id
 from src.ptlog.recorder import SessionRecorder
 from src.ptlog.store import SessionStore
 
@@ -236,18 +234,3 @@ class LiveSession:
             self.store.interrupt_session(self.recorder.session_id, reason)
             self._result = self.store.load_session(self.recorder.session_id)
             return self._result
-
-
-def save_screenshot(frame: Optional[np.ndarray], patient_id: Optional[str],
-                    out_dir: Optional[Path] = None, now: Optional[datetime] = None) -> Path:
-    """Write the annotated frame as `<pseudonymous id>_<YYYYMMDD_HHMMSS>.png` under the export location."""
-    if frame is None:
-        raise ValueError("No frame to save")
-    from src.ptlog import exports
-    pid = validate_patient_id(patient_id or UNASSIGNED)
-    out = Path(out_dir) if out_dir else exports.default_export_dir()
-    out.mkdir(parents=True, exist_ok=True)
-    path = out / f"{pid}_{(now or datetime.now()):%Y%m%d_%H%M%S}.png"
-    if not cv2.imwrite(str(path), frame):
-        raise ValueError(f"Could not write {path}")
-    return path

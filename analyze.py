@@ -806,10 +806,10 @@ def get_default_configs() -> Dict[str, ExerciseConfig]:
 # MAIN ANALYSIS FUNCTIONS
 # =============================================================================
 
-def _open_recording(patient_id: Optional[str]):
+def _open_recording(patient_id: Optional[str], db_path=None):
     """Open the canonical record and validate the patient before any heavy work."""
     patient_id = patient_id or "unassigned"
-    store = SessionStore(default_db_path()).open()
+    store = SessionStore(db_path or default_db_path()).open()
     if store.get_patient(patient_id) is None:
         store.close()
         raise PatientNotFoundError(f"Patient '{patient_id}' not found")
@@ -830,7 +830,7 @@ def _close_recording(recorder, store, session, patient_id: str) -> None:
 def main(video_path: str, exercise_name: str = "knee_extension",
          output_path: Optional[str] = None, config_path: str = "config.yaml",
          model_path: str = "models/yolo11m-pose.pt", show_video: bool = True,
-         patient_id: Optional[str] = None) -> ExerciseSession:
+         patient_id: Optional[str] = None, db_path=None, source_ref: Optional[str] = None) -> ExerciseSession:
     """
     Process a video file for PT exercise analysis.
 
@@ -870,7 +870,7 @@ def main(video_path: str, exercise_name: str = "knee_extension",
     print(f"{'='*60}\n")
 
     # Canonical record: validate the patient before loading the model
-    store, patient_id = _open_recording(patient_id)
+    store, patient_id = _open_recording(patient_id, db_path)
 
     # Load YOLO model
     print("Loading YOLO pose model...")
@@ -894,7 +894,7 @@ def main(video_path: str, exercise_name: str = "knee_extension",
 
     # Canonical session record (single writer; replaces the legacy loggers)
     recorder = SessionRecorder(store)
-    recorder.start(patient_id, "video", Path(video_path).name, exercise_config,
+    recorder.start(patient_id, "video", source_ref or Path(video_path).name, exercise_config,
                    exercise_key=exercise_name)
 
     # Setup video writer if output path specified

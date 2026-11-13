@@ -1521,11 +1521,13 @@ Examples:
     mr = msg_sub.add_parser("remove", help="Remove one message, leaving a marker")
     mr.add_argument("message_id", type=int)
 
-    clinic_parser = subparsers.add_parser("clinic", help="Run the clinic app (the new therapist side) at /therapist")
+    clinic_parser = subparsers.add_parser("clinic", help="Run the clinic app (the therapist side) at /therapist")
     clinic_parser.add_argument("--host", default="127.0.0.1")
-    clinic_parser.add_argument("--port", type=int, default=8502)
+    clinic_parser.add_argument("--port", type=int, default=8501)
     clinic_parser.add_argument("--public-origin", action="append", default=[], metavar="URL")
     clinic_parser.add_argument("--trust-proxy", action="store_true")
+    clinic_parser.add_argument("--portal-url", default="http://localhost:8600",
+                               help="Where the patient portal runs; invite links point there")
 
     portal_parser = subparsers.add_parser("portal", help="Home access for patients: codes, access history, the patient service")
     portal_sub = portal_parser.add_subparsers(dest="portal_cmd")
@@ -1548,7 +1550,7 @@ Examples:
     pserve.add_argument("--certfile", default=None)
     pserve.add_argument("--keyfile", default=None)
     pserve.add_argument("--insecure-http", action="store_true")
-    pserve.add_argument("--therapist-url", default="http://localhost:8501")
+    pserve.add_argument("--therapist-url", default="http://localhost:8501/therapist")
     padmin = portal_sub.add_parser("admin", help="Therapist sign-in: set, check, or remove the therapist password")
     padmin_sub = padmin.add_subparsers(dest="admin_cmd")
     pset = padmin_sub.add_parser("set-password", help="Set the therapist password (asked for, never an argument)")
@@ -1588,7 +1590,8 @@ Examples:
         return cmd_tracker(args)
     elif args.command == "clinic":
         from interfaces import clinic
-        argv = ["--host", args.host, "--port", str(args.port)] + (["--trust-proxy"] if args.trust_proxy else [])
+        argv = ["--host", args.host, "--port", str(args.port), "--portal-url", args.portal_url]
+        argv += ["--trust-proxy"] if args.trust_proxy else []
         for origin in args.public_origin:
             argv += ["--public-origin", origin]
         return clinic.main(argv)

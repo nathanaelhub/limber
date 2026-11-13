@@ -209,7 +209,7 @@ def rel(a: Attachment) -> str:
 
 
 def path(media_dir: Path, a: Attachment) -> Path:
-    """The file on a local install (the Streamlit app uses it; the hosted demo has no local file)."""
+    """The file on a local install (local exports and backups use it; the hosted demo has no local file)."""
     return Path(media_dir) / rel(a)
 
 

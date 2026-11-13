@@ -1,4 +1,4 @@
-# Limber: patient service (8600) and therapist app (8501, under /therapist) in one image.
+# Limber: patient service (8600) and clinic app (8501, under /therapist) in one image.
 # On a one-port host (Railway), set PORT and Caddy inside the image routes both (deploy/Caddyfile.single).
 # Build from the repository root:  docker build -f deploy/Dockerfile -t limber .
 # NOTE: this image was written on a machine without Docker and has not been built yet; see docs/DEPLOYMENT.md.

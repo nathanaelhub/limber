@@ -2,6 +2,29 @@
 
 ---
 
+## Update 18 — 2026-11-13 — The Clinic App Replaces Streamlit
+
+Feature spec: `specs/019-clinic-app/` (slice 8, the cutover). No schema change.
+
+- **One therapist side, everywhere.** The clinic app (`interfaces/clinic.py`, rules in `src/clinic/`) is now the
+  only therapist interface, locally and on the hosted demo. Run it with `python interfaces/cli.py clinic`; it
+  takes the old port, **8501**, under `/therapist/`. The Docker image starts it in place of Streamlit, with the
+  health check at `/therapist/api/health`, and the portal's Therapist door points at `http://localhost:8501/therapist`.
+- **Removed:** `interfaces/app.py`, `interfaces/app_theme.py`, `interfaces/assets/`, `.streamlit/`, and the
+  `streamlit`, `streamlit-webrtc`, `pyarrow` and `pandas` dependencies. `python-multipart` (form uploads), which
+  used to arrive through Streamlit, is now pinned on its own.
+- **Video analysis keeps the clinic model locally** (owner's G2 decision): with `models/yolo11m-pose.pt` installed,
+  *Tools → Video analysis* sends the clip to this computer and analyses it with YOLO, as before; the clip is
+  deleted afterwards and only the measurements are kept. The hosted demo analyses in the browser instead.
+- **Nothing the old tests pinned was lost without a decision.** Every Streamlit UI test is mapped to the clinic
+  test that now covers it, or to the retired list agreed in SC-003 (the screenshot saved on the server, the app
+  opening without a staff password, the placeholder pictures): `specs/019-clinic-app/cutover-map.md`. Voice-note
+  behaviours gained clinic tests, and the rep-CSV export is checked byte for byte against a file the old pandas
+  export wrote.
+- **Constitution 1.5.2**: the transition wording is gone (wording only, no new obligation).
+
+---
+
 ## Update 17 — 2026-09-29 — Writing Voice Notes Out, Built but Not Installed
 
 Feature spec: `specs/014-voice-notes/` (User Story 3). No schema change; `transcriptions` arrived with

@@ -4,7 +4,7 @@
 
 The **AI Physical Therapy Assistant** is a computer vision application that uses YOLO11 pose estimation to monitor and provide feedback on physical therapy exercises. This project demonstrates real-world AI applications in healthcare, combining deep learning with biomechanical analysis to create an intelligent exercise monitoring system.
 
-**Key Technologies:** YOLO11 Pose Estimation, OpenCV, Python, Streamlit
+**Key Technologies:** YOLO11 Pose Estimation, MoveNet (in the browser), OpenCV, Python, Starlette, SQLite
 
 **Primary Use Cases:**
 - Home-based PT exercise monitoring
@@ -82,14 +82,16 @@ ai-pt-assistant/
 │
 ├── interfaces/
 │   ├── cli.py              # Command-line interface
-│   └── app.py              # Streamlit web application
+│   ├── clinic.py           # Clinic app: the therapist side, under /therapist
+│   ├── patient_portal.py   # Patient service and front page
+│   └── vercel_app.py       # Both, as one app for the hosted demo
 │
 ├── specs/                  # Spec-driven development artifacts (Spec Kit)
 ├── tests/
 │   ├── test_analysis.py
 │   ├── test_form_assessment.py
 │   ├── test_ptlog_*.py     # Record, recorder, recovery, exports, import
-│   ├── test_app_pages.py   # Headless Streamlit page tests
+│   ├── test_clinic_*.py    # Clinic app pages and rules, through Starlette's test client
 │   └── fixtures/           # Golden legacy files and synthetic legacy inputs
 │
 ├── data/                   # ptassist.db — the canonical record (git-ignored)
@@ -186,15 +188,17 @@ User-friendly terminal interface with:
 - Interactive menus
 - Multiple subcommands
 
-### `interfaces/app.py` (~600 lines)
-**Streamlit web application**
+### `interfaces/clinic.py` and `src/clinic/`
+**The clinic app (the therapist side)**
 
-Browser-based interface featuring:
-- Dashboard with quick stats
-- Live webcam session page
-- Video upload and analysis
-- Progress reports with charts
-- Educational "How It Works" section
+A stateless web app under `/therapist`, the same locally and on the hosted demo. Server-rendered pages, with the
+rules in `src/clinic/` tested without a browser:
+- Dashboard (home), Inbox, Patients, Schedule, and a patient search
+- Sessions, Review (trends, flags, compare, goals and thresholds, exports) and the Tracker
+- Video analysis (the clinic model locally, or browser pose on the hosted demo)
+- Live session (browser pose, the engine counting on the server)
+- How it works, People (admins) and My settings
+- Claude-drafted replies and summaries, always labelled as AI and never sent on their own
 
 ---
 
@@ -274,8 +278,8 @@ python analyze.py video --input exercise.mp4 --exercise knee_extension
 # Start webcam session
 python analyze.py webcam --exercise shoulder_flexion
 
-# Run web interface
-streamlit run interfaces/app.py
+# Run the clinic app (therapist side) on http://127.0.0.1:8501/therapist/
+python interfaces/cli.py clinic
 
 # Use CLI interface
 python interfaces/cli.py interactive
@@ -295,7 +299,7 @@ Edit `config.yaml` to:
 
 ### Beginner Level
 1. **Run the demo** - Try the webcam mode with default settings
-2. **Explore the web app** - Use Streamlit interface to understand features
+2. **Explore the web app** - Use the clinic app (`python interfaces/cli.py clinic`) to understand features
 3. **Read the "How It Works" page** - Built-in educational content
 4. **Examine config.yaml** - See how exercises are configured
 

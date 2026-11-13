@@ -2,11 +2,11 @@
 """
 The Limber clinic app (feature 019): the therapist side, as a stateless web app under /therapist.
 
-It replaces the Streamlit therapist app one slice at a time. It only routes and renders: the rules live in
+It replaced the Streamlit therapist app (removed in 019 slice 8). It only routes and renders: the rules live in
 src/clinic/ and the record's own modules. Every route is registered with the role it needs, and every request
 opens one store that is limited to the signed-in person's patients before any handler sees it.
 
-    python interfaces/cli.py clinic                  # http://127.0.0.1:8502/therapist/
+    python interfaces/cli.py clinic                  # http://127.0.0.1:8501/therapist/
 """
 
 from __future__ import annotations
@@ -63,13 +63,14 @@ PREFIX = signin.PREFIX
 FILES_REQUEST_MAX = attachments.MAX_PHOTOS * attachments.PHOTO_MAX + 1024 * 1024
 
 
-async def _form_body(request: Request) -> dict:
-    """A reply with photos or a PDF sent as a form (local installs; the hosted demo uploads straight to its bucket)."""
+async def _form_body(request: Request, max_file: int = attachments.PDF_MAX + 1) -> dict:
+    """Files sent as a form on a local install: a reply's photos or PDF (the hosted demo uploads those straight to its
+    bucket), or a clip for the clinic model. Text fields come through as text; the files as (type, bytes)."""
     form = await request.form(max_files=attachments.MAX_PHOTOS + 1, max_fields=10)
-    body = {k: form.get(k) for k in ("text", "plan_id")}
+    body = {k: v for k, v in form.multi_items() if isinstance(v, str)}
     body["confirm"] = form.get("confirm") in ("true", "1", "yes")
     body["from_draft"] = form.get("from_draft") in ("true", "1", "yes")
-    body["files"] = [(u.content_type or "", await u.read(attachments.PDF_MAX + 1)) for u in form.getlist("files")]
+    body["files"] = [(u.content_type or "", await u.read(max_file)) for u in form.getlist("files")]
     await form.close()
     return body
 
@@ -172,13 +173,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                                                 else "application/json", page_name="Limber clinic")
                 if refused:
                     return refused
-                if max_body is not None and int(request.headers.get("content-length") or 0) > max_body:
+                if not multipart and max_body is not None and int(request.headers.get("content-length") or 0) > max_body:
                     return json_response({"error": "This is too large to send in one go."}, 413)
                 if multipart:
-                    if int(request.headers.get("content-length") or 0) > FILES_REQUEST_MAX:
+                    if int(request.headers.get("content-length") or 0) > (max_body or FILES_REQUEST_MAX):
                         return json_response({"error": "These files are too large to send together."}, 413)
                     try:
-                        body = await _form_body(request)
+                        body = await _form_body(request, (max_body or attachments.PDF_MAX) + 1)
                     except ValueError:
                         return json_response({"error": "Send a form with the files."}, 400)
                 else:
@@ -1080,7 +1081,22 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
 
     def video_page(ctx: Ctx) -> Response:
         patients = [p.id for p in ctx.store.list_patients() if not p.is_builtin]
-        return html(video_view.page(ctx.account, ctx.classes, patients, clinic_video.exercises()))
+        return html(video_view.page(ctx.account, ctx.classes, patients, clinic_video.exercises(),
+                                    yolo=clinic_video.yolo_available()))
+
+    def video_yolo(ctx: Ctx) -> Response:
+        if not clinic_video.yolo_available():
+            raise NotYours()                     # hosted, or no clinic model on this computer
+        body = _body(ctx)
+        pid = own_real_patient(ctx.store, _text(body, "patient_id") or "").id
+        clips = body.get("files") or []
+        data = clips[0][1] if clips else b""
+        if len(data) > clinic_video.YOLO_MAX_BYTES:
+            return json_response({"error": "This clip is larger than 500 MB."}, 413)
+        result = clinic_video.analyze_with_yolo(ctx.store, db_path, pid, _text(body, "exercise") or "", data,
+                                                label=body.get("label"))
+        return json_response({"redirect": f"{PREFIX}/logs/{result['session_id']}", **{
+            k: result[k] for k in ("reps", "rom", "form", "warnings")}}, 201)
 
     def video_analyze(ctx: Ctx) -> Response:
         body = _body(ctx)
@@ -1099,6 +1115,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/video", video_page, "therapist")
     clinic_route("/api/video", video_analyze, "therapist", methods=("POST",), kind="api",
                  max_body=clinic_video.MAX_BODY)
+    clinic_route("/api/video/yolo", video_yolo, "therapist", methods=("POST",), kind="api", files=True,
+                 max_body=clinic_video.YOLO_MAX_BYTES)
 
     # ------------------------------------------------------------------ Live session (slice 7)
 
@@ -1271,7 +1289,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
 def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser(description="Limber clinic app (demo and study use only)")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8502)
+    parser.add_argument("--port", type=int, default=8501)
     parser.add_argument("--public-origin", action="append", default=[], metavar="URL",
                         help="An address staff use to reach this app, e.g. a tunnel's https URL (repeatable)")
     parser.add_argument("--trust-proxy", action="store_true", help="Read the visitor's address from X-Forwarded-For")

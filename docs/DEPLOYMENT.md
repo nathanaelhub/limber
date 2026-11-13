@@ -13,7 +13,7 @@ or run yet**. Expect to fix small things on the first build, and rehearse a rest
 
 ```text
 internet ──443──> proxy (Caddy: HTTPS, certificates)
-                     ├── /therapist*  ──> limber:8501   therapist app; shows only a sign-in until signed in
+                     ├── /therapist*  ──> limber:8501   clinic app (therapist side); only a sign-in until signed in
                      └── everything   ──> limber:8600   front page, patient view, session WebSocket
 limber container ── /data volume: ptassist.db (the record), portal.key, exports/, backups/
 ```
@@ -89,7 +89,7 @@ To turn it on, on the host:
 
 1. Install the speech library in the same environment as the service: `pip install faster-whisper`
    (CPU, int8 — no graphics card). Budget **1-2 GB of memory while a note is being written out**, on top
-   of Streamlit and torch. On the 4 GB reference host, do not also run a backup at the same time.
+   of the clinic app and torch. On the 4 GB reference host, do not also run a backup at the same time.
 2. Download the model yourself from a source you trust (for example
    `https://huggingface.co/Systran/faster-whisper-small`), check the files, and record their SHA-256
    hashes.

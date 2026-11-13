@@ -1,7 +1,7 @@
 """Build a simulated caseload for demos and manual testing.
 
     .venv/bin/python scripts/seed_demo.py                 # writes data/demo.db (replaced if present)
-    PTASSIST_DB=data/demo.db streamlit run interfaces/app.py
+    PTASSIST_DB=data/demo.db .venv/bin/python interfaces/cli.py clinic   # the therapist side, port 8501
 
 Everything is invented. Patients have pseudonymous IDs and clinical labels only, never names.
 The real record (data/ptassist.db) is never touched: the script refuses to write to it.
@@ -400,7 +400,7 @@ def write_demo_logins(db_path: Path) -> None:
         "Limber demo sign-ins (simulated data only; reissued every time the demo is rebuilt)",
         "",
         "Start it:  PTASSIST_DB=data/demo.db .venv/bin/python interfaces/cli.py portal serve",
-        "           PTASSIST_DB=data/demo.db .venv/bin/streamlit run interfaces/app.py --server.port 8501",
+        "           PTASSIST_DB=data/demo.db .venv/bin/python interfaces/cli.py clinic",
         "Open:      http://127.0.0.1:8600",
         "",
         f"Every password below is  {DEMO_PASSWORD}",

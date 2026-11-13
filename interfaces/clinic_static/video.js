@@ -70,6 +70,21 @@
     const file = form.elements.clip.files[0];
     if (!file) { fail("Choose a clip first."); return; }
     button.disabled = true;
+    const mode = (form.querySelector("input[name=mode]:checked") || form.elements.mode).value;
+    if (mode === "yolo") {
+      // A local install with the clinic model: the clip goes to this computer, is analysed, and is not kept.
+      say("Analysing on this computer with the clinic model. A long clip can take a few minutes…");
+      try {
+        const data = new FormData();
+        ["patient_id", "exercise", "label"].forEach((k) => data.append(k, form.elements[k].value));
+        data.append("files", file);
+        const r = await fetch("/therapist/api/video/yolo", { method: "POST", credentials: "same-origin", body: data });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || "The clip could not be analysed.");
+        location.assign(body.redirect);
+      } catch (err) { fail(err.message); }
+      return;
+    }
     say("Loading the pose model…");
     try {
       const found = await points(file);

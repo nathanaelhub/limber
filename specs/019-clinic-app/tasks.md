@@ -30,7 +30,7 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 - [x] T009 Route-table test (SC-004): every route declares its role; `rivera` gets 404 for another therapist's
       patient, plan, visit or file on every route; admin-only accounts get 403 on clinical routes
 - [x] T010 The portal's service worker never handles `/therapist` (FR-016), with a test
-- [x] T011 `interfaces/cli.py clinic` (port 8502); the hosted demo mounts the clinic at `/therapist` in
+- [x] T011 `interfaces/cli.py clinic` (port 8502; 8501 since the cutover); the hosted demo mounts the clinic at `/therapist` in
       `interfaces/vercel_app.py`; importing the clinic loads nothing heavy (test); deploy and check
 
 ## Slice 2: Inbox (Story 2; FR-007 to FR-009) → milestone M2
@@ -98,10 +98,11 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 ## Slice 8: Cutover (FR-015) → milestone M5
 
 - [ ] T032 **G3**: re-run the 16 user cases against the clinic app, locally and on the hosted demo
-- [ ] T033 Move to :8501; update the portal default, `deploy/*`, and `interfaces/cli.py`
-- [ ] T034 Remove `interfaces/app.py`, `interfaces/app_theme.py`, `.streamlit/`, `streamlit`, `streamlit-webrtc`,
+      (cases 10-16, the therapist side, re-run on the hosted clinic app in #89; the rest before the showing)
+- [x] T033 Move to :8501; update the portal default, `deploy/*`, and `interfaces/cli.py`
+- [x] T034 Remove `interfaces/app.py`, `interfaces/app_theme.py`, `.streamlit/`, `streamlit`, `streamlit-webrtc`,
       `pyarrow`, `pandas` (if unused), and the old UI tests, after a list maps each behaviour to its clinic test or
-      to SC-003's retired list
-- [ ] T035 Constitution: remove the transition wording and the Streamlit mention in Principle V
-- [ ] T036 `docs/UPDATES.md`, `README.md`, `docs/PROJECT_OVERVIEW.md`, `docs/DEPLOYMENT.md`; retake the user-case
-      screenshots and rebuild the User Cases PDF
+      to SC-003's retired list (`cutover-map.md`)
+- [x] T035 Constitution: remove the transition wording and the Streamlit mention in Principle V
+- [x] T036 `docs/UPDATES.md`, `README.md`, `docs/PROJECT_OVERVIEW.md`, `docs/DEPLOYMENT.md`; retake the user-case
+      screenshots and rebuild the User Cases PDF (screenshots and PDF in #89)

@@ -4,6 +4,8 @@ rep CSV matches the old pandas export byte for byte."""
 
 from datetime import datetime
 
+from pathlib import Path
+
 import pytest
 
 from src.clinic import records
@@ -53,12 +55,16 @@ def test_activity_by_week_and_period(world):
     assert records.period("90") == 90 and records.period("365") == 30 and records.period(None) == 30
 
 
+GOLDEN = Path(__file__).resolve().parent / "fixtures" / "golden" / "rep_csv_from_pandas.csv"
+
+
 def test_rep_csv_matches_the_old_pandas_export(world):
-    pd = pytest.importorskip("pandas")
+    """The file was written by the Streamlit page's pandas export (DataFrame(reps).to_csv(index=False)) for this
+    session before pandas was removed (019 slice 8); the stdlib export must stay byte for byte the same."""
     db, clock, first, *_ = world
     with SessionStore(db, clock=clock).open() as s:
         reps = records.log_data(s, first)["reps"]
-    assert records.rep_csv(reps) == pd.DataFrame(reps).to_csv(index=False)
+    assert records.rep_csv(reps) == GOLDEN.read_text()
 
 
 def test_timeline_lines_say_their_units():

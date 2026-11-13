@@ -29,9 +29,9 @@ fi
 # Refuse to start without a therapist password, a server key, a writable record, pose assets, and https.
 python interfaces/cli.py deploy preflight --public-origin "$LIMBER_PUBLIC_ORIGIN" --therapist-url "$THERAPIST_URL"
 
-# The therapist app, reachable only through the proxy under /therapist, and gated by the therapist sign-in.
-streamlit run interfaces/app.py --server.port 8501 --server.address 0.0.0.0 --server.baseUrlPath therapist \
-    --server.headless true --browser.gatherUsageStats false --server.enableXsrfProtection true &
+# The clinic app (the therapist side), reachable only through the proxy under /therapist, gated by staff sign-in.
+python interfaces/cli.py clinic --host 0.0.0.0 --port 8501 --trust-proxy \
+    --public-origin "${LIMBER_PUBLIC_ORIGIN%/}" --portal-url "${LIMBER_PUBLIC_ORIGIN%/}" &
 
 # The patient service and front page. Exactly one instance may write the record.
 set -- --host 0.0.0.0 --port 8600 --insecure-http \
@@ -44,7 +44,7 @@ if [ -n "${PORT:-}" ]; then
     python interfaces/cli.py portal serve "$@" &
     tries=0
     until curl -fsS -o /dev/null http://127.0.0.1:8600/api/health \
-            && curl -fsS -o /dev/null http://127.0.0.1:8501/therapist/_stcore/health; do
+            && curl -fsS -o /dev/null http://127.0.0.1:8501/therapist/api/health; do
         tries=$((tries + 1))
         if [ "$tries" -ge 120 ]; then echo "Limber did not start within two minutes." >&2; exit 1; fi
         sleep 1
