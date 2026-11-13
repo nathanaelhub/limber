@@ -1,4 +1,4 @@
-"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026 and the photo and video trial of 5 November 2026.
+"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026, the photo and video trial of 5 November 2026, and the clinic-app re-run of 13 November 2026.
 
     python scripts/build_user_cases_pdf.py            # writes user-cases.html and Limber-User-Cases.pdf
     python scripts/build_user_cases_pdf.py --html     # the HTML only
@@ -142,78 +142,88 @@ CASES = [
     dict(id=10, who="therapist", title="Morning inbox triage",
          persona="The clinic's therapist, with ten minutes before the first patient.",
          goal="See who wrote, which plan it is about, and what they sent.",
-         steps=["Open Inbox. Look at the per-plan unread counts and the reschedule notices.",
-                "Open P-021's conversation and view the photo."],
-         expected="Unread counts per patient and plan, attachments shown inline, and reschedule requests flagged.",
-         actual="The list shows P-021 (6 unread, hip and shoulder plans), P-023 (marked “May need a direct response”) and "
-                "P-017. Both reschedule requests appear above the list, and photos show as thumbnails. "
-                "<b>Note:</b> opening the inbox opens the first conversation and marks it read (the badge went 10 → 5). "
-                "This is known, and why the app starts on the Dashboard.",
-         status="pass", shots=["c10a_inbox.png", "c10b_photo.png"]),
+         steps=["Sign in: the Dashboard opens, with Needs you, today's visits and patients to look at.",
+                "Open Inbox. Read the one Needs you list: red flags, reschedule requests, unread messages by plan.",
+                "Open P-021's hip-plan conversation and view the photo."],
+         expected="Everything waiting in one list, attachments shown inline, nothing marked read until a conversation "
+                  "is opened.",
+         actual="The Dashboard showed 5 items needing the therapist. The Inbox listed P-023 first (Urgent), then "
+                "P-021's reschedule request, then unread messages by plan, each with its plan and first line. "
+                "<b>Opening the Inbox marked nothing read</b> (still 5); opening P-021's conversation marked only that "
+                "plan read. The photo shows as a thumbnail in the thread, beside the voice note with its player.",
+         status="pass", shots=["c10c_dashboard.png", "c10a_inbox.png", "c10b_photo.png"]),
     dict(id=11, who="therapist", title="Draft a reply with the AI, then send it yourself",
          persona="The therapist wants to answer P-021 warmly but quickly.",
          goal="Get a first draft, edit it, send it.",
          steps=["Press Draft a reply.", "Read and edit the draft.", "Press Send."],
          expected="The draft lands in the reply box, labelled AI-drafted, and nothing is sent until Send is pressed.",
-         actual="A draft appeared in about 8 seconds under “AI-drafted — check before sending”. The database showed "
-                "<b>no new message after drafting</b> and one after Send. The draft was sensible, and it offered to "
-                "phone the patient on the number they shared, which the therapist has to stand behind before sending.",
+         actual="A draft appeared in under 10 seconds in a dashed box labelled “AI-drafted — check before sending”. "
+                "The record had <b>no new message after drafting</b> and one after Send, marked “began as an AI draft”. "
+                "The draft named the booked visit correctly (“Tuesday at 09:00”) and allowed for the pending "
+                "reschedule: drafts now get the booked visit, after an earlier draft guessed the day from an old "
+                "message. The therapist replaced its last line before sending.",
          status="pass", shots=["c11a_draft.png", "c11b_sent.png"]),
     dict(id=12, who="therapist", title="A message the AI must not draft for",
          persona="P-023 wrote: “I had a fall this morning getting out of the car. Now my knee feels numb.”",
          goal="Respond safely.",
          steps=["Open P-023's conversation.", "Phone the patient (off-screen), then press Mark as handled by phone."],
          expected="No draft offered, a clear notice to contact the patient directly, and a way to record the call.",
-         actual="Red notice: “This message may need a direct response. P-023 mentioned ‘numb’, ‘had a fall’. The "
-                "assistant has not drafted a reply.” Draft a reply is disabled. Mark as handled by phone recorded it.",
+         actual="A red notice above the thread: “This message may need a direct response. P-023 used words that can "
+                "point to an injury: ‘numb’ and ‘had a fall’. No reply was drafted.” It quotes the message. There is "
+                "no Draft button. Mark as handled by phone removed it from Needs you (5 → 3 with the reply sent in "
+                "case 11) and Draft a reply came back.",
          status="pass", shots=["c12a_withheld.png", "c12b_handled.png"]),
     dict(id=13, who="therapist", title="Summarise the patient's week",
-         persona="The therapist preparing for P-021's Friday visit.",
+         persona="The therapist preparing for P-021's next visit.",
          goal="A short picture of the week, with sources, saved to the record.",
          steps=["Open P-021 → Overview → Summarise the last 7 days.", "Read it, then Save as session note."],
          expected="Adherence, pain trend and questions, 1–3 next steps that cite records, labelled as AI. Saved notes "
                   "stay marked AI-drafted.",
-         actual="The summary covered adherence (3 of 3 sessions, one “felt very hard”), pain rising 5 → 8, poor sleep, "
-                "and the patient's questions, each tagged with record ids. It also noticed that the same knee message "
-                "had gone into two plans, and suggested checking it. Saved as a session note, marked AI-drafted.",
+         actual="The summary, from 18 records, covered adherence (3 sessions, one “felt very hard”), pain rising "
+                "5 → 8, poor sleep and the patient's questions, each statement followed by the records it came from "
+                "(“From: Session S-70 · Log E-7”). Saved as a session note, it keeps the AI-drafted label. The "
+                "patient never sees it.",
          status="pass", shots=["c13b_summary.png", "c13c_session_note.png"]),
     dict(id=14, who="therapist", title="Answer the reschedule request",
          persona="The therapist, picking up P-021's request from case 5.",
          goal="Move the visit to an afternoon.",
-         steps=["Open Schedule: requests are listed first.",
-                "Open P-021, set the new time to 15:30, press Change time.",
+         steps=["Open Schedule: requests are listed first, with the patient's note.",
+                "In the request, set the time to 15:30 and press Offer this time.",
                 "Check what the patient sees."],
          expected="The flag clears and the patient sees the new time, in clinic time, whatever their device's time zone.",
-         actual="Schedule listed both requests first, each with an Open button. After Change time the visit was stored "
-                "as 15:30 Chicago time (21:30 UTC), the request flag cleared, and the patient's Visits page showed "
-                "“Fri 20 Nov, 15:30” with Ask to reschedule available again.",
+         actual="Schedule showed the request first, quoting “Afternoons are better for me this week”, and answered it "
+                "in place. After Offer this time the request cleared (Needs you went down by one), the visit moved to "
+                "15:30 Chicago time, and the patient's Visits page showed “Tue 17 Nov, 15:30” with Ask to reschedule "
+                "available again.",
          status="pass", shots=["c14a_schedule.png", "c14b_change_time.png", "c14c_patient_sees_new_time.png"]),
     dict(id=15, who="therapist", title="Turn on the coach and read what was asked",
          persona="The therapist decides P-017 is ready for the coach, and checks P-021's coach chats.",
          goal="Switch the coach on, and review every question and answer.",
          steps=["P-017 → AI settings → switch on Patient exercise coach.",
-                "P-021 → AI settings → Past coach conversations.",
+                "P-021 → AI settings → Coach conversations.",
                 "As P-017, open Today."],
          expected="Off by default. The patient's notice is shown to the therapist, and every coach turn is readable.",
-         actual="The switch shows exactly what the patient will be told. The log listed all 15 of P-021's questions: "
-                "2 answered, 6 sent to the therapist, 5 emergency cards, 2 not about the program. Each one says "
-                "whether AI text was shown. P-017's Today now has the coach entry.",
+         actual="The switch saves as soon as it is flipped and shows exactly what the patient is told, and since when "
+                "it has been on. The read-only log groups P-021's questions by day with what happened to each "
+                "(“1 answered, 1 sent to you”), the AI's answers labelled as AI and the set messages shown word for "
+                "word. P-017's Today has the coach entry.",
          status="pass", shots=["c15b_coach_on.png", "c15c_coach_log.png", "c15d_p017_coach_first_time.png"]),
     # ---- Admin ---------------------------------------------------------------------------------------------
     dict(id=16, who="admin", title="Invite a new therapist; keep caseloads separate",
          persona="The clinic administrator, onboarding a new physical therapist.",
          goal="Give the new therapist an account without seeing any clinical data, and make sure therapists only see "
               "their own patients.",
-         steps=["Sign in as admin → People → Create invite link (therapist).",
+         steps=["Sign in as admin → People → Invite someone (therapist) → Create invite link.",
                 "Open the link on a phone and onboard as “nora”.",
                 "Sign in as nora, and as rivera, and compare patient lists."],
          expected="The admin sees no clinical pages. The link works once. Nora starts with no patients, and rivera "
                   "sees only her own.",
-         actual="The admin's sidebar has no Inbox, Patients or Schedule. The link said “You're invited to Limber as a "
-                "therapist” and onboarding signed nora straight into the therapist app. Nora's patient list was empty "
-                "apart from the built-in “unassigned” placeholder. Rivera saw only P-018, P-022 and P-024.",
-         status="pass", shots=["c16b_invite_link.png", "c16d_nora_empty.png", "c16e_rivera_inbox.png",
-                               "c16c_onboarding.png"]),
+         actual="The admin's top bar has only People and My settings. The invite link is shown once (“Limber does not "
+                "send it anywhere”). The link said “You're invited to Limber as a therapist”, and onboarding handed "
+                "nora straight into the clinic app's Dashboard. Nora's patient list is empty (the built-in placeholder "
+                "no longer shows). Rivera sees only P-018, P-022 and P-024; P-021's page answers “not found”.",
+         status="pass", shots=["c16b_invite_link.png", "c16c_onboarding.png", "c16d_nora_empty.png",
+                               "c16e_rivera_inbox.png"]),
     # ---- AI on photos and videos: a trial, 5 November 2026 (issue #27) -----------------------------------
     dict(id=17, who="trial", trial=True, title="Triage a patient's photo with AI",
          persona="The therapist, sorting four photos sent with short messages. The photos are public Wikimedia "
@@ -257,9 +267,13 @@ CASES = [
                 "and form 53 instead of 68. Claude spotted the hidden arm in one run, then called the visible arm "
                 "the left in a rerun, so it can't be relied on for left and right. Each check took about 13 "
                 "seconds. In the app's Video analysis page (9 Nov dry run) the annotated video didn't play "
-                "(#35, fixed).",
+                "(#35, fixed). <b>Update, 13 Nov:</b> the clinic app now analyses clips in the browser (MoveNet) on "
+                "the hosted demo. On the same clips it counts the squats and push-ups 4 of 4 like YOLO, with range of "
+                "motion 8° lower and 14–21° higher; the leg extension still undercounts, so the result now says the "
+                "camera angle may have hidden the movement (last picture).",
          status="issue", issues=[23, 24, 35],
-         shot_height=2.1, shots=["c18a_leg_extension_3_reps.png", "c18b_push_up_overlay.png"]),
+         shot_height=1.45, shots=["c18a_leg_extension_3_reps.png", "c18b_push_up_overlay.png",
+                                 "c18c_browser_camera_note.png"]),
     dict(id=19, who="script", title="Summary and drafts after the video sessions",
          persona="The therapist, after the three videos were saved under P-021, with summaries and drafts on for "
                  "P-017, P-021 and P-023.",
@@ -298,15 +312,15 @@ PHOTO_CREDITS = [
 ]
 NOTES = [
     "Messages opens on the plan with unread messages. A patient who misses the switcher can post into the wrong plan (case 3).",
-    "Opening the therapist inbox marks the first conversation read. This is why the app starts on the Dashboard (case 10).",
+    "Fixed since: opening the therapist Inbox used to mark the first conversation read. It now marks nothing until a conversation is opened (case 10).",
     "The AI draft offered to phone the patient on a number they had shared. That's fine, because the therapist edits and sends it, but it's a reminder that drafts can commit the therapist to an action (case 11).",
-    "Streamlit's upload box still says “200MB per file”. The real limits, 15 MB a photo and 20 MB a PDF, are enforced on the host.",
-    "A video session's stored duration is how long the analysis ran (about 30 s), not the length of the clip (about 7 s) (case 18).",
+    "Fixed since: the therapist side was Streamlit, whose upload box said “200MB per file”; the clinic app says the real limits (4 photos or 1 PDF).",
+    "A local (YOLO) video session's stored duration is how long the analysis ran, not the clip's length; the browser-pose path stores the clip's length (case 18).",
 ]
 TRIAL_AI = dict(calls=15, photos=4, videos=6, summaries=2, drafts=3, input_tokens=41136, output_tokens=12347,
                 cost="about $0.41")
-AI_TOTALS = dict(calls=15, coach=11, drafts=3, summaries=1, input_tokens=16810, output_tokens=3428,
-                 no_model=7, cost="about $0.11",
+AI_TOTALS = dict(calls=17, coach=11, drafts=4, summaries=2, input_tokens=20847, output_tokens=5836,
+                 no_model=7, cost="about $0.17",
                  note="Prices from Anthropic's published rates: Claude Opus 5.5 $4 / $20 and Claude Sonnet 5.5 $2 / $10 "
                       "per million input / output tokens.")
 
@@ -400,7 +414,9 @@ def cover():
   5 November 2026: a trial of AI on photos and videos. Every patient is simulated and known only by a code such as
   P-021, never by name. Live AI: Claude Opus 5.5 (therapist summaries, drafts and the trial) and Claude Sonnet 5.5
   (patient coach). Source: github.com/nathanaelhub/limber, issues #13 and #27. Updated 10 November 2026 with
-  the fixes since, and a demo dry run of the whole app on 9 November.</div>
+  the fixes since, and a demo dry run of the whole app on 9 November. <b>Updated 13 November 2026:</b> therapist and
+  admin cases 10–16 re-run in the new clinic app (the therapist side that also runs on the hosted demo), with new
+  pictures; case 18 adds video analysis on browser pose.</div>
 </section>"""
 
 

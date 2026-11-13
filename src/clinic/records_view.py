@@ -152,11 +152,15 @@ def log_pane(log: Optional[dict]) -> str:
     duration = data.get("duration_seconds")
     kind = "Video analysis" if s.source == "video" else "Live session"
     target = log["target"]
+    none_counted = not summary["total_reps"]          # no rep, no average: say so rather than show a 0
+    form_avg = None if none_counted else summary["avg_form_score"]
+    rom_avg = None if none_counted else summary["avg_rom"]
     facts = ('<div class="facts">'
              + _fact("Reps completed", f'{summary["total_reps"]}' + (f' <small>of {target}</small>' if target else ""),
                      f'{log["completion"]}% of the target' if log["completion"] is not None else "")
-             + _fact("Average form score", f'{_num(summary["avg_form_score"])}<small> of 100</small>', "Higher is better")
-             + _fact("Average range of motion", _num(summary["avg_rom"], "°"), "Degrees")
+             + _fact("Average form score", f'{_num(form_avg)}' + ("" if form_avg is None else "<small> of 100</small>"),
+                     "Higher is better")
+             + _fact("Average range of motion", _num(rom_avg, "°"), "Degrees")
              + _fact("Events", f'{len(data["events"])}', "Every step the engine recorded") + "</div>")
     warnings = "".join(f'<li><span class="tag urgent">Note</span><span>{_e(w)}</span></li>' for w in summary["warnings"])
     parts = [facts]
