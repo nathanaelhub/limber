@@ -28,7 +28,7 @@ PAGES = (
     Page("patients", "Patients", "/patients", "therapist", online=True),
     Page("schedule", "Schedule", "/schedule", "therapist", online=True),
     Page("dashboard", "Dashboard", "/dashboard", "therapist", online=True),
-    Page("live", "Live session", "/live", "therapist"),
+    Page("live", "Live session", "/live", "therapist", online=True),
     Page("video", "Video analysis", "/video", "therapist", online=True),
     Page("sessions", "Sessions", "/sessions", "therapist", online=True),
     Page("logs", "Observation logs", "/logs", "therapist", online=True),

@@ -26,19 +26,29 @@ MIN_SIDE, MAX_SIDE = 64, 4096
 MESSAGE_TYPES = ("start", "resume", "frame", "next", "stop")   # resume: feature 020
 
 
+def segment_due(over: float, phase: Any, reps: int, reps_when_due: Optional[int]) -> bool:
+    """Feature 020: a host that cuts connections (Vercel, 300 s). Once a connection is `over` its segment length,
+    end it as a rep completes (back to neutral, or the count went up since it became due), never mid-rep, and at
+    most 15 s late. Shared by the patient's and the clinic's live sockets."""
+    if over <= 0:
+        return False
+    return over > 15 or phase == "neutral" or (reps_when_due is not None and reps > reps_when_due)
+
+
 class FrameError(PortalError):
     """A message from the browser is not what the contract allows."""
 
 
-def parse(text: Any) -> Dict[str, Any]:
-    """A WebSocket text message as a dict with a known `type`, or FrameError."""
+def parse(text: Any, allowed=MESSAGE_TYPES) -> Dict[str, Any]:
+    """A WebSocket text message as a dict with a known `type`, or FrameError. Each socket names the types it takes:
+    the patient's the five above, the clinic's live session also switch, reset and target (019 slice 7)."""
     if not isinstance(text, str) or len(text.encode("utf-8", "ignore")) > MAX_MESSAGE_BYTES:
         raise FrameError("message too large or not text")
     try:
         data = json.loads(text)
     except ValueError:
         raise FrameError("message is not JSON") from None
-    if not isinstance(data, dict) or data.get("type") not in MESSAGE_TYPES:
+    if not isinstance(data, dict) or data.get("type") not in allowed:
         raise FrameError("unknown message")
     return data
 

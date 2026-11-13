@@ -92,7 +92,7 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 
 ## Slice 7: Live session (Story 5, scenario 4; FR-013)
 
-- [ ] T031 Therapist session page on the browser pose path, recorded under the chosen patient, using 020 slice F's
+- [x] T031 Therapist session page on the browser pose path, recorded under the chosen patient, using 020 slice F's
       transport and lease; switch, reset, target reps; screenshot as a browser download
 
 ## Slice 8: Cutover (FR-015) → milestone M5
