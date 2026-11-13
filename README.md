@@ -164,8 +164,8 @@ has a red-flag message).
 For the AI features (an Anthropic key in `.env` as `LIMBER_ANTHROPIC_API_KEY`), use **P-021**, which has
 summaries, drafts and the coach turned on: Inbox → Draft a reply, Patients → Weekly summary, and the patient's
 Coach page. P-023's message shows a draft withheld for a red flag. The user cases, tried by hand in this demo,
-are in [`docs/user-cases/Limber-User-Cases.pdf`](docs/user-cases/Limber-User-Cases.pdf), also online at
-<https://limber-user-cases.vercel.app>.
+are in [`docs/user-cases/Limber-User-Cases.pdf`](docs/user-cases/Limber-User-Cases.pdf) (updated 13 November 2026:
+the therapist cases re-run in the clinic app).
 
 **Where data lives:** every session is written to one local SQLite file, `data/ptassist.db`
 (set `PTASSIST_DB=/path/to/file.db` to use another location). Exports default to `exports/`.
