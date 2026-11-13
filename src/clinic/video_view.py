@@ -16,7 +16,7 @@ def _e(text) -> str:
     return escape(str(text if text is not None else ""))
 
 
-def content(patients: List[str], exercises: List[tuple]) -> str:
+def content(patients: List[str], exercises: List[tuple], yolo: bool = False) -> str:
     if not patients:
         return ('<div class="page-head"><h1>Video analysis</h1></div><p class="dim">Register a patient first: every '
                 'analysis is recorded under one.</p>')
@@ -27,6 +27,12 @@ def content(patients: List[str], exercises: List[tuple]) -> str:
             + "</div>"
             + field("Describe the clip (optional)", "label", "", extra=' maxlength="60" placeholder="Side view, week 3"',
                     hint="Never a name. The file's own name is not used.")
+            + ('<fieldset class="stack plain-set"><legend class="strong">Analyse with</legend>'
+               '<label class="check"><input type="radio" name="mode" value="yolo" checked> <span>This computer, with the '
+               'clinic model (YOLO). The clip is sent to this computer, analysed, and not kept.</span></label>'
+               '<label class="check"><input type="radio" name="mode" value="browser"> <span>This browser, with MoveNet. '
+               'The clip never leaves the browser.</span></label></fieldset>' if yolo else
+               '<input type="hidden" name="mode" value="browser">')
             + '<label class="field"><span>Clip</span><input class="input" type="file" name="clip" accept="video/*" '
             'required><span class="hint">MP4, MOV or WebM, up to 15 minutes. Film from the side, with the whole body '
             'in view.</span></label>'
@@ -34,15 +40,17 @@ def content(patients: List[str], exercises: List[tuple]) -> str:
             '<p class="small" role="status" data-progress hidden></p>'
             '<p class="error-text" role="alert" data-error hidden></p></form>')
     return ('<div class="page-head"><div class="stack tight"><h1>Video analysis</h1><p class="dim">The clip is analysed '
-            'in this browser and is never uploaded. Only the body points found in it are sent, and the session is '
-            'recorded under the patient as a video measured by browser pose (MoveNet).</p></div></div>'
+            + ('on this computer with the clinic model, or in this browser with MoveNet.' if yolo else
+               'in this browser and is never uploaded. Only the body points found in it are sent, and the session is '
+               'recorded under the patient as a video measured by browser pose (MoveNet).')
+            + '</p></div></div>'
             f'{form}<video class="vh" data-clip muted playsinline></video><canvas class="vh" data-canvas></canvas>'
             '<p class="small dim">Browser pose counts reps and scores form like the clinic model, but reads range of '
             'motion differently, so these sessions are kept apart from others in Review. See How it works.</p>')
 
 
-def page(account, classes: str, patients: List[str], exercises: List[tuple]) -> str:
-    body = shell.top_bar(account, "video") + f'<main class="page wide" id="main">{content(patients, exercises)}</main>'
+def page(account, classes: str, patients: List[str], exercises: List[tuple], yolo: bool = False) -> str:
+    body = shell.top_bar(account, "video") + f'<main class="page wide" id="main">{content(patients, exercises, yolo)}</main>'
     scripts = ("clinic.js",) + tuple(f"vendor/{n}" for n in ("tf-core.min.js", "tf-converter.min.js",
                                                              "tf-backend-webgl.min.js", "pose-detection.min.js")) + (
         "video.js",)

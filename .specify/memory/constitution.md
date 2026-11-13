@@ -1,13 +1,12 @@
 <!--
 Sync Impact Report (temporary; remove before the next amendment)
-Version change: 1.5.0 -> 1.5.1 (PATCH: wording, no new obligation)
-Rationale: on the hosted demo (feature 020) the clinic app (019) and the patient portal are served from one Vercel
-function, mounted at different paths. They stay separate applications with their own factory, routes, cookie and
-static folder; only the "separate launch" wording needed to allow one shared entry point.
-Modified: Technical Constraints, User interface.
+Version change: 1.5.1 -> 1.5.2 (PATCH: wording, no new obligation)
+Rationale: feature 019's cutover removed the Streamlit therapist app, as 1.5.1's follow-up asked. The transition
+wording in Technical Constraints and the Streamlit and pandas mentions in Principle V describe software that is no
+longer in the repository.
+Modified: Principle V (dependency examples), Technical Constraints (User interface).
 Added sections: none. Removed sections: none.
-Follow-ups carried over: at 019's cutover, remove the Streamlit transition wording in Technical Constraints and the
-Streamlit mention in Principle V. specs/020 carries the hosted-demo Constitution Check (1.5.0).
+Follow-ups: none. specs/020 carries the hosted-demo Constitution Check (1.5.0).
 -->
 
 # PT Assist Constitution
@@ -126,7 +125,7 @@ layer will be trusted by clinicians only if its behaviour is pinned the same way
 Prefer the simplest tool that already exists, and make every number a clinician can read.
 
 - Prefer the standard library and dependencies already in `requirements.txt` (`sqlite3`,
-  `pandas`, Streamlit, matplotlib) over new frameworks. A new dependency MUST be justified in
+  Starlette, NumPy, OpenCV) over new frameworks. A new dependency MUST be justified in
   the plan's Complexity Tracking section with the simpler alternative that was rejected.
 - Every metric surfaced to a physical therapist MUST have a defined unit and a plain-language
   definition, in the code docstring and in the UI (for example, range of motion in degrees,
@@ -150,14 +149,13 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
   SQLite through the standard library `sqlite3` module is the default choice; a plan MAY choose
   otherwise only with a justification under Principle V.
 - **User interface**: the clinic app in `interfaces/clinic.py` (feature 019) and the CLI in
-  `interfaces/cli.py` are the therapist's interface surfaces. The Streamlit app in
-  `interfaces/app.py` remains in service only until the clinic app's cutover, then it is
-  removed. The patient portal in `interfaces/patient_portal.py` is the one patient-facing
+  `interfaces/cli.py` are the therapist's interface surfaces (the Streamlit app was removed at the clinic app's
+  cutover). The patient portal in `interfaces/patient_portal.py` is the one patient-facing
   surface. The portal and the clinic app are separate applications, each with its own factory,
   routes, cookie, and static folder; a hosted demo MAY mount both at different path prefixes of
   one entry point. The portal contains no therapist pages, and the clinic app contains no
   patient pages. Business logic MUST live in `src/` and be testable
-  without Streamlit or a running server; interface code only renders and dispatches. Browser
+  without a browser or a running server; interface code only renders and dispatches. Browser
   JavaScript MUST stay free of clinical logic (rep counting, form wording, program order), so
   that behaviour is covered by the Python test suite.
 - **Engine surface**: the public outputs listed in Principle I are the only supported
@@ -200,4 +198,4 @@ and clearly defined numbers make the tool trustworthy and maintainable by a smal
 - **Exceptions** are temporary, recorded in the affected `plan.md` with an expiry condition,
   and revisited at the next amendment.
 
-**Version**: 1.5.1 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-11
+**Version**: 1.5.2 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-11-13

@@ -14,7 +14,7 @@ An intelligent exercise monitoring system using YOLO11 pose estimation to provid
 - **One canonical session record** (local SQLite) with pseudonymous patients, crash-safe logging, and exports in the legacy PTA-Log, JSON, CSV, and text formats
 - **Review over time**: trends per exercise, attention flags with evidence, side-by-side comparison, session reviews with notes and next steps, goals, and review summary exports
 - **Multi-patient tracker**: caseload roster, program assignment from the pre-built programs, week-by-week adherence, a cross-patient queue, discharge, and a roster export
-- **Multiple interfaces**: CLI, Web (Streamlit), and programmatic API
+- **Multiple interfaces**: CLI, the clinic app for therapists, the patient portal, and a programmatic API
 
 ## Installation
 
@@ -100,14 +100,16 @@ python interfaces/cli.py review thresholds P-017 --set rom_regression=5
 python interfaces/cli.py review thresholds P-017 --exercise "Knee Extension" --set rom_regression=5
 python interfaces/cli.py review thresholds P-017 --history
 
-# Launch web interface
-streamlit run interfaces/app.py
+# The clinic app (the therapist side) on http://127.0.0.1:8501/therapist/
+python interfaces/cli.py clinic
 ```
 
-**Live sessions in the browser:** open *Live Session*, pick the patient in the sidebar, choose the
-exercise, target reps, and camera, and press START. The page runs the same engine as the command
-line and records the session as it happens; STOP shows the stored summary with a link to the
-session. Switch exercise, Reset reps, and Save Screenshot work while streaming.
+**Live sessions in the browser:** in the clinic app open *Tools → Live session*, pick the patient, the
+exercise, the target reps and the camera, and press Start. The browser finds the body points (the video never
+leaves it); the same engine counts and records the session as it happens. Stop shows the stored summary with a
+link to the session. Switch exercise, Reset reps and Screenshot (a download) work while it runs.
+*Tools → Video analysis* analyses a recorded clip: with the clinic model installed (`models/yolo11m-pose.pt`)
+on this computer, or in the browser on the hosted demo.
 
 **Limber for patients (home use, demo and study only):** one front page with two doors.
 
@@ -128,8 +130,8 @@ A copy with simulated patients only runs at **<https://limber-demo.vercel.app>**
 
 - **Patients:** the front page. Sign in with `patient017` (password below) or an access code.
 - **Therapists:** the front page's Therapist door, or **<https://limber-demo.vercel.app/therapist>** directly.
-  Inbox, Patients, Schedule, People and My settings are online; the Tools pages (dashboard, sessions,
-  review, tracker, video and live session) are moving there next and run locally for now.
+  Every page is online: Dashboard, Inbox, Patients, Schedule, the Tools pages (sessions, review, tracker,
+  video analysis, live session, how it works), People and My settings.
 
 It uses the same demo sign-ins as below. Access codes are not listed here: they change every time the hosted demo
 is reset, and are given out with the demo. The record is invented and reset often, so nothing entered there is
@@ -143,7 +145,7 @@ counted back from today. It refuses to write into the real record. Rebuild it on
 ```bash
 python scripts/seed_demo.py                                                        # writes data/demo.db
 PTASSIST_DB=data/demo.db python interfaces/cli.py portal serve                     # front page, :8600
-PTASSIST_DB=data/demo.db streamlit run interfaces/app.py --server.port 8501        # therapist app, :8501
+PTASSIST_DB=data/demo.db python interfaces/cli.py clinic                          # therapist side, :8501
 ```
 
 Open **http://127.0.0.1:8600**. These sign-ins exist only in the demo database. Never create them on a real
@@ -220,7 +222,9 @@ ai-pt-assistant/
 │   └── ptlog/              # Canonical record: store, recorder, measures, flags, review, programs, adherence, tracker, views, exports, importer
 ├── interfaces/
 │   ├── cli.py              # Command-line interface (patients, sessions, review, tracker, export, import-legacy)
-│   └── app.py              # Streamlit web app
+│   ├── clinic.py           # The clinic app: the therapist side, under /therapist (rules in src/clinic/)
+│   ├── patient_portal.py   # The patient service and front page
+│   └── vercel_app.py       # Both, as one app for the hosted demo
 ├── specs/                  # Spec Kit feature specs, plans, and tasks
 ├── data/                   # ptassist.db (created on first run, git-ignored)
 ├── exports/                # Session exports (git-ignored)

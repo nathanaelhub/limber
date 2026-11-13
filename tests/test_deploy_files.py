@@ -23,9 +23,10 @@ def test_dockerfile():
 def test_entrypoint_checks_before_anything_starts():
     text = (DEPLOY / "entrypoint.sh").read_text()
     assert text.startswith("#!/bin/sh") and "set -eu" in text
-    order = [text.index(marker) for marker in ("deploy init", "deploy preflight", "streamlit run", "portal serve")]
+    order = [text.index(marker) for marker in ("deploy init", "deploy preflight", "cli.py clinic", "portal serve")]
     assert order == sorted(order)
-    assert "--server.baseUrlPath therapist" in text and "--trust-proxy" in text
+    assert "clinic --host 0.0.0.0 --port 8501 --trust-proxy" in text and "streamlit" not in text
+    assert '--public-origin "${LIMBER_PUBLIC_ORIGIN%/}"' in text                         # the clinic's sign-in origin check
     assert "LIMBER_PUBLIC_ORIGIN:?" in text                                                   # refuses to start without it
     assert "echo $" not in text and "cat /run/secrets" not in text                            # never prints a secret
 
@@ -76,13 +77,13 @@ def test_single_port_caddy_routes_like_the_two_container_setup():
 def test_entrypoint_demo_mode_seeds_once_and_still_checks_first():
     text = (DEPLOY / "entrypoint.sh").read_text()
     assert 'LIMBER_DEMO:-' in text and "seed_demo.py --db" in text and "/data/demo.db" in text
-    order = [text.index(m) for m in ("deploy init", "seed_demo.py --db", "deploy preflight", "streamlit run",
+    order = [text.index(m) for m in ("deploy init", "seed_demo.py --db", "deploy preflight", "cli.py clinic",
                                      "portal serve", "caddy run")]
     assert order == sorted(order)
     # A one-port host sends traffic once it can connect, so the port opens only after both apps answer.
     wait = text.index("until curl -fsS")
     assert text.index("portal serve") < wait < text.index("exec caddy run")
-    assert "127.0.0.1:8600/api/health" in text and "127.0.0.1:8501/therapist/_stcore/health" in text
+    assert "127.0.0.1:8600/api/health" in text and "127.0.0.1:8501/therapist/api/health" in text
     assert '[ ! -f "$PTASSIST_DB" ]' in text                                    # never reseeds over the demo record
     assert 'if [ -n "${PORT:-}" ]' in text                                      # one-port mode only when asked
 

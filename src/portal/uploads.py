@@ -57,7 +57,7 @@ def media_rel(media: Media) -> str:
 
 
 def media_path(media_dir: Path, media: Media) -> Path:
-    """The file on a local install (the Streamlit app and backups use it; the hosted demo has no local file)."""
+    """The file on a local install (local exports and backups use it; the hosted demo has no local file)."""
     return Path(media_dir) / media_rel(media)
 
 
