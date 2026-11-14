@@ -64,7 +64,9 @@ def frame(pid: str, section: str, header: str, body: str) -> str:
                    f'{_e(label)}</a>' for key, label in SECTIONS)
     return (f'<div class="page-head"><div class="stack tight"><h1>Review · <a class="code" href="/therapist/patients/'
             f'{_e(pid)}">{_e(pid)}</a></h1><p class="dim">{_e(header)}</p></div>'
-            f'<a class="btn quiet small sp" href="/therapist/sessions?patient={_e(pid)}">Sessions</a></div>'
+            f'<div class="rowflex sp"><a class="btn quiet small" href="/therapist/review/{_e(pid)}/report">'
+            'Progress report</a>'
+            f'<a class="btn quiet small" href="/therapist/sessions?patient={_e(pid)}">Sessions</a></div></div>'
             f'<nav class="tabs" aria-label="Review sections">{tabs}</nav><div class="stack loose review-body">{body}</div>')
 
 

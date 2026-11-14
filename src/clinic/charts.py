@@ -95,8 +95,10 @@ def _x_labels(points: List[Point]) -> List[str]:
     """One label per point, thinned to about 12 so they never overlap; the table keeps every value."""
     n = len(points)
     every = max(1, math.ceil(n / 12))
-    return [f'<text x="{_x(i, n)}" y="162" text-anchor="middle">{escape(label)}</text>'
-            for i, (label, _) in enumerate(points) if i % every == 0 or i == n - 1]
+    keep = [i for i in range(n) if i % every == 0]
+    if keep and keep[-1] != n - 1:               # the last always shows; drop the step label crowding it
+        keep = keep[:-1] + [n - 1] if len(keep) > 1 else keep + [n - 1]
+    return [f'<text x="{_x(i, n)}" y="162" text-anchor="middle">{escape(points[i][0])}</text>' for i in keep]
 
 
 def _svg(parts: List[str], description: str) -> str:

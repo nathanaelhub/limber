@@ -68,6 +68,8 @@
     document.addEventListener("visibilitychange", refresh);
   }
   document.querySelectorAll("[data-reload]").forEach((b) => b.addEventListener("click", () => location.reload()));
+  // The progress report: the browser's own print dialog, where "Save as PDF" makes the file (021 N3).
+  document.querySelectorAll("[data-print]").forEach((b) => b.addEventListener("click", () => window.print()));
 
   // Sign out.
   document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", async () => {

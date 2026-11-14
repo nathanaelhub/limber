@@ -932,6 +932,13 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
         content = review_view.frame(pid, section, clinic_patients.header(store, pid, clock().date()), body)
         return html(review_view.page(ctx.account, ctx.classes, f"Review · {pid}", content))
 
+    def review_report(ctx: Ctx) -> Response:
+        from src.clinic import report as clinic_report, report_view
+        pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
+        data = clinic_report.build(ctx.store, pid, ctx.request.query_params.get("period"), clock())
+        shell.BADGE.set(0)                       # the printed title goes to the patient: no "(3)" count in it
+        return html(report_view.page(ctx.account, ctx.classes, data))
+
     def review_download(ctx: Ctx) -> Response:
         from src.ptlog import review as ptreview
         from src.ptlog.exports import to_review_csv, to_review_report
@@ -1002,6 +1009,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
 
     rv = "/api/review/{patient_id}"
     clinic_route("/review", review_index, "therapist")
+    clinic_route("/review/{patient_id}/report", review_report, "therapist")          # before {section} (021 N3)
     clinic_route("/review/{patient_id}/{section}", review_section, "therapist")
     clinic_route("/review/{patient_id}/export/{kind}", review_download, "therapist", kind="api")
     clinic_route("/files/{patient_id}/clips/{media_id}", clip_file, "therapist", kind="api")

@@ -259,15 +259,17 @@ def compare(store: SessionStore, session_a: int, session_b: int, exercise: Optio
 
 # ------------------------------------------------------------------ review summary (US6)
 
-def review_summary(store: SessionStore, patient_id: str, period: str = "all", now: Optional[datetime] = None):
-    """Everything the review exports need for a patient and period (FR-020, FR-021)."""
+def review_summary(store: SessionStore, patient_id: str, period: str = "all", now: Optional[datetime] = None,
+                   since: Optional[datetime] = None):
+    """Everything the review exports need for a patient and period (FR-020, FR-021). `since` overrides the period's
+    start (the progress report's "this plan of care", feature 021); `period` then only labels the summary."""
     from .measures import measures_for_session
     from .models import PatientNotFoundError, ReviewSummary
 
     if store.get_patient(patient_id) is None:
         raise PatientNotFoundError(f"Patient '{patient_id}' not found")
     now = _now(now)
-    since = period_start(period, now)
+    since = since if since is not None else period_start(period, now)
     sessions = store.sessions_in_period(patient_id, since)
     names = _exercise_order(sessions)
     trends = {name: _trend_from_sessions(store, patient_id, name, period, sessions) for name in names}

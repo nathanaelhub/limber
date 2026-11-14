@@ -50,3 +50,11 @@ def test_many_points_keep_their_labels_apart():
     c = charts.bar_chart("Form", [(str(i), 70) for i in range(1, 31)])
     assert c.svg.count('y="162"') <= 13 and ">30</text>" in c.svg
     assert ">70</text>" not in c.svg and len(c.rows) == 30                   # no crowded numbers; the table has them
+
+
+def test_the_last_label_never_sits_on_top_of_the_one_before():
+    """16 points thin to every 2nd label; the last (index 15) used to land beside index 14 ("11 Nov12 Nov")."""
+    c = charts.line_chart("ROM", [(f"d{i}", 60 + i) for i in range(16)])
+    shown = [int(x) for x in __import__("re").findall(r'y="162" text-anchor="middle">d(\d+)<', c.svg)]
+    assert shown[-1] == 15 and shown[0] == 0
+    assert all(b - a >= 2 for a, b in zip(shown, shown[1:]))

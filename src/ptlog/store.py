@@ -2979,7 +2979,8 @@ class SessionStore:
     @staticmethod
     def _note(row) -> dict:
         return {"id": row["id"], "patient_id": row["patient_id"], "plan_id": row["plan_id"], "body": row["body"],
-                "ai_drafted": bool(row["ai_drafted"]), "edited": bool(row["edited"]), "created_at": row["created_at"]}
+                "ai_drafted": bool(row["ai_drafted"]), "edited": bool(row["edited"]), "created_at": row["created_at"],
+                "account_id": row["account_id"]}
 
     def therapist_notes(self, patient_id: str) -> List[dict]:
         if not self._vis(patient_id):
