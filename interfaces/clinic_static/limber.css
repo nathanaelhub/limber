@@ -398,3 +398,20 @@ video.clip{width:420px;max-width:100%;border-radius:10px;background:#000}
 .cam-wrap{position:relative;border-radius:var(--radius-card);overflow:hidden;background:#000}
 .cam-wrap video{display:block;width:100%;height:auto}
 .cam-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+
+/* Progress report (021 N3): on screen a normal page; on paper no navigation, tables open, sections kept whole. */
+.report .report-block{padding-top:4px}
+.report .report-foot{margin-top:24px}
+@media print{
+  @page{margin:14mm}
+  html,body{background:#fff !important}
+  .lb.app{background:#fff;color:#000}
+  .lb header.top,.lb .no-print,.lb .tabs,.lb button,.lb summary{display:none !important}
+  .lb .page{padding:0;max-width:none}
+  .lb .report-sec{border:0;box-shadow:none}
+  .lb .report-sec h2,.lb .report-sec h3{break-after:avoid;page-break-after:avoid}
+  .lb figure.chart,.lb .report-sec > p,.lb .report-sec tr{break-inside:avoid;page-break-inside:avoid}
+  .lb .report .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .lb a{color:#000;text-decoration:none}
+  .lb .table{font-size:11px}
+}

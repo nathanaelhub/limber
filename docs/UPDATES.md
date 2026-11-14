@@ -2,6 +2,30 @@
 
 ---
 
+## Update 19 — 2026-11-13 — A Progress Report to Print or Save as PDF
+
+Feature spec: `specs/021-therapist-extras/` (Story N3). No schema change.
+
+- **Where**: Review → **Progress report** (`/therapist/review/<patient>/report`). Choose the last 4 weeks, the last
+  12 weeks, this plan of care, or everything, then press **Print or save as PDF**. The browser makes the PDF, so it
+  works the same locally and on the hosted demo, with nothing installed.
+- **What it shows**:
+  - the plan of care and the program;
+  - range of motion and form by exercise (charts with their table, first to latest, kept apart by how they were
+    measured);
+  - pain at check-in;
+  - goals and progress;
+  - adherence by week;
+  - questionnaire scores with the change;
+  - saved notes, with AI-drafted ones labelled.
+
+  A section with nothing in it says so in one line.
+- **What it leaves out**: anything the patient wrote in their own words (check-in notes, messages, transcripts,
+  captions). Patients appear by code only. The printed title carries no "needs you" count.
+- **Also fixed**: on a chart with many points, the last date label no longer overlaps the one before it.
+
+---
+
 ## Update 18 — 2026-11-13 — The Clinic App Replaces Streamlit
 
 Feature spec: `specs/019-clinic-app/` (slice 8, the cutover). No schema change.
