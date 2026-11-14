@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-13
 
-**Status**: Draft; awaiting the owner's approval and the decisions under "Decision Gates". Depends on 017 (plans of
+**Status**: Approved 13 November 2026, with the owner's decisions D1 to D3 below. Depends on 017 (plans of
 care and visits), 019 (the clinic app, cut over in #93), and 020 (the hosted demo).
 
 **Input**: When planning the rest of the therapist side (12 November 2026), the owner chose four additions for after
@@ -57,7 +57,8 @@ Start a live session and see the target.
    A set completes at 10.
 3. **Given** the therapist changes Squat from 10 to 12 reps, **Then** the current program is changed in place (the
    adherence history is unchanged), and the patient sees 12 on their next page load.
-4. **Given** the therapist adds Bridge or removes Leg extension, **Then** this follows Decision Gate D2.
+4. **Given** the therapist adds Bridge or removes Leg extension, **Then** a new assignment starts today with the
+   details carried over for the exercises in both, and past weeks keep the list they had (D2).
 5. **Given** a note that looks like it identifies someone (the existing privacy check), **Then** the therapist is
    warned and can edit it or send it anyway, as with replies.
 6. **Given** reps outside 1–100, sets outside 1–10, hold outside 0–120 seconds, or a note over 200 characters,
@@ -174,9 +175,11 @@ last.
   (0–120), `frequency` (`daily` or `per_week` with `days` 1–7), and `note` (up to 200 characters). Missing values
   fall back to today's behaviour.
 - **FR-002**: Changing a detail MUST edit the current assignment in place and MUST NOT change adherence history.
-- **FR-003**: Adding or removing an exercise MUST follow Decision Gate D2.
+- **FR-003**: Adding or removing an exercise MUST start a new assignment from today, carrying the details over for
+  exercises in both (D2).
 - **FR-004**: The patient's Today page, exercise list and live session MUST show the details in one plain sentence,
-  with the note. The live session's target MUST follow Decision Gate D1.
+  with the note. The live session's target MUST be the prescribed reps, else the
+  goal's target reps, else the exercise's default (D1).
 - **FR-005**: The AI extracts (018) MUST include the prescription. A draft prompt MUST say not to contradict it.
 
 ### N2, proposed time
@@ -218,13 +221,13 @@ last.
 ## Decision Gates (owner)
 
 - **D1, which target wins in a live session?** The prescribed reps (N1), the patient's goal target, or the exercise's
-  default. *Recommended:* prescription, then goal, then default. The prescription is today's dose; a goal is where
+  default. **Owner's decision (13 Nov):** prescription, then goal, then default. The prescription is today's dose; a goal is where
   the patient is heading.
 - **D2, adding or removing an exercise.** Either (a) the current program changes in place, which is simplest but
   makes past weeks' adherence count against the new list, or (b) a new assignment starts today with the details
-  carried over for exercises in both, so past weeks keep the list they had. *Recommended:* (b). It reuses
+  carried over for exercises in both, so past weeks keep the list they had. **Owner's decision (13 Nov):** (b). It reuses
   `assign_program` and keeps adherence honest.
-- **D3, the order of the four stories.** *Recommended:* N3 first (no schema change), then the v19 migration with N1,
+- **D3, the order of the four stories.** **Owner's decision (13 Nov):** N3 first (no schema change), then the v19 migration with N1,
   then N2, then N4. That is one demo reset, after N1.
 
 ## Success Criteria
