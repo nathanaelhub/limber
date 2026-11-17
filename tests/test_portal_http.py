@@ -119,7 +119,7 @@ class TestToday:
         assert r.headers["cache-control"] == "no-store"
         assert body["patient_id"] == "P-017" and body["program"] == {"name": "Knee Home Program", "sessions_per_week": 3}
         assert body["exercises"][0] == {"key": "knee_extension", "name": "Knee Extension", "target_reps": 12,
-                                        "done_today": True}
+                                        "dose": "", "note": "", "done_today": True}
         assert body["exercises"][1]["done_today"] is False and body["week"]["planned"] == 3
 
     def test_patient_without_a_program(self, client, seeded):

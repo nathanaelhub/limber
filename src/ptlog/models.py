@@ -791,6 +791,7 @@ class Assignment:
     start_date: str                 # YYYY-MM-DD
     end_date: Optional[str]         # YYYY-MM-DD or None
     created_at: str
+    exercise_details: Dict[str, dict] = field(default_factory=dict)   # key -> sets, reps, hold, how often, note
 
 
 @dataclass

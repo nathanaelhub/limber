@@ -2,6 +2,28 @@
 
 ---
 
+## Update 20 — 2026-11-16 — Sets, Reps, Hold and a Note for Each Exercise
+
+Feature spec: `specs/021-therapist-extras/` (Story N1). **Schema v19**, so the hosted demo needs one reset
+(`deploy demo-reset`), which issues new patient access codes.
+
+- **Where**: Patients → a patient → **Exercises** → **Current program**. Each exercise has **Change details**: sets
+  (1–10), reps (1–100), hold in seconds (0–120), how often (every day, or a number of days a week), and a note to the
+  patient of up to 200 characters. Every box is optional; an empty one falls back to the usual target.
+- **Changing a number** edits the current program in place, so adherence history is unchanged.
+- **Adding or removing an exercise** starts a new program today with the details carried over, and past weeks keep
+  the list they had (owner's decision D2). A program that started today is changed in place.
+- **The note** goes through the same privacy check as replies: a note that looks like it holds a phone number or
+  similar asks before it is saved.
+- **The patient** reads "3 sets of 10 · 5-second hold · Every day" and the note on Today and in the live session.
+  The live session's target is the prescribed reps, else the goal's, else the exercise's default (owner's decision
+  D1).
+- **The AI**: the draft-reply and weekly-summary extracts carry the prescription, and the draft prompt says not to
+  contradict it. The exercise coach answers with the prescription when there is one. The progress report's Program
+  table shows it too.
+- **v19** also adds the two columns the next stories need (`appointments.requested_starts_at` for N2,
+  `admin_audit.account_id` for N4), so there is only one reset.
+
 ## Update 19 — 2026-11-13 — A Progress Report to Print or Save as PDF
 
 Feature spec: `specs/021-therapist-extras/` (Story N3). No schema change.

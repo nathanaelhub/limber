@@ -230,8 +230,58 @@ def visits_section(pid: str, visits: List[dict], live_plans: List[Plan], zone: s
     return section("Visits", body + f'<p class="hint">Times are clinic time ({_e(zone)}).</p>')
 
 
+def _detail_form(pid: str, item: dict) -> str:
+    d = item["detail"]
+    often = select("How often", "frequency", [("", "Not set"), ("daily", "Every day"), ("per_week", "Days a week")],
+                   chosen=d.get("frequency") or "", cls="w-day")
+    inner = ('<input type="hidden" name="key" value="' + _e(item["key"]) + '"><div class="rowflex">'
+             + field("Sets", "sets", d.get("sets", ""), "number", cls="w-time", extra=' min="1" max="10"')
+             + field("Reps", "reps", d.get("reps", ""), "number", cls="w-time", extra=' min="1" max="100"')
+             + field("Hold (seconds)", "hold_seconds", d.get("hold_seconds", ""), "number", cls="w-time",
+                     extra=' min="0" max="120"')
+             + often
+             + field("Days a week", "days", d.get("days", ""), "number", cls="w-time", extra=' min="1" max="7"')
+             + "</div>"
+             + field("Note to the patient (optional)", "note", d.get("note", ""), extra=' maxlength="200"',
+                     hint="Up to 200 characters, such as \"Keep your knee soft at the top\". No names or contact "
+                          "details. Empty boxes fall back to the usual target.")
+             + '<input type="hidden" name="confirm" value="">')
+    return form(f"/api/patients/{pid}/program/exercise", inner, "Save details", quiet=True)
+
+
+def current_program(pid: str, current: Optional[dict]) -> str:
+    """The current program's exercises, each with its details and its own edit form (021 N1)."""
+    if current is None:
+        return ""
+    items = []
+    for x in current["exercises"]:
+        line = x["dose"] or (f'{x["target"]} reps (the usual target)' if x["target"] else "")
+        note = x["detail"].get("note")
+        remove = (form(f"/api/patients/{pid}/program/remove", f'<input type="hidden" name="key" value="{_e(x["key"])}">',
+                       "Remove", cls="inline-form", quiet=True,
+                       confirm=f"Remove {x['name']}? A new program starts today without it; past weeks keep their list.")
+                  if len(current["exercises"]) > 1 else "")
+        items.append(f'<li class="top"><div class="stack tight grow-col"><span class="strong">{_e(x["name"])}</span>'
+                     + (f'<span>{_e(line)}</span>' if line else "")
+                     + (f'<span class="small dim">“{_e(note)}”</span>' if note else "")
+                     + ("" if x["known"] else '<span class="small warn-text">No longer in the exercise list, so the '
+                        'patient does not see it.</span>')
+                     + f'<details class="edit"><summary class="btn quiet small">Change details</summary>'
+                     + _detail_form(pid, x) + "</details></div>" + remove + "</li>")
+    add = ""
+    if current["addable"]:
+        add = ('<details class="edit"><summary class="btn quiet small">Add an exercise</summary>'
+               + form(f"/api/patients/{pid}/program/add", select("Exercise", "key", current["addable"], cls="w-wide"),
+                      "Add", confirm="Add this exercise? A new program starts today with it; past weeks keep their "
+                                     "list.") + "</details>")
+    lead = (f'<p class="small dim">{_e(current["name"])}, from {_e(current["start"])}. Changing a number edits this '
+            'program in place. Adding or removing an exercise starts a new one today.</p>')
+    return section("Current program", lead + f'<ul class="lines">{"".join(items)}</ul>' + add)
+
+
 def exercises(pid: str, programs, exercise_names: List[tuple], history: List[dict], questionnaires: List[dict],
-              choices: List[tuple], interval_options: List[tuple], problems: List[str], today: date) -> str:
+              choices: List[tuple], interval_options: List[tuple], problems: List[str], today: date,
+              current: Optional[dict] = None) -> str:
     options = [(p.id, p.name) for p in programs] + [("custom", "Custom: choose the exercises")]
     assign = form(f"/api/patients/{pid}/program",
                   '<div class="rowflex">' + select("Program", "program", options, cls="w-wide")
@@ -251,7 +301,7 @@ def exercises(pid: str, programs, exercise_names: List[tuple], history: List[dic
                  f'<th scope="col">Exercises</th></tr></thead><tbody>{rows}</tbody></table></div>')
     else:
         table = '<p class="dim">No program assigned yet.</p>'
-    program = section("Program", table + '<details class="edit"><summary class="btn quiet small">Assign a program'
+    program = current_program(pid, current) + section("Program history" if current else "Program", table + '<details class="edit"><summary class="btn quiet small">Assign a program'
                       '</summary>' + assign + "</details>")
     items = []
     for q in questionnaires:

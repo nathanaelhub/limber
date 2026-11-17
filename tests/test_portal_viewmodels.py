@@ -59,8 +59,9 @@ class TestTodayView:
         assert view["program"] == {"name": "Knee Home Program", "sessions_per_week": 2}
         assert [(p["title"], p["has_program"]) for p in view["plans"]] == [("Plan of care", True)]
         assert view["exercises"] == [
-            {"key": "knee_extension", "name": "Knee Extension", "target_reps": 10, "done_today": False},
-            {"key": "squat", "name": "Squat", "target_reps": 15, "done_today": False}]       # the goal's target wins
+            {"key": "knee_extension", "name": "Knee Extension", "target_reps": 10, "dose": "", "note": "",
+             "done_today": False},
+            {"key": "squat", "name": "Squat", "target_reps": 15, "dose": "", "note": "", "done_today": False}]       # the goal's target wins
         assert view["week"] == {"done": 0, "planned": 2} and view["streak_weeks"] == 3 and view["message"] is None
 
     def test_done_today_needs_a_counted_rep_today(self, patient, make_session):

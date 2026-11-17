@@ -20,6 +20,7 @@
 
   function render(state) {
     el("exercise").textContent = state.exercise;
+    el("dose").textContent = [state.dose, state.note].filter(Boolean).join(". ");
     el("step").textContent = "Exercise " + state.index + " of " + state.total;
     el("reps").textContent = String(state.rep_count);
     el("target").textContent = String(state.target_reps);

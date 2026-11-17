@@ -329,9 +329,14 @@
           tick.setAttribute("stroke-linecap", "round"); tick.setAttribute("stroke-linejoin", "round");
           svg.appendChild(tick); check.appendChild(svg);
         }
-        var name = document.createElement("span"); name.className = "name"; name.textContent = e.name;
-        var amount = document.createElement("span"); amount.className = "amount"; amount.textContent = e.target_reps + " reps";
-        li.appendChild(check); li.appendChild(name); li.appendChild(amount); list.appendChild(li);
+        // The therapist's prescription (021 N1) in one sentence, with their note underneath; else the target reps.
+        var name = document.createElement("span"); name.className = "name";
+        var title = document.createElement("span"); title.textContent = e.name; name.appendChild(title);
+        if (e.dose) { var dose = document.createElement("span"); dose.className = "ex-dose"; dose.textContent = e.dose; name.appendChild(dose); }
+        if (e.note) { var note = document.createElement("span"); note.className = "ex-note"; note.textContent = e.note; name.appendChild(note); }
+        li.appendChild(check); li.appendChild(name);
+        if (!e.dose) { var amount = document.createElement("span"); amount.className = "amount"; amount.textContent = e.target_reps + " reps"; li.appendChild(amount); }
+        list.appendChild(li);
       });
       (d.notes || []).forEach(function (n) {
         var li = document.createElement("li"); li.textContent = n; document.getElementById("notes").appendChild(li);

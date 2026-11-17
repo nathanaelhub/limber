@@ -150,6 +150,25 @@ def program_rows(store: SessionStore, patient_id: str, today: date) -> List[dict
             for h in store.assignment_history(patient_id)]
 
 
+def current_program(store: SessionStore, patient_id: str, today: date) -> Optional[dict]:
+    """The current program's exercises with their details (021 N1), for the Exercises tab; None without one."""
+    from src.portal import viewmodels
+    from src.ptlog import programs
+    a = store.active_assignment(patient_id, today)
+    if a is None:
+        return None
+    shown = {e["key"]: e for e in viewmodels.program_exercises(store, patient_id, today)}
+    catalog = programs.load_catalog()
+    items = []
+    for key in a.exercise_keys:
+        e = shown.get(key)
+        items.append({"key": key, "name": programs.exercise_name(key), "detail": a.exercise_details.get(key) or {},
+                      "dose": e["dose"] if e else "", "target": e["target_reps"] if e else None,
+                      "default": catalog.exercises.get(key, {}).get("target_reps"), "known": e is not None})
+    return {"name": a.program_name, "start": a.start_date, "exercises": items,
+            "addable": [(k, programs.exercise_name(k)) for k in catalog.exercises if k not in a.exercise_keys]}
+
+
 def access_line(status) -> str:
     """Home access in one line; the code itself is never stored, so it is never shown again."""
     if status.state == "active":

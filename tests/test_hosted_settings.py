@@ -33,9 +33,9 @@ def test_the_v18_upgrade_keeps_every_row(tmp_db):
     with SessionStore(tmp_db).open() as s:
         after = {t: s.conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                  for (t,) in s.conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
-    assert SCHEMA_VERSION == 18 and [v for v, _ in MIGRATIONS][-1] == 18
+    assert SCHEMA_VERSION >= 18 and [v for v, _ in MIGRATIONS][-1] == SCHEMA_VERSION
     for table, n in before.items():
-        assert after[table] == (n + 1 if table == "schema_version" else n), table
+        assert after[table] == (n + SCHEMA_VERSION - 17 if table == "schema_version" else n), table
     assert {"login_failures", "login_lockouts"} <= set(after)
 
 

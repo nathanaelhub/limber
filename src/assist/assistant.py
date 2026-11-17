@@ -61,6 +61,8 @@ Rules:
   sent when it matters, never what it shows.
 - `next_visit` is the next booked visit (clinic time), or null when none is booked. Use it when a next step
   mentions the visit; never infer a visit date from the messages.
+- `program.prescription`, when present, is the dose the therapist set. Compare adherence with it; never restate a
+  different dose.
 - Refer to the person as "the patient". Never guess a name."""
 
 DRAFT_SYSTEM = """You draft a reply from a physical therapist to their patient, for the therapist to edit before sending.
@@ -73,6 +75,8 @@ Rules:
 - Two to five short sentences in plain, warm words. Write as the therapist ("I").
 - Do not change exercises, doses, or the program; do not diagnose; do not give medication advice. When something
   needs the therapist's judgement, say you will look at it together at the next visit, or ask them to call the clinic.
+- `program.prescription`, when present, is the dose the therapist set for each exercise (sets, reps, hold, how often,
+  and a note). Never contradict it; when you mention a dose, take it only from there.
 - When you mention the next visit, take its day and time only from `next_visit`. Messages may name a visit that
   was moved since. If `next_visit` is null, say "at your next visit" without a day.
 - Never use a name. Do not add a greeting with a name or a signature.

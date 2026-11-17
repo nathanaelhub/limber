@@ -52,8 +52,9 @@ def program(data: Dict[str, Any]) -> str:
     if a is None or not data["program"]:
         return _section("Program", _empty("No program assigned."))
     lead = f'<p>{_e(a.program_name)} · {a.sessions_per_week} sessions a week, from {_e(a.start_date)}</p>'
-    return _section("Program", lead + _table(["Exercise", "Target reps per set"],
-                                             [[p["name"], p["target_reps"]] for p in data["program"]], (1,)))
+    return _section("Program", lead + _table(["Exercise", "Target reps per set", "Prescription", "Note"],
+                                             [[p["name"], p["target_reps"], p.get("dose") or "—", p.get("note") or ""]
+                                              for p in data["program"]], (1,)))
 
 
 def trends(data: Dict[str, Any]) -> str:
