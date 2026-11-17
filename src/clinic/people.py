@@ -101,3 +101,81 @@ def reassign(store: SessionStore, actor: Account, patient_id: str, therapist_id:
 def expires_words(iso: str, now: datetime) -> str:
     days = (datetime.fromisoformat(iso[:19]) - now).days
     return "Ends today" if days <= 0 else f"Ends in {days} day{'s' if days != 1 else ''}"
+
+
+# ----------------------------------------------------------------------------- History (feature 021 N4)
+
+PAGE = 200
+KINDS = (("all", "Everything"), ("accounts", "Account changes"), ("signins", "Staff sign-ins"))
+_ACCOUNT_EVENTS = {
+    "account_created": "Account created", "invite_created": "Invite created", "invite_used": "Invite used",
+    "invite_revoked": "Invite revoked", "account_disabled": "Account disabled", "account_enabled": "Account re-enabled",
+    "patient_reassigned": "Patient moved to another therapist", "prefs_changed": "Settings changed",
+}
+_SIGNIN_EVENTS = {
+    "login_ok": "Signed in", "login_failed": "Sign-in failed", "locked_out": "Locked out after failed sign-ins",
+    "logout": "Signed out", "password_set": "Installation password set", "password_cleared": "Installation password cleared",
+}
+
+
+def kind_key(value) -> str:
+    return value if value in dict(KINDS) else "all"
+
+
+def _name(store: SessionStore, account_id) -> str:
+    if account_id is None:
+        return "nobody recorded"
+    account = store.account_get(int(account_id))
+    if account is None:
+        return "a removed account"
+    if account.role == "patient":
+        return account.patient_id or "a patient"         # a patient appears only by code
+    return account.display_name or account.username
+
+
+def _subject(store: SessionStore, subject: Optional[str]) -> str:
+    """To whom or what, as names and patient codes only: "therapist:5" → the account's name, "invite:3" → "invite 3",
+    "P-001->4" → "P-001 to <name>"."""
+    if not subject:
+        return ""
+    if "->" in subject:
+        pid, _, tid = subject.partition("->")
+        return f"{pid} to {_name(store, tid) if tid.isdigit() else tid}"
+    parts = subject.split(":")
+    if parts[-2:-1] == ["invite"] or parts[0] == "invite":
+        return f"{parts[0]} invite {parts[-1]}" if parts[0] != "invite" else f"invite {parts[-1]}"
+    if len(parts) == 2 and parts[1].isdigit():
+        return f"{_name(store, parts[1])} ({parts[0]})"
+    return subject
+
+
+def _signin_who(store: SessionStore, account_id) -> str:
+    if account_id is None:
+        return "account not recorded"                     # before v19
+    if int(account_id) == store.UNKNOWN_USERNAME:
+        return "unknown username"
+    return _name(store, account_id)
+
+
+def history(store: SessionStore, actor: Account, kind: str = "all", page: int = 0) -> dict:
+    """Account changes and staff sign-in events, newest first, PAGE rows at a time, with names resolved. No clinical
+    field and no patient access history (that stays on the patient's page). Admins only."""
+    _require_admin(actor)
+    kind, page = kind_key(kind), max(0, int(page or 0))
+    want = (page + 1) * PAGE + 1                          # one more than shown, to know whether older rows exist
+    rows: List[dict] = []
+    with _every_patient(store):
+        if kind in ("all", "accounts"):
+            for r in store.account_audit_list(want):
+                rows.append({"at": r["at"], "kind": "Account", "what": _ACCOUNT_EVENTS.get(r["event"], r["event"]),
+                             "who": _name(store, r["actor"]) if r["actor"] is not None else "the system",
+                             "subject": _subject(store, r["subject"])})
+        if kind in ("all", "signins"):
+            for r in store.admin_audit_list(want):
+                rows.append({"at": r["at"], "kind": "Sign-in", "what": _SIGNIN_EVENTS.get(r["event"], r["event"]),
+                             "who": _signin_who(store, r.get("account_id")), "subject": ""})
+    rows.sort(key=lambda r: r["at"], reverse=True)
+    shown = rows[page * PAGE:(page + 1) * PAGE]
+    for r in shown:
+        r["when"] = r["at"][:16].replace("T", " ")
+    return {"kind": kind, "page": page, "rows": shown, "older": len(rows) > (page + 1) * PAGE}

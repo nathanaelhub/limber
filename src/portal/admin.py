@@ -43,7 +43,7 @@ def set_password(store: SessionStore, password: Optional[str]) -> Account:
                                           password=password, role="therapist", is_admin=True)
     else:
         store.account_set_password(account.id, salt, digest)
-    store.admin_audit_add("password_set")
+    store.admin_audit_add("password_set", account_id=account.id)
     return account
 
 
@@ -52,7 +52,7 @@ def clear_password(store: SessionStore) -> bool:
     if account is None or not account.has_password:
         return False
     store.account_set_password(account.id, None, None)
-    store.admin_audit_add("password_cleared")
+    store.admin_audit_add("password_cleared", account_id=account.id)
     return True
 
 
@@ -69,15 +69,19 @@ def check_password(store: SessionStore, password: Optional[str], client: str, li
     if not username:
         installation = store.installation_account()
         username = installation.username if installation and installation.has_password else "-"
+    # Which account the attempt was for (021 N4): a known username's account, else "unknown username"; the typed
+    # name itself is never stored, as it could be a mistyped password.
+    known = store.account_by_username(username.strip().lower()) if isinstance(username, str) and username.strip() else None
+    tried = known.id if known is not None else store.UNKNOWN_USERNAME
     try:
         account = accounts.authenticate(store, username, password, client, limiter, roles=STAFF)
     except LockedOut:
-        store.admin_audit_add("locked_out", client)
+        store.admin_audit_add("locked_out", client, tried)
         raise
     except AccessDenied:
-        store.admin_audit_add("login_failed", client)
+        store.admin_audit_add("login_failed", client, tried)
         raise AccessDenied(DENIED_ADMIN_MESSAGE)
-    store.admin_audit_add("login_ok", client)
+    store.admin_audit_add("login_ok", client, account.id)
     return account
 
 
@@ -130,9 +134,10 @@ def signed_in(store: SessionStore, token: Optional[str], clock: Callable[[], dat
 
 
 def sign_out(store: SessionStore, token: Optional[str], client: Optional[str] = None) -> None:
+    row = store.admin_token_get(token_hash(token)) if token else None
     if token and store.admin_token_delete(token_hash(token)):
-        store.admin_audit_add("logout", client)
+        store.admin_audit_add("logout", client, row[2] if row else None)
 
 
-def history(store: SessionStore, limit: int = 200) -> List[dict]:
-    return store.admin_audit_list(limit)
+def history(store: SessionStore, limit: int = 200, offset: int = 0) -> List[dict]:
+    return store.admin_audit_list(limit, offset)

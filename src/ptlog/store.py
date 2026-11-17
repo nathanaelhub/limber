@@ -2236,8 +2236,9 @@ class SessionStore:
                           (self._now(), event, actor, subject))
         self.conn.commit()
 
-    def account_audit_list(self, limit: int = 200) -> List[dict]:
-        rows = self.conn.execute(f"SELECT * FROM account_audit ORDER BY id DESC LIMIT {int(limit)}").fetchall()
+    def account_audit_list(self, limit: int = 200, offset: int = 0) -> List[dict]:
+        rows = self.conn.execute(f"SELECT * FROM account_audit ORDER BY id DESC LIMIT {int(limit)} "
+                                 f"OFFSET {int(offset)}").fetchall()
         return [{"at": r["at"], "event": r["event"], "actor": r["actor"], "subject": r["subject"]} for r in rows]
 
     # therapist sign-in tokens (feature 007, US6; per account since feature 016)
@@ -2259,13 +2260,20 @@ class SessionStore:
         self.conn.commit()
         return cur.rowcount > 0
 
-    def admin_audit_add(self, event: str, client: Optional[str] = None) -> None:
-        self.conn.execute("INSERT INTO admin_audit (at, event, client) VALUES (?, ?, ?)", (self._now(), event, client))
+    # A staff sign-in event's account (021 N4, v19): the account's id; UNKNOWN_USERNAME for a failed attempt with a
+    # username no account has (the typed name is never stored); NULL for events from before v19.
+    UNKNOWN_USERNAME = 0
+
+    def admin_audit_add(self, event: str, client: Optional[str] = None, account_id: Optional[int] = None) -> None:
+        self.conn.execute("INSERT INTO admin_audit (at, event, client, account_id) VALUES (?, ?, ?, ?)",
+                          (self._now(), event, client, account_id))
         self.conn.commit()
 
-    def admin_audit_list(self, limit: int = 200) -> List[dict]:
-        rows = self.conn.execute(f"SELECT at, event, client FROM admin_audit ORDER BY id DESC LIMIT {int(limit)}").fetchall()
-        return [{"at": r["at"], "event": r["event"], "client": r["client"]} for r in rows]
+    def admin_audit_list(self, limit: int = 200, offset: int = 0) -> List[dict]:
+        rows = self.conn.execute(f"SELECT at, event, client, account_id FROM admin_audit ORDER BY id DESC "
+                                 f"LIMIT {int(limit)} OFFSET {int(offset)}").fetchall()
+        return [{"at": r["at"], "event": r["event"], "client": r["client"], "account_id": r["account_id"]}
+                for r in rows]
 
     # plans of care (feature 017); the rules live in src/portal/plans.py
 
