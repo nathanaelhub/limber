@@ -46,14 +46,21 @@
     }
   });
 
-  async function answerVisit(card) {
+  async function answerVisit(card, confirm) {
     const answer = card.querySelector("input[name=answer]:checked").value;
-    await api(base + "/visits/" + card.dataset.visit + "/answer", {
-      answer,
-      date: card.querySelector("input[name=date]").value,
-      time: card.querySelector("input[name=time]").value,
-      note: card.querySelector("input[name=note]").value,
-    });
+    try {
+      await api(base + "/visits/" + card.dataset.visit + "/answer", {
+        answer,
+        date: card.querySelector("input[name=date]").value,
+        time: card.querySelector("input[name=time]").value,
+        note: card.querySelector("input[name=note]").value,
+        confirm: !!confirm,
+      });
+    } catch (err) {
+      // Accepting a proposed time that overlaps another visit asks first (021 N2).
+      if (!confirm && err.data && err.data.needs_confirm && window.confirm(err.message)) return answerVisit(card, true);
+      throw err;
+    }
   }
 
   // ---- the reply box

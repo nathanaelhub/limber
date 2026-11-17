@@ -7,7 +7,7 @@ from html import escape
 from typing import List
 
 from src.clinic import people as people_rules, shell
-from src.clinic.patients_view import check, field, form, section, select
+from src.clinic.patients_view import check, field, form, proposal, section, select
 from src.ptlog.models import Account
 
 
@@ -34,9 +34,10 @@ def schedule(groups: dict, zone: str) -> str:
             base = f"/api/patients/{v['patient_id']}/visits/{v['id']}"
             note = f'<blockquote class="bubble self-start">“{_e(v["request_note"])}”</blockquote>' if v["request_note"] else ""
             cards.append(f'<div class="card stack resched"><p>{_who(v)}</p><p class="dim">Booked {_e(_when(v))}, '
-                         f'{v["minutes"]} minutes · asks to move it</p>{note}<div class="rowflex top-row">'
+                         f'{v["minutes"]} minutes · asks to move it</p>{proposal(v["patient_id"], v)}{note}'
+                         '<div class="rowflex top-row">'
                          + form(f"{base}/move", '<div class="rowflex">' + field("Day", "date", v["date"], "date", cls="w-day")
-                                + field("Time", "time", v["time"], "time", cls="w-time") + "</div>", "Offer this time")
+                                + field("Time", "time", v["time"], "time", cls="w-time") + "</div>", "Offer another time" if v.get("requested_label") else "Offer this time")
                          + form(f"{base}/decline", field("Note to the patient (optional)", "note", "",
                                                         extra=' maxlength="300"'), f"Keep {_when(v)}", quiet=True)
                          + "</div></div>")

@@ -611,7 +611,12 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             if pid is None:
                 return _json({"error": "Please sign in."}, 401)
             try:
-                a = plans.request_reschedule(store, pid, request.path_params["appointment_id"], body.get("note"))
+                day, at = body.get("date"), body.get("time")       # an optional proposed time (021 N2)
+                proposed = f"{day}T{at}" if isinstance(day, str) and isinstance(at, str) and day and at else None
+                if bool(day) != bool(at):
+                    return _json({"error": "Give both a day and a time, or leave both empty."}, 400)
+                a = plans.request_reschedule(store, pid, request.path_params["appointment_id"], body.get("note"),
+                                             proposed)
             except PTLogError as err:
                 return _bad(err)
             return _json(plans.appointment_json(store, a))

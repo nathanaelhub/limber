@@ -2,7 +2,7 @@
 // text, dates and times as strings, numbers as numbers, a checkbox as true or false, a multiple select as a list.
 // A confirm text asks first. On success the page reloads, goes where the server says, or (data-result-once) shows
 // what the server hands back exactly once, such as a new access code. A form with a hidden "confirm" field asks
-// before saving text the privacy check flagged (021 N1).
+// before saving text the privacy check flagged (021 N1), or before accepting a visit time that overlaps (021 N2).
 "use strict";
 
 (function () {
@@ -25,7 +25,9 @@
     }
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;
+      const resend = form.querySelector("input[type=hidden][name=confirm]");
+      // A resend after "anyway?" was already confirmed once; don't ask the form's own question again.
+      if (form.dataset.confirm && !(resend && resend.value) && !window.confirm(form.dataset.confirm)) return;
       const error = form.querySelector("[data-error]");
       const button = form.querySelector("button[type=submit]");
       error.hidden = true;
@@ -54,7 +56,7 @@
         // The privacy check (as for replies): say what it found, and save anyway only when the person agrees.
         const again = form.querySelector("input[type=hidden][name=confirm]");
         if (err.data && err.data.needs_confirm && again && !again.value) {
-          if (window.confirm(err.message + "\n\nSave anyway?")) {
+          if (window.confirm(err.message.endsWith("?") ? err.message : err.message + "\n\nSave anyway?")) {
             again.value = "yes";
             form.requestSubmit();
             again.value = "";

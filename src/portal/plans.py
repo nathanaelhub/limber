@@ -12,7 +12,7 @@ travelling with their phone still sees the time the clinic means.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -25,6 +25,9 @@ NOTE_MAX = 200
 REQUEST_MAX = 500
 DEFAULT_TIME_ZONE = "America/Chicago"
 TIME_ZONE_KEY = "time_zone"
+PROPOSE_DAYS = 90                      # how far ahead a patient may propose a time (021 FR-006)
+PROPOSE_STEP = 5                       # minutes
+ACCEPTED_NOTE = "Moved at your request."
 
 
 # ---------------------------------------------------------------- plans
@@ -161,20 +164,89 @@ def cancel(store: SessionStore, appointment_id: int) -> Appointment:
     return store.appointment_update(appointment_id, status="cancelled", reschedule_requested=False)
 
 
-def request_reschedule(store: SessionStore, patient_id: str, appointment_id, note) -> Appointment:
+def _now_utc(store: SessionStore) -> datetime:
+    return store.clock().astimezone(timezone.utc)
+
+
+def proposed_time(store: SessionStore, local) -> Optional[str]:
+    """A time the patient proposes, in clinic time, as UTC; None when they gave none (021 FR-006). It must be in
+    the future, within 90 days, and on a 5-minute step."""
+    if local in (None, "", "T"):
+        return None
+    try:
+        when = datetime.fromisoformat(local) if isinstance(local, str) else None
+    except ValueError:
+        when = None
+    if when is None or when.tzinfo is not None:
+        raise PortalError("Choose a day and a time for the new visit.")
+    if when.second or when.microsecond or when.minute % PROPOSE_STEP:
+        raise PortalError(f"Choose a time on a {PROPOSE_STEP}-minute step, such as 09:00 or 09:05.")
+    utc = datetime.fromisoformat(to_utc(store, when))
+    now = _now_utc(store)
+    if utc <= now:
+        raise PortalError("Choose a time in the future.")
+    if utc > now + timedelta(days=PROPOSE_DAYS):
+        raise PortalError(f"Choose a time within the next {PROPOSE_DAYS} days.")
+    return utc.isoformat()
+
+
+def request_reschedule(store: SessionStore, patient_id: str, appointment_id, note, proposed=None) -> Appointment:
+    """The patient asks to move a visit, optionally proposing a time. A second request replaces the first."""
     a = store.appointment_get(appointment_id)
     if a is None or a.patient_id != patient_id:
         raise PortalError("No such appointment.")
     if a.status == "cancelled":
         raise PortalError("This appointment was cancelled.")
-    if datetime.fromisoformat(a.starts_at) <= store.clock().astimezone(timezone.utc):
+    if datetime.fromisoformat(a.starts_at) <= _now_utc(store):
         raise PortalError("This appointment has already happened.")
     return store.appointment_update(a.id, reschedule_requested=True, request_note=_note(note, REQUEST_MAX),
-                                    response_note="")
+                                    response_note="", requested_starts_at=proposed_time(store, proposed))
 
 
 def decline_request(store: SessionStore, appointment_id: int, note: str = "") -> Appointment:
     return store.appointment_update(appointment_id, reschedule_requested=False, response_note=_note(note, REQUEST_MAX))
+
+
+def proposal_passed(store: SessionStore, a: Appointment) -> bool:
+    return bool(a.requested_starts_at) and datetime.fromisoformat(a.requested_starts_at) <= _now_utc(store)
+
+
+def overlaps(store: SessionStore, a: Appointment) -> List[Appointment]:
+    """Other scheduled visits the therapist can see that the proposed time would overlap (021 FR-008)."""
+    if not a.requested_starts_at:
+        return []
+    start = datetime.fromisoformat(a.requested_starts_at)
+    end = start + timedelta(minutes=a.minutes)
+    rows = store.conn.execute("SELECT id FROM appointments WHERE status = 'scheduled' AND id != ? AND starts_at < ?",
+                              (a.id, end.isoformat())).fetchall()
+    found = []
+    for row in rows:
+        other = store.appointment_get(row["id"])
+        if other is None:
+            continue
+        other_start = datetime.fromisoformat(other.starts_at)
+        if other_start + timedelta(minutes=other.minutes) > start:
+            found.append(other)
+    return found
+
+
+def overlap_warning(store: SessionStore, found: List[Appointment]) -> str:
+    parts = [f"{o.patient_id}'s visit at {to_local(store, o.starts_at).strftime('%H:%M')}" for o in found]
+    return "This overlaps " + " and ".join(parts) + "."
+
+
+def accept_request(store: SessionStore, appointment_id: int, note: str = "") -> Appointment:
+    """Move the visit to the time the patient proposed, keeping its length (021 FR-007)."""
+    a = store.appointment_get(appointment_id)
+    if a is None:
+        raise PortalError("No such appointment.")
+    if not (a.reschedule_requested and a.requested_starts_at):
+        raise PortalError("There is no proposed time to accept.")
+    if proposal_passed(store, a):
+        raise PortalError("The time they asked for has passed. Offer another time or keep this one.")
+    extra = _note(note, REQUEST_MAX - len(ACCEPTED_NOTE) - 1)
+    return store.appointment_update(a.id, starts_at=a.requested_starts_at, reschedule_requested=False,
+                                    response_note=f"{ACCEPTED_NOTE} {extra}".strip())
 
 
 def state(store: SessionStore, a: Appointment) -> str:
@@ -190,7 +262,15 @@ def appointment_json(store: SessionStore, a: Appointment) -> Dict[str, Any]:
             "starts_local": local.strftime("%Y-%m-%dT%H:%M"), "time_zone": str(clinic_zone(store)),
             "minutes": a.minutes, "note": a.note, "status": a.status, "state": state(store, a),
             "reschedule_requested": a.reschedule_requested, "request_note": a.request_note,
-            "response_note": a.response_note}
+            "response_note": a.response_note, **_proposal_json(store, a)}
+
+
+def _proposal_json(store: SessionStore, a: Appointment) -> Dict[str, Any]:
+    if not (a.reschedule_requested and a.requested_starts_at):
+        return {"requested_local": None, "requested_label": None, "requested_passed": False}
+    local = to_local(store, a.requested_starts_at)
+    return {"requested_local": local.strftime("%Y-%m-%dT%H:%M"), "requested_label": local.strftime("%a %-d %b, %H:%M"),
+            "requested_passed": proposal_passed(store, a)}
 
 
 def appointments_view(store: SessionStore, patient_id: str, plan_id: Optional[int] = None) -> List[Dict[str, Any]]:
