@@ -69,7 +69,8 @@ def people(me: Account, staff: List[dict], patients: List[dict], invites: List[d
     waiting = len(invites)
     head = ('<div class="page-head"><div class="stack tight"><h1>People</h1>'
             f'<p class="dim">{len(staff)} staff account{"s" if len(staff) != 1 else ""} · {waiting} invite'
-            f'{"s" if waiting != 1 else ""} waiting</p></div></div>')
+            f'{"s" if waiting != 1 else ""} waiting</p></div>'
+            '<a class="btn quiet small sp" href="/therapist/people/history">History</a></div>')
     rows = []
     for s in staff:
         status = ('<span class="tag teal">Active</span>' if s["status"] == "active"
@@ -125,6 +126,32 @@ def people(me: Account, staff: List[dict], patients: List[dict], invites: List[d
                        "Move patient", confirm="Move this patient? Only the new therapist will see them."))
     return (head + section("Staff", staff_html) + section("Invites waiting", invites_html)
             + section("Patients with a username", pat_html) + move)
+
+
+def history(data: dict) -> str:
+    """People → History (021 N4): who did what, newest first, 200 rows at a time. No clinical field."""
+    opts = "".join(f'<option value="{k}"{" selected" if k == data["kind"] else ""}>{_e(label)}</option>'
+                   for k, label in people_rules.KINDS)
+    head = ('<div class="page-head"><div class="stack tight"><h1>History</h1><p class="dim">Account changes and staff '
+            'sign-ins, newest first. Patients appear by code only; their own sign-ins are on their page.</p></div>'
+            '<a class="btn quiet small sp" href="/therapist/people">Back to People</a></div>')
+    filt = ('<form class="rowflex top-row" method="get" action="/therapist/people/history"><label class="field w-wide">'
+            f'<span>Show</span><select class="input" name="kind" data-submit-on-change>{opts}</select></label>'
+            '<button class="btn quiet small" type="submit">Show</button></form>')
+    if data["rows"]:
+        body = "".join(f'<tr><td class="num">{_e(r["when"])}</td><td>{_e(r["kind"])}</td><td>{_e(r["what"])}</td>'
+                       f'<td>{_e(r["who"])}</td><td>{_e(r["subject"])}</td></tr>' for r in data["rows"])
+        table = ('<div class="scroll" tabindex="0" role="region" aria-label="Table, scrolls sideways when wide">'
+                 '<table class="table"><thead><tr><th scope="col">When</th><th scope="col">Kind</th><th scope="col">'
+                 'What happened</th><th scope="col">Who</th><th scope="col">To whom or what</th></tr></thead>'
+                 f'<tbody>{body}</tbody></table></div>')
+    else:
+        table = '<p class="dim">Nothing recorded yet.</p>'
+    more = (f'<a class="btn quiet small" href="/therapist/people/history?kind={data["kind"]}&amp;page={data["page"] + 1}">'
+            'Show older</a>' if data["older"] else "")
+    newer = (f'<a class="btn quiet small" href="/therapist/people/history?kind={data["kind"]}&amp;page={data["page"] - 1}">'
+             'Show newer</a>' if data["page"] else "")
+    return head + filt + table + (f'<div class="rowflex">{newer}{more}</div>' if more or newer else "")
 
 
 def page(account: Account, classes: str, active: str, title: str, content: str) -> str:

@@ -788,6 +788,12 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             clock())
         return html(schedule_people_view.page(me, ctx.classes, "people", "People", content))
 
+    def people_history(ctx: Ctx) -> Response:
+        q = ctx.request.query_params
+        data = clinic_people.history(ctx.store, ctx.account, q.get("kind") or "all", _int(q.get("page")) or 0)
+        content = schedule_people_view.history(data)
+        return html(schedule_people_view.page(ctx.account, ctx.classes, "people", "History", content))
+
     def _int(value) -> Optional[int]:
         try:
             return int(value)
@@ -822,6 +828,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
 
     clinic_route("/schedule", schedule_page, "therapist")
     clinic_route("/people", people_page, "admin")
+    clinic_route("/people/history", people_history, "admin")
     clinic_route("/api/people/invite", people_invite, "admin", methods=("POST",), kind="api")
     clinic_route("/api/people/invites/{invite_id:int}/revoke", people_revoke, "admin", methods=("POST",), kind="api")
     clinic_route("/api/people/accounts/{account_id:int}/status", people_status, "admin", methods=("POST",), kind="api")

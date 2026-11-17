@@ -397,6 +397,10 @@ def demo_logins(db_path: Path) -> list:
                 accounts.assign(s, pid, rivera.id if pid in DEMO_SECOND_CASELOAD else lead.id)
             accounts.create_account(s, username="patient017", display_name="Demo patient", password=DEMO_PASSWORD,
                                     role="patient", patient_id="P-017")
+            # some staff sign-in history for People → History (021 N4, FR-016); no address is stored
+            for event, who in (("login_ok", lead.id), ("logout", lead.id), ("login_failed", rivera.id),
+                               ("login_ok", rivera.id), ("login_failed", s.UNKNOWN_USERNAME)):
+                s.admin_audit_add(event, None, who)
         key = access.load_key(access.default_key_path(db_path))
         return [(pid, about, access.issue_code(s, key, pid, days=30)[0]) for pid, about in DEMO_PATIENTS]
 

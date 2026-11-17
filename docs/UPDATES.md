@@ -2,6 +2,21 @@
 
 ---
 
+## Update 22 — 2026-11-16 — Admins See Who Did What
+
+Feature spec: `specs/021-therapist-extras/` (Story N4). Uses the v19 column added in Update 20, so no reset is needed.
+
+- **Where**: People → **History** (admins only; anyone else gets 403, like the rest of People).
+- **What it shows**, newest first, 200 rows at a time with **Show older**: account changes (created, invite created,
+  used or revoked, disabled or re-enabled, patient moved, settings changed) and staff sign-in events (signed in,
+  failed, locked out, signed out). Each row gives the time, what happened, who did it, and to whom or what, as names;
+  a patient appears only by code. A filter shows everything, account changes only, or sign-ins only.
+- **Sign-in events now record the account.** A failed attempt with a username no account has reads "unknown
+  username", and the typed name is never stored, as it could be a mistyped password. Events from before v19 read
+  "account not recorded".
+- **No clinical fields**: no session data, messages, notes, or patient access history (that stays on the patient's
+  page).
+
 ## Update 21 — 2026-11-16 — The Patient Proposes a New Time
 
 Feature spec: `specs/021-therapist-extras/` (Story N2). Uses the v19 column added in Update 20, so no reset is needed.
