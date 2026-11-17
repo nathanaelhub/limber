@@ -460,3 +460,12 @@ class TestClipRoutes:
         assert client.delete(f"/api/media/{m['id']}", headers={"Origin": ORIGIN}).status_code == 404
         assert m["id"] not in client.get("/api/media").text
         assert client.get("/clip").status_code == 200 and "stored on the Limber" in client.get("/clip").text
+
+
+def test_the_front_door_sends_a_signed_in_patient_to_today(client, seeded):
+    """Found on the hosted dry run: a signed-in patient opening / saw the sign-in page again."""
+    _, codes = seeded
+    assert "Open my plan" in client.get("/").text
+    login(client, codes["P-017"])
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/today"

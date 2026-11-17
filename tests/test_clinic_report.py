@@ -113,3 +113,18 @@ def test_the_printed_title_carries_no_needs_you_count(world):
     c, *_ = world
     page = c.get("/therapist/review/P-001/report").text
     assert "<title>Limber · Progress report · P-001</title>" in page
+
+
+def test_every_plan_that_is_not_archived_is_listed(world):
+    """Found on the hosted dry run: with a hip plan and a newer shoulder plan, only the shoulder was named."""
+    c, db, clock = world
+    with SessionStore(db, clock=clock).open() as s:
+        first = s.current_plan("P-001")
+        s.plan_update(first.id, title="Right knee")
+        s.plan_add("P-001", "Left shoulder")
+        old = s.plan_add("P-001", "Old ankle")
+        s.plan_set_status(old.id, "completed")
+        s.plan_set_status(old.id, "archived")
+    page = c.get("/therapist/review/P-001/report").text
+    section = page.split("<h2>Plan of care</h2>")[1].split("<h2>")[0]
+    assert "Right knee" in section and "Left shoulder" in section and "Old ankle" not in section

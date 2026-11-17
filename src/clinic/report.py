@@ -75,7 +75,7 @@ def build(store: SessionStore, patient_id: str, key: str, now: datetime) -> Dict
         "period_label": LABELS[key],
         "since": since.date().isoformat() if since else None,
         "generated": now.strftime("%-d %b %Y, %H:%M"),
-        "plan": _plan(store, patient_id),
+        "plans": [p for p in store.plans(patient_id) if p.status != "archived"] or [p for p in [_plan(store, patient_id)] if p],
         "program": viewmodels.program_exercises(store, patient_id, now.date()),
         "assignment": store.active_assignment(patient_id, now.date()),
         "trends": [t for t in summary.trends.values() if t.points],

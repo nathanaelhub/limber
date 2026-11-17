@@ -949,7 +949,11 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             text = text.replace('<html lang="en">', f'<html lang="en" class="{classes}">', 1)
         return Response(text, media_type="text/html", headers={"Cache-Control": "no-store"})
 
-    def index(_request: Request):
+    def index(request: Request):
+        if request.cookies.get(COOKIE):                       # only then is the store worth opening
+            with open_store() as store:
+                if signed_in(request, store) is not None:
+                    return RedirectResponse("/today", status_code=303)
         return html_page("index")
 
     def invite_page(_request: Request):
