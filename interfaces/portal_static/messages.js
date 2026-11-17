@@ -254,7 +254,7 @@
       return Promise.all(uploads.map(function (u, i) {
         return fetch(u.url, { method: "PUT", headers: { "Content-Type": u.type }, body: files[i].file }).then(function (r) {
           if (!r.ok) { throw new Error("upload"); }
-        });
+        }, function () { throw new Error("upload"); });
       })).then(function () {
         return jsonPost("/api/plans/" + current.id + "/messages",
                         { text: box.value, confirm: confirm, uploaded: uploads.map(function (u) { return u.key; }) });
@@ -279,7 +279,13 @@
         error.textContent = res.data.error || "The message could not be sent."; error.hidden = false;
         return null;
       })
-      .catch(function () { $("send").disabled = false; error.textContent = "The service cannot be reached right now."; error.hidden = false; });
+      .catch(function (e) {
+        $("send").disabled = false;
+        error.textContent = e && e.message === "upload"
+          ? "The photo could not be uploaded. Try again, or remove it and send the message on its own."
+          : "The service cannot be reached right now.";
+        error.hidden = false;
+      });
   }
 
   form.addEventListener("submit", function (event) { event.preventDefault(); send(false); });

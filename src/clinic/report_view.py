@@ -40,11 +40,14 @@ def _day(stamp: str) -> str:
 # ----------------------------------------------------------------------------- sections
 
 def plan(data: Dict[str, Any]) -> str:
-    p = data["plan"]
-    if p is None:
+    """Every plan that is not archived (a patient may be seen for a knee and a shoulder at once); else the latest."""
+    if not data["plans"]:
         return _section("Plan of care", _empty("No plan of care."))
-    span = f"from {p.start_date[:10]}" + (f" to {p.end_date[:10]}" if p.end_date else ", ongoing")
-    return _section("Plan of care", f'<p><span class="strong">{_e(p.title)}</span> · {_e(span)} · {_e(p.status)}</p>')
+    lines = []
+    for p in data["plans"]:
+        span = f"from {p.start_date[:10]}" + (f" to {p.end_date[:10]}" if p.end_date else ", ongoing")
+        lines.append(f'<p><span class="strong">{_e(p.title)}</span> · {_e(span)} · {_e(p.status)}</p>')
+    return _section("Plan of care", "".join(lines))
 
 
 def program(data: Dict[str, Any]) -> str:
