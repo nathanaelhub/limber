@@ -1,7 +1,8 @@
 // Limber clinic forms (feature 019 slice 3a). Every form with data-api is posted as JSON to /therapist{data-api}:
 // text, dates and times as strings, numbers as numbers, a checkbox as true or false, a multiple select as a list.
 // A confirm text asks first. On success the page reloads, goes where the server says, or (data-result-once) shows
-// what the server hands back exactly once, such as a new access code.
+// what the server hands back exactly once, such as a new access code. A form with a hidden "confirm" field asks
+// before saving text the privacy check flagged (021 N1).
 "use strict";
 
 (function () {
@@ -49,9 +50,19 @@
         }
         location.reload();
       } catch (err) {
+        button.disabled = false;
+        // The privacy check (as for replies): say what it found, and save anyway only when the person agrees.
+        const again = form.querySelector("input[type=hidden][name=confirm]");
+        if (err.data && err.data.needs_confirm && again && !again.value) {
+          if (window.confirm(err.message + "\n\nSave anyway?")) {
+            again.value = "yes";
+            form.requestSubmit();
+            again.value = "";
+            return;
+          }
+        }
         error.textContent = err.message;
         error.hidden = false;
-        button.disabled = false;
       }
     });
   });

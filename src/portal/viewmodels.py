@@ -65,14 +65,17 @@ def adherence_view(store: SessionStore, patient_id: str, now: Optional[datetime]
     return {"week": week, "streak_weeks": streak(adh.weeks)}
 
 
-def _target_reps(store: SessionStore, patient_id: str, name: str, default: int) -> int:
+def _target_reps(store: SessionStore, patient_id: str, name: str, default: int, detail=None) -> int:
+    from src.ptlog import prescription
     goal = store.get_goal(patient_id, name)
-    return int(goal.target_reps) if goal is not None and goal.target_reps else int(default)
+    return prescription.target(detail, goal.target_reps if goal is not None else None, default)
 
 
 def program_exercises(store: SessionStore, patient_id: str, today: date) -> List[Dict[str, Any]]:
-    """The active assignment's exercises that the configuration still defines, in order, with the
-    target reps the patient should aim for (their goal's target, else the exercise default)."""
+    """The active assignment's exercises that the configuration still defines, in order, with the target reps the
+    patient should aim for (the prescribed reps, else their goal's target, else the exercise default: 021 D1), the
+    prescription in one sentence and the therapist's note (021 N1)."""
+    from src.ptlog import prescription
     assignment = store.active_assignment(patient_id, today)
     if assignment is None:
         return []
@@ -83,8 +86,10 @@ def program_exercises(store: SessionStore, patient_id: str, today: date) -> List
         if entry is None:
             continue
         name = entry["display_name"]
+        detail = assignment.exercise_details.get(key) or {}
         result.append({"key": key, "name": name,
-                       "target_reps": _target_reps(store, patient_id, name, entry["target_reps"])})
+                       "target_reps": _target_reps(store, patient_id, name, entry["target_reps"], detail),
+                       "dose": prescription.dose(detail), "note": detail.get("note") or ""})
     return result
 
 

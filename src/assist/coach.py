@@ -50,13 +50,15 @@ SET_TEXT = {"emergency": EMERGENCY_TEXT, "referral": REFERRAL_TEXT, "refusal": R
 
 SYSTEM = """You are the exercise coach in a physical therapy app. A patient asks about their own home exercise program.
 
-You receive the patient's program as JSON: each exercise's name, its prescribed repetitions, any range-of-motion
-target, the clinic's short instructions, and whether it was done today. The patient is identified only by a code.
+You receive the patient's program as JSON: each exercise's name, its prescribed repetitions, the therapist's
+prescription in one sentence and note when set, any range-of-motion target, the clinic's short instructions, and
+whether it was done today. The patient is identified only by a code.
 
 Decide the kind of reply:
 - "answer": the question is about how to do an exercise in the program, its prescribed dose, or which exercises
   are left today. Answer in one to three short, plain sentences. Start with the exercise name and its dose exactly
-  as the program states it (for example "Heel slides: 10 reps."). Use only numbers that appear in the program.
+  as the program states it (the "prescription" when there is one, for example "Heel slides: 3 sets of 10 · Every
+  day.", else the reps, for example "Heel slides: 10 reps."). Use only numbers that appear in the program.
   Set "exercise" to the exercise's name exactly as in the program. A gentle reminder to stop and tell their
   therapist if they feel sharp pain is fine.
 - "referral": the question is about pain getting worse, new or changed symptoms, medication, doing more or less
@@ -124,6 +126,10 @@ def program_extract(store: SessionStore, patient_id: str) -> Optional[dict]:
     items = []
     for e in exercises:
         item = {"name": e["name"], "reps": e["target_reps"], "done_today": e["key"] in done}
+        if e.get("dose"):
+            item["prescription"] = e["dose"]          # the therapist's dose in one sentence (021 N1)
+        if e.get("note"):
+            item["therapist_note"] = e["note"]
         goal = store.get_goal(patient_id, e["name"])
         if goal is not None and goal.target_rom:
             item["range_of_motion_target_degrees"] = int(goal.target_rom) if float(goal.target_rom).is_integer() \

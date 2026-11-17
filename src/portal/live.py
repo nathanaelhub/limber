@@ -223,7 +223,8 @@ class PortalLiveSession:
             angle = m.get("current_angle")
             return {
                 "type": "state", "exercise": current["name"], "index": self.index + 1, "total": len(self.exercises),
-                "target_reps": current["target_reps"], "rep_count": reps, "phase": str(m.get("state", "neutral")),
+                "target_reps": current["target_reps"], "dose": current.get("dose") or "",
+                "note": current.get("note") or "", "rep_count": reps, "phase": str(m.get("state", "neutral")),
                 "angle": round(float(angle), 1) if seen and angle is not None else None,
                 "form_status": m.get("form_status"), "form_messages": list(m.get("form_messages", []))[:2],
                 "feedback": m.get("feedback") or "", "set_complete": reps >= current["target_reps"],

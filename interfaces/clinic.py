@@ -540,7 +540,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     [(i.key, i.name) for i in installed.listed() if i.key not in live],
                     list(questionnaires.INTERVALS),
                     [f"The questionnaire file {x.file} could not be used: {x.message}" for x in installed.problems],
-                    now.date())
+                    now.date(), clinic_patients.current_program(store, pid, now.date()))
             else:
                 status = store.portal_status(pid)
                 history = [(h.at[:16].replace("T", " "), h.event, h.detail or "")
@@ -614,6 +614,31 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
                     if prog is None:
                         return json_response({"error": "Choose a program."}, 400)
                     store.assign_program(pid, prog.id, prog.name, prog.exercise_keys, per_week, start, end)
+            elif action == "exercise-detail":
+                ex_key = _text(body, "key") or ""
+                detail = {k: body.get(k) for k in ("sets", "reps", "hold_seconds", "frequency", "days", "note")}
+                note = (_text(body, "note") or "").strip()
+                found = ptmessages.check_text(note) if note else []
+                if found and not body.get("confirm"):           # the privacy check, as for replies (021 N1)
+                    return json_response({"error": "This note looks like it contains a " + " and a ".join(found)
+                                          + ". Limber works without names or contact details. Edit it, or save it "
+                                          "anyway.", "reasons": found, "needs_confirm": True}, 409)
+                store.set_exercise_detail(pid, ex_key, detail)
+            elif action in ("exercise-add", "exercise-remove"):
+                current = store.active_assignment(pid, clock().date())
+                if current is None:
+                    return json_response({"error": "There is no current program. Assign one first."}, 400)
+                ex_key = _text(body, "key") or ""
+                if action == "exercise-add":
+                    keys = current.exercise_keys + ([ex_key] if ex_key not in current.exercise_keys else [])
+                else:
+                    if ex_key not in current.exercise_keys:
+                        return json_response({"error": "That exercise is not in the current program."}, 400)
+                    keys = [k for k in current.exercise_keys if k != ex_key]
+                    if not keys:
+                        return json_response({"error": "A program needs at least one exercise. Assign a new "
+                                              "program instead."}, 400)
+                store.change_program_exercises(pid, keys)
             elif action == "questionnaire":
                 from src.ptlog import instruments, questionnaires
                 chosen, interval = _text(body, "instrument"), _text(body, "interval")
@@ -722,7 +747,9 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     clinic_route("/api/patients", register, "therapist", methods=("POST",), kind="api")
     for suffix, action in (("details", "details"), ("delete", "delete"), ("discharge", "discharge"),
                            ("reactivate", "reactivate"), ("plans", "open-plan"), ("visits", "add-visit"),
-                           ("program", "program"), ("questionnaires", "questionnaire"), ("logging", "logging"),
+                           ("program", "program"), ("program/exercise", "exercise-detail"),
+                           ("program/add", "exercise-add"), ("program/remove", "exercise-remove"),
+                           ("questionnaires", "questionnaire"), ("logging", "logging"),
                            ("access/issue", "issue-code"), ("access/revoke", "revoke-code")):
         clinic_route(f"{pat}/{suffix}", patient_api(action), "therapist", methods=("POST",), kind="api")
     for action in ("edit", "complete", "reopen", "archive"):

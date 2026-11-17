@@ -44,8 +44,16 @@ def _program(store: SessionStore, patient_id: str) -> Optional[Dict[str, Any]]:
     a = store.active_assignment(patient_id)
     if a is None:
         return None
-    return {"name": a.program_name, "sessions_per_week": a.sessions_per_week,
-            "exercises": [programs.exercise_name(k) for k in a.exercise_keys]}
+    from src.ptlog import prescription
+    out = {"name": a.program_name, "sessions_per_week": a.sessions_per_week,
+           "exercises": [programs.exercise_name(k) for k in a.exercise_keys]}
+    # The dose the therapist set (021 N1, FR-005), so a draft never contradicts it.
+    prescribed = [{"exercise": programs.exercise_name(k), "dose": prescription.dose(d),
+                   **({"note": d["note"]} if d.get("note") else {})}
+                  for k, d in ((k, a.exercise_details.get(k) or {}) for k in a.exercise_keys) if d]
+    if prescribed:
+        out["prescription"] = prescribed
+    return out
 
 
 def _next_visit(store: SessionStore, patient_id: str) -> Optional[Dict[str, Any]]:

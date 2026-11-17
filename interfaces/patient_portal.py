@@ -816,7 +816,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     # ------------------------------------------------------------------ guided session
 
     STATE_KEYS = ("exercise", "index", "rep_count", "phase", "form_status", "form_messages", "feedback",
-                  "set_complete", "seen", "notice", "target_reps")
+                  "set_complete", "seen", "notice", "target_reps", "dose", "note")
     IDLE_SECONDS, MAX_SECONDS, BAD_LIMIT, RECHECK_EVERY = 60, 60 * 60, 10, 15
 
     def _patient_for(token):

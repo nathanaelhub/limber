@@ -14,7 +14,7 @@ import os
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from .privacy import validate_label, validate_notes, validate_patient_id
 from . import backend, thresholds
@@ -71,7 +71,7 @@ from .models import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 SCHEMA_V1_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -764,6 +764,15 @@ CREATE TABLE IF NOT EXISTS login_lockouts (
 );
 """
 
+# v19 (feature 021): one upgrade for three stories, so the hosted demo is reset once. Per-exercise details of a
+# program (N1), a time the patient proposes when asking to move a visit (N2), and which staff account a sign-in event
+# belongs to (N4).
+SCHEMA_V19_SQL = """
+ALTER TABLE assignments ADD COLUMN exercise_details TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE appointments ADD COLUMN requested_starts_at TEXT;
+ALTER TABLE admin_audit ADD COLUMN account_id INTEGER;
+"""
+
 SCHEMA_V17_SQL = """
 CREATE TABLE IF NOT EXISTS coach_turns (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -799,6 +808,7 @@ MIGRATIONS: List[tuple] = [
     (16, SCHEMA_V16_SQL),
     (17, SCHEMA_V17_SQL),
     (18, SCHEMA_V18_SQL),
+    (19, SCHEMA_V19_SQL),
 ]
 
 
@@ -1828,13 +1838,17 @@ class SessionStore:
 
     @staticmethod
     def _assignment_from_row(row: sqlite3.Row) -> Assignment:
+        details = json.loads(row["exercise_details"] or "{}") if "exercise_details" in row.keys() else {}
         return Assignment(row["id"], row["patient_id"], row["program_id"], row["program_name"],
                           json.loads(row["exercise_keys"]), row["sessions_per_week"], row["start_date"],
-                          row["end_date"], row["created_at"])
+                          row["end_date"], row["created_at"], details)
 
     def assign_program(self, patient_id: str, program_id: str, program_name: str, exercise_keys: List[str],
-                       sessions_per_week: int = 3, start_date=None, end_date=None) -> Assignment:
-        """Assign a program; any assignment still open on the new start ends the day before (FR-006, FR-007)."""
+                       sessions_per_week: int = 3, start_date=None, end_date=None,
+                       exercise_details: Optional[Dict[str, dict]] = None) -> Assignment:
+        """Assign a program; any assignment still open on the new start ends the day before (FR-006, FR-007).
+        Per-exercise details (021 N1) are kept only for exercises in the program."""
+        from . import prescription
         from .programs import validate_exercise_keys
         patient = self.get_patient(patient_id)
         if patient is None:
@@ -1848,6 +1862,8 @@ class SessionStore:
         end = self._to_date(end_date)
         if end is not None and end < start:
             raise AssignmentValidationError("end date must not be before the start date")
+        details = {k: d for k, d in ((k, prescription.clean(v)) for k, v in (exercise_details or {}).items()
+                                     if k in keys) if d}
         plan = self._plan_for_write(patient.id)
         previous_day = (start - timedelta(days=1)).isoformat()
         self.conn.execute(
@@ -1856,11 +1872,11 @@ class SessionStore:
         cur = self.conn.execute(
             """
             INSERT INTO assignments (patient_id, program_id, program_name, exercise_keys, sessions_per_week,
-                                     start_date, end_date, created_at, plan_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     start_date, end_date, created_at, plan_id, exercise_details)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (patient.id, program_id, program_name, json.dumps(keys), int(sessions_per_week), start.isoformat(),
-             end.isoformat() if end else None, self._now(), plan))
+             end.isoformat() if end else None, self._now(), plan, json.dumps(details, sort_keys=True)))
         self.conn.commit()
         row = self.conn.execute("SELECT * FROM assignments WHERE id = ?", (cur.lastrowid,)).fetchone()
         return self._assignment_from_row(row)
@@ -1873,6 +1889,52 @@ class SessionStore:
             ORDER BY start_date DESC, id DESC LIMIT 1
             """, (patient_id, on_date, on_date)).fetchone()
         return self._assignment_from_row(row) if row else None
+
+    def _current_assignment_for_write(self, patient_id: str) -> Assignment:
+        patient = self.get_patient(patient_id)
+        if patient is None:
+            raise PatientNotFoundError(f"Patient '{patient_id}' not found")
+        current = self.active_assignment(patient.id)
+        if current is None:
+            raise AssignmentValidationError("There is no current program. Assign one first.")
+        return current
+
+    def set_exercise_detail(self, patient_id: str, exercise_key: str, detail: Optional[dict]) -> Assignment:
+        """Change one exercise's details in the current program, in place (021 FR-002): the assignment and its dates
+        stay the same, so adherence history is unchanged. Empty details clear them."""
+        from . import prescription
+        current = self._current_assignment_for_write(patient_id)
+        if exercise_key not in current.exercise_keys:
+            raise AssignmentValidationError("That exercise is not in the current program.")
+        details = dict(current.exercise_details)
+        cleaned = prescription.clean(detail)
+        if cleaned:
+            details[exercise_key] = cleaned
+        else:
+            details.pop(exercise_key, None)
+        self.conn.execute("UPDATE assignments SET exercise_details = ? WHERE id = ?",
+                          (json.dumps(details, sort_keys=True), current.id))
+        self.conn.commit()
+        return self.active_assignment(patient_id)
+
+    def change_program_exercises(self, patient_id: str, exercise_keys: List[str]) -> Assignment:
+        """Add or remove exercises (021 FR-003, owner's decision D2): a new assignment starts today with the same
+        program, weekly sessions and end, carrying the details over for exercises in both, so past weeks keep the
+        list they had. A program that started today is changed in place, as it has no past weeks yet."""
+        from .programs import validate_exercise_keys
+        current = self._current_assignment_for_write(patient_id)
+        keys = validate_exercise_keys(list(exercise_keys))
+        if keys == current.exercise_keys:
+            return current
+        details = {k: v for k, v in current.exercise_details.items() if k in keys}
+        today = self.clock().date()
+        if current.start_date == today.isoformat():
+            self.conn.execute("UPDATE assignments SET exercise_keys = ?, exercise_details = ? WHERE id = ?",
+                              (json.dumps(keys), json.dumps(details, sort_keys=True), current.id))
+            self.conn.commit()
+            return self.active_assignment(patient_id)
+        return self.assign_program(patient_id, current.program_id, current.program_name, keys,
+                                   current.sessions_per_week, today, current.end_date, details)
 
     def assignment_history(self, patient_id: str) -> List[Assignment]:
         rows = self.conn.execute(

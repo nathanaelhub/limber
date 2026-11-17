@@ -107,7 +107,10 @@ def build(db_path: Path, seed: int = 7) -> None:
             record(s, clock, rng, "P-017", "Knee Extension", d, 86, rom, hour=18, home=True)
             record(s, clock, rng, "P-017", "Squat", d, 80, 104, reps=10, hour=18, home=True)
         review_all("P-017", leave=2)
-        s.assign_program("P-017", "knee_rehab", "Knee Rehabilitation", ["knee_extension", "squat"], 3, today - timedelta(days=35))
+        s.assign_program("P-017", "knee_rehab", "Knee Rehabilitation", ["knee_extension", "squat"], 3, today - timedelta(days=35),
+                         exercise_details={"knee_extension": {"sets": 3, "reps": 10, "hold_seconds": 5, "frequency": "daily",
+                                                              "note": "Keep your knee soft at the top."},
+                                           "squat": {"sets": 2, "reps": 10, "frequency": "per_week", "days": 3}})
         s.set_goal("P-017", "Knee Extension", target_rom=95.0, target_reps=10)
 
         # P-018: shoulder. Progressed well, then nothing for 12 days.
@@ -115,7 +118,9 @@ def build(db_path: Path, seed: int = 7) -> None:
         for d, rom in zip([38, 35, 31, 28, 24, 21, 17, 12], ramp(108, 140, 8)):
             record(s, clock, rng, "P-018", "Shoulder Flexion", d, 90, rom)
         review_all("P-018", step="progress")
-        s.assign_program("P-018", "shoulder_mobility", "Shoulder Mobility", ["shoulder_flexion"], 2, today - timedelta(days=35))
+        s.assign_program("P-018", "shoulder_mobility", "Shoulder Mobility", ["shoulder_flexion"], 2, today - timedelta(days=35),
+                         exercise_details={"shoulder_flexion": {"sets": 2, "reps": 12, "frequency": "daily",
+                                                                "note": "Stop below shoulder height if it pinches."}})
         s.set_goal("P-018", "Shoulder Flexion", target_rom=150.0)
 
         # P-019: conditioning. Steady and adherent; a quiet row on the roster.
@@ -132,7 +137,9 @@ def build(db_path: Path, seed: int = 7) -> None:
         for d, form, partials in zip([22, 18, 15, 11, 8, 4, 1], [92, 91, 90, 86, 82, 77, 71], [0, 0, 0, 1, 1, 3, 5]):
             record(s, clock, rng, "P-021", "Hip Abduction", d, form, 32, partials=partials, warnings=2 if d < 9 else 0)
         review_all("P-021", leave=3)
-        s.assign_program("P-021", "hip_strengthening", "Hip Strengthening", ["hip_abduction"], 3, today - timedelta(days=21))
+        s.assign_program("P-021", "hip_strengthening", "Hip Strengthening", ["hip_abduction"], 3, today - timedelta(days=21),
+                         exercise_details={"hip_abduction": {"sets": 3, "reps": 12, "hold_seconds": 2, "frequency": "daily",
+                                                             "note": "Hold the counter for balance."}})
 
         # P-022: knee OA. ROM flat for weeks while below the goal (plateau).
         s.add_patient("P-022", label="Knee osteoarthritis")
