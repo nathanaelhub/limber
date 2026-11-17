@@ -672,6 +672,7 @@ class Appointment:
     response_note: str
     created_at: str
     updated_at: str
+    requested_starts_at: Optional[str] = None   # a time the patient proposed, UTC (021 N2)
 
 
 @dataclass

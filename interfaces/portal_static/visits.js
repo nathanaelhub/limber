@@ -38,6 +38,7 @@
     else if (isNext) { tags.appendChild(tag("Next", "bd-ok")); }
     if (a.reschedule_requested) { tags.appendChild(tag("Reschedule requested", "bd-req")); }
     if (tags.childNodes.length) { body.appendChild(tags); }
+    if (a.reschedule_requested && a.requested_label) { body.appendChild(el("p", "small", "You asked for " + a.requested_label + ".")); }
     if (a.reschedule_requested && a.request_note) { body.appendChild(el("p", "small", "You asked: “" + a.request_note + "”")); }
     if (!a.reschedule_requested && a.response_note) { body.appendChild(el("p", "small", "Your therapist: “" + a.response_note + "”")); }
     if (a.state === "upcoming" && !a.reschedule_requested) {
@@ -101,7 +102,7 @@
   function openSheet(a, from) {
     asking = a; opener = from;
     $("reschedule-when").textContent = when(a) + " · " + a.minutes + " min";
-    $("reschedule-note").value = ""; $("reschedule-error").hidden = true;
+    $("reschedule-note").value = ""; $("reschedule-date").value = ""; $("reschedule-time").value = ""; $("reschedule-error").hidden = true;
     $("reschedule-send").disabled = false; $("reschedule-send").textContent = "Send request";
     $("reschedule-sheet").hidden = false; $("reschedule-note").focus();
   }
@@ -115,7 +116,7 @@
     send.disabled = true; send.textContent = "Sending…"; err.hidden = true;
     fetch("/api/appointments/" + asking.id + "/reschedule", {
       method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ note: $("reschedule-note").value }) })
+      body: JSON.stringify({ note: $("reschedule-note").value, date: $("reschedule-date").value, time: $("reschedule-time").value }) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { status: r.status, data: d }; }); })
       .then(function (res) {
         if (res.status === 200) {

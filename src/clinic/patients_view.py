@@ -185,6 +185,20 @@ def plans_section(pid: str, plans: List[Plan]) -> str:
                    'and makes it read-only. Neither deletes records.</p>')
 
 
+def proposal(pid: str, v: dict) -> str:
+    """The time the patient proposed (021 N2), with Accept while it is still ahead. Accept keeps the visit's length;
+    an overlap with another visit asks first (forms.js, the hidden confirm field)."""
+    if not (v.get("reschedule_requested") and v.get("requested_label")):
+        return ""
+    if v["requested_passed"]:
+        return (f'<p class="small strong warn-text">They asked for {_e(v["requested_label"])}. The time they asked '
+                'for has passed.</p>')
+    return (f'<p class="strong">Asks for {_e(v["requested_label"])}</p>'
+            + form(f"/api/patients/{pid}/visits/{v['id']}/accept", '<input type="hidden" name="confirm" value="">',
+                   f"Accept {v['requested_label']}", cls="inline-form",
+                   confirm=f"Move this visit to {v['requested_label']}? It keeps its length."))
+
+
 def visits_section(pid: str, visits: List[dict], live_plans: List[Plan], zone: str, today: date) -> str:
     items = []
     for v in visits:
@@ -196,7 +210,7 @@ def visits_section(pid: str, visits: List[dict], live_plans: List[Plan], zone: s
         note = ""
         if v["reschedule_requested"]:
             note = (f'<p class="small warn-text">{_e(pid)} asked to reschedule'
-                    + (f': “{_e(v["request_note"])}”' if v["request_note"] else ".") + "</p>")
+                    + (f': “{_e(v["request_note"])}”' if v["request_note"] else ".") + "</p>" + proposal(pid, v))
         elif v["response_note"]:
             note = f'<p class="small dim">Your reply: {_e(v["response_note"])}</p>'
         actions = ""

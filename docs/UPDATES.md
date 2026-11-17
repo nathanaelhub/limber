@@ -2,6 +2,20 @@
 
 ---
 
+## Update 21 — 2026-11-16 — The Patient Proposes a New Time
+
+Feature spec: `specs/021-therapist-extras/` (Story N2). Uses the v19 column added in Update 20, so no reset is needed.
+
+- **The patient**: Visits → **Ask to reschedule** now has an optional day and time. It must be in the future, within
+  90 days, and on a 5-minute step; the visit stays booked until the therapist answers. A second request replaces the
+  first. While it is open, Visits shows "You asked for Wed 18 Nov, 16:15".
+- **The therapist** sees "Asks for Wed 18 Nov, 16:15" on the Inbox, the Schedule, the Dashboard and the patient's
+  Overview, with **Accept** (one click: the visit moves there with its length kept), **Offer another time** and
+  **Keep**. The patient's Visits then shows the new time with "Moved at your request."
+- **Checks**: once the proposed time has passed, Accept isn't offered and the request says so. If the time overlaps
+  another visit on the caseload, Accept first says which one ("This overlaps P-023's visit at 16:00") and asks.
+- A request without a proposed time works exactly as before.
+
 ## Update 20 — 2026-11-16 — Sets, Reps, Hold and a Note for Each Exercise
 
 Feature spec: `specs/021-therapist-extras/` (Story N1). **Schema v19**, so the hosted demo needs one reset

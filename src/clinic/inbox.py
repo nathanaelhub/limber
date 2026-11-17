@@ -47,6 +47,8 @@ class Item:
     at: str                      # local ISO time, for sorting and the "when" label
     unread: int = 0
     words: List[str] = field(default_factory=list)
+    visit_id: Optional[int] = None           # a reschedule request's visit, for Accept on the Dashboard (021 N2)
+    proposed: Optional[str] = None           # the time the patient asked for, when it is still ahead
 
     @property
     def href(self) -> str:
@@ -157,9 +159,14 @@ def needs_you(store: SessionStore) -> List[Item]:
         view = ptplans.appointment_json(store, a)
         plan = store.plan_get(a.plan_id)
         when = _visit_label(view["starts_local"])
-        line = f"Asks to move {when}" + (f": “{first_line(a.request_note, 60)}”" if a.request_note else "")
+        line = f"Asks to move {when}"
+        if view["requested_label"]:
+            line += (f" to {view['requested_label']}" if not view["requested_passed"]
+                     else f" (the time they asked for, {view['requested_label']}, has passed)")
+        line += f": “{first_line(a.request_note, 60)}”" if a.request_note else ""
         items.append(Item(RESCHEDULE, a.patient_id, a.plan_id, plan.title if plan else "", line,
-                          (a.updated_at or "")[:19]))
+                          (a.updated_at or "")[:19], visit_id=a.id,
+                          proposed=view["requested_label"] if not view["requested_passed"] else None))
     items.sort(key=lambda i: i.at or "", reverse=True)
     items.sort(key=lambda i: _ORDER[i.kind])
     return items

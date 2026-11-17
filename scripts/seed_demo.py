@@ -313,7 +313,8 @@ def build(db_path: Path, seed: int = 7) -> None:
         _plans.schedule(s, "P-017", at(-10, "10:30"), 45, "Range of motion check")
         _plans.schedule(s, "P-017", at(3, "10:30"), 45, "Progress squats if the knee is calm")
         nxt = _plans.schedule(s, "P-021", at(5, "09:00"), 45, "Re-check hip strength", plan_id=hip.id)
-        _plans.request_reschedule(s, "P-021", nxt.id, "Afternoons are better for me this week.")
+        _plans.request_reschedule(s, "P-021", nxt.id, "Afternoons are better for me this week.",
+                                  at(6, "14:30"))                       # a proposed time (021 N2)
         _plans.cancel(s, _plans.schedule(s, "P-021", at(12, "14:00"), 30, "Shoulder assessment", plan_id=shoulder.id).id)
         _plans.schedule(s, "P-021", at(19, "14:00"), 30, "Shoulder assessment", plan_id=shoulder.id)
         _plans.schedule(s, "P-023", at(2, "16:00"), 60, "Return-to-sport testing")

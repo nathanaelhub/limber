@@ -181,14 +181,30 @@ def _withheld(patient_id: str, flagged: List[Message], words: List[str], now: da
             '</div></div></div>')
 
 
+def _proposal_line(view: dict) -> str:
+    """The time the patient proposed (021 N2), or that it has passed."""
+    if not view.get("requested_label"):
+        return ""
+    if view["requested_passed"]:
+        return (f'<p class="strong warn-text">They asked for {_e(view["requested_label"])}. '
+                'The time they asked for has passed.</p>')
+    return f'<p class="strong">Asks for {_e(view["requested_label"])}</p>'
+
+
 def _reschedule(patient_id: str, view: dict, request_note: str) -> str:
     when = datetime.fromisoformat(view["starts_local"]).strftime("%a %-d %b, %H:%M")
+    accept = (f'<label class="check"><input type="radio" name="answer" value="accept" checked> <span>Accept '
+              f'{_e(view["requested_label"])}</span></label>'
+              if view.get("requested_label") and not view["requested_passed"] else "")
     note = f'<blockquote class="bubble self-start">“{_e(request_note)}”</blockquote>' if request_note else ""
     return (f'<section class="card stack resched" data-visit="{view["id"]}" aria-label="Reschedule request">'
             f'<div class="stack tight"><h2>{I_CAL} Reschedule request</h2>'
             f'<p class="dim">{_e(patient_id)} asks to move the visit booked for {_e(when)}, {view["minutes"]} minutes.</p>'
+            + _proposal_line(view) +
             f'</div>{note}<fieldset class="stack plain-set"><legend class="strong">Your answer</legend>'
-            '<label class="check"><input type="radio" name="answer" value="move" checked> <span>Offer another time</span></label>'
+            + accept +
+            f'<label class="check"><input type="radio" name="answer" value="move"{"" if accept else " checked"}> '
+            '<span>Offer another time</span></label>'
             f'<div class="rowflex"><label class="field w-day"><span>Day</span><input class="input" type="date" '
             f'name="date" value="{_e(view["date"])}"></label><label class="field w-time"><span>Time</span>'
             f'<input class="input" type="time" name="time" value="{_e(view["time"])}"></label></div>'

@@ -2386,7 +2386,9 @@ class SessionStore:
                            starts_at=row["starts_at"], minutes=int(row["minutes"]), note=row["note"],
                            status=row["status"], reschedule_requested=bool(row["reschedule_requested"]),
                            request_note=row["request_note"], response_note=row["response_note"],
-                           created_at=row["created_at"], updated_at=row["updated_at"])
+                           created_at=row["created_at"], updated_at=row["updated_at"],
+                           requested_starts_at=row["requested_starts_at"] if "requested_starts_at" in row.keys()
+                           else None)
 
     def appointment_add(self, patient_id: str, starts_at_utc: str, minutes: int, note: str = "",
                         plan_id: Optional[int] = None) -> Appointment:
@@ -2413,8 +2415,10 @@ class SessionStore:
         return [self._appointment(r) for r in self.conn.execute(sql + " ORDER BY starts_at, id", args)]
 
     def appointment_update(self, appointment_id: int, **fields) -> Appointment:
-        """Change an appointment. A new time answers any reschedule request, so the flag clears."""
-        allowed = {"starts_at", "minutes", "note", "status", "reschedule_requested", "request_note", "response_note"}
+        """Change an appointment. A new time answers any reschedule request, so the flag clears, and so does a
+        time the patient proposed (021 N2)."""
+        allowed = {"starts_at", "minutes", "note", "status", "reschedule_requested", "request_note", "response_note",
+                   "requested_starts_at"}
         bad = set(fields) - allowed
         if bad:
             raise ValueError(f"cannot update {bad}")
@@ -2426,6 +2430,8 @@ class SessionStore:
             fields.setdefault("reschedule_requested", False)
         if "reschedule_requested" in fields:
             fields["reschedule_requested"] = 1 if fields["reschedule_requested"] else 0
+            if not fields["reschedule_requested"]:
+                fields.setdefault("requested_starts_at", None)
         fields["updated_at"] = self._now()
         sets = ", ".join(f"{k} = ?" for k in fields)
         self.conn.execute(f"UPDATE appointments SET {sets} WHERE id = ?", (*fields.values(), current.id))

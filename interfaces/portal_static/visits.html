@@ -50,7 +50,14 @@
       <span class="grab" aria-hidden="true"></span>
       <h2 id="reschedule-title">Ask to reschedule</h2>
       <p id="reschedule-when" class="b"></p>
-      <label for="reschedule-note">What times suit you better?</label>
+      <fieldset class="propose">
+        <legend>A time that suits you (optional)</legend>
+        <div class="propose-row">
+          <label for="reschedule-date">Day<input id="reschedule-date" class="field" type="date"></label>
+          <label for="reschedule-time">Time<input id="reschedule-time" class="field" type="time" step="300"></label>
+        </div>
+      </fieldset>
+      <label for="reschedule-note">Anything else your therapist should know?</label>
       <textarea id="reschedule-note" class="field" rows="3" maxlength="500" placeholder="For example: any afternoon next week"></textarea>
       <p class="small">Your therapist will change the time or reply in Messages. Your visit stays booked until then.</p>
       <p id="reschedule-error" class="error" role="alert" hidden></p>

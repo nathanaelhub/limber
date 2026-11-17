@@ -412,11 +412,22 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             return json_response({"ok": True})
         return act
 
+    def accept_visit(store: SessionStore, a, confirmed: bool, note: str = "") -> Response:
+        """Accept the time the patient proposed (021 N2). An overlap with another visit asks first (FR-008)."""
+        found = ptplans.overlaps(store, a)
+        if found and not confirmed:
+            return json_response({"error": ptplans.overlap_warning(store, found) + " Accept anyway?",
+                                  "needs_confirm": True}, 409)
+        ptplans.accept_request(store, a.id, note)
+        return json_response({"ok": True})
+
     def answer_visit(ctx: Ctx) -> Response:
         pid = clinic_inbox.own_patient(ctx.store, ctx.request.path_params["patient_id"])
         a = clinic_inbox.own_appointment(ctx.store, pid, ctx.request.path_params["appointment_id"])
         body = ctx.body if isinstance(ctx.body, dict) else {}
         note = body.get("note") if isinstance(body.get("note"), str) else ""
+        if body.get("answer") == "accept":
+            return accept_visit(ctx.store, a, bool(body.get("confirm")), note)
         if body.get("answer") == "keep":
             ptplans.decline_request(ctx.store, a.id, note)
         elif body.get("answer") == "move":
@@ -684,6 +695,8 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
             pid = own_real_patient(ctx.store, ctx.request.path_params["patient_id"]).id
             a = clinic_inbox.own_appointment(ctx.store, pid, ctx.request.path_params["appointment_id"])
             body = _body(ctx)
+            if action == "accept":
+                return accept_visit(ctx.store, a, bool(body.get("confirm")), _text(body, "note") or "")
             if action == "move":
                 ptplans.move(ctx.store, a.id, f"{_text(body, 'date') or ''}T{_text(body, 'time') or ''}")
             elif action == "decline":
@@ -755,7 +768,7 @@ def create_app(db_path: Optional[Path] = None, key: Optional[bytes] = None,
     for action in ("edit", "complete", "reopen", "archive"):
         clinic_route(pat + "/plans/{plan_id:int}/" + action, plan_api(action), "therapist", methods=("POST",),
                      kind="api")
-    for action in ("move", "decline", "cancel"):
+    for action in ("move", "decline", "cancel", "accept"):
         clinic_route(pat + "/visits/{appointment_id:int}/" + action, visit_api(action), "therapist",
                      methods=("POST",), kind="api")
     clinic_route(pat + "/questionnaires/{assignment_id:int}/end", end_questionnaire, "therapist", methods=("POST",),

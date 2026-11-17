@@ -29,6 +29,15 @@ def _fact(label: str, value: str, detail: str = "", href: str = "") -> str:
     return f'<div class="fact"><span class="lbl">{_e(label)}</span><span class="val">{value}</span>{link}</div>'
 
 
+def _accept_form(i) -> str:
+    """Accept the time the patient proposed, straight from the Dashboard (021 N2); an overlap asks first."""
+    return (f'<form class="inline-form" data-api="/api/patients/{_e(i.patient_id)}/visits/{i.visit_id}/accept" '
+            f'data-confirm="Move {_e(i.patient_id)}\'s visit to {_e(i.proposed)}?" novalidate>'
+            '<input type="hidden" name="confirm" value="">'
+            f'<button class="btn small" type="submit">Accept {_e(i.proposed)}</button>'
+            '<p class="error-text" role="alert" data-error hidden></p></form>')
+
+
 def dashboard(name: str, today: str, needs: List[inbox_rules.Item], visits: List[dict], attention: List,
               act: dict, days: int, recent: List[dict]) -> str:
     head = (f'<div class="page-head"><div class="stack tight"><h1>Dashboard</h1><p class="dim">{_e(today)} · '
@@ -41,7 +50,8 @@ def dashboard(name: str, today: str, needs: List[inbox_rules.Item], visits: List
         f'<li><span class="code">{_e(i.patient_id)}</span><span class="tag {"urgent" if i.kind == "urgent" else "ghost" if i.kind == "reschedule" else "new"}">'
         f'{"Urgent" if i.kind == "urgent" else "Reschedule" if i.kind == "reschedule" else f"{i.unread} new"}</span>'
         f'<span class="grow-col ellipsis">{_e(i.plan_title)} · {_e(i.line)}</span>'
-        f'<a class="sp" href="{_e(i.href)}">Open</a></li>' for i in needs[:5])
+        + (_accept_form(i) if i.proposed else "")
+        + f'<a class="sp" href="{_e(i.href)}">Open</a></li>' for i in needs[:5])
     need_html = (f'<ul class="lines">{need_items}</ul>' if need_items else '<p class="dim">Nothing needs you right now.</p>')
     visit_items = "".join(
         f'<li><span class="strong num w-time-col">{_e(v["time"])}</span><a class="code" href="/therapist/patients/'
@@ -211,4 +221,5 @@ def log_pane(log: Optional[dict]) -> str:
 
 def page(account, classes: str, active: str, title: str, content: str, split: bool = False) -> str:
     inner = f'<div class="split">{content}</div>' if split else f'<main class="page wide" id="main">{content}</main>'
-    return shell.document(title, shell.top_bar(account, active) + inner, classes, scripts=("clinic.js",))
+    scripts = ("clinic.js", "forms.js") if active == "dashboard" else ("clinic.js",)   # Accept on the Dashboard
+    return shell.document(title, shell.top_bar(account, active) + inner, classes, scripts=scripts)
