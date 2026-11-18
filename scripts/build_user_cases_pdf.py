@@ -1,4 +1,4 @@
-"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026, the photo and video trial of 5 November 2026, and the clinic-app re-run of 13 November 2026.
+"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026, the photo and video trial of 5 November 2026, the clinic-app re-run of 13 November 2026, and the hosted re-run of 17 November 2026.
 
     python scripts/build_user_cases_pdf.py            # writes user-cases.html and Limber-User-Cases.pdf
     python scripts/build_user_cases_pdf.py --html     # the HTML only
@@ -36,7 +36,9 @@ CASES = [
          actual="Landed on Today. “Saved.” appeared, and Today re-drew with larger, high-contrast text. "
                 "The settings live on the account, so they follow the patient. "
                 "<b>Issue:</b> the three Settings labels are squeezed to about 38 px wide at every screen size, so each "
-                "word wraps onto its own line, and with Larger text on the lines overlap.",
+                "word wraps onto its own line, and with Larger text on the lines overlap. "
+                "<b>Update, 17 Nov:</b> re-run on the hosted demo at 390 px; the Settings labels no longer wrap word "
+                "by word or overlap (#14, fixed).",
          status="issue", issues=[14],
          shots=["c01a_front_door.png", "c01b_settings_on.png", "c01c_today_large_contrast.png"]),
     dict(id=2, who="patient", title="Today, with two plans of care",
@@ -61,7 +63,10 @@ CASES = [
                 "The stored copy of the photo was downloaded and checked: <b>no GPS, no camera make</b>. The host had "
                 "re-encoded it. "
                 "<b>Finding:</b> Messages opens on whichever plan has an unread message. On the first try that was the "
-                "shoulder plan, so a note about the hip landed there. The plan switcher is visible, but easy to miss.",
+                "shoulder plan, so a note about the hip landed there. The plan switcher is visible, but easy to miss. "
+                "<b>Update, 17 Nov:</b> on the hosted demo the phone-number warning works, but the photo itself "
+                "can't be sent yet: the photo store still needs a cross-origin (CORS) rule. The patient now sees "
+                "“The photo could not be uploaded…” and can send the message without it (#104).",
          status="pass", shots=["c03a_messages.png", "c03b_warning.png", "c03c_sent.png"]),
     dict(id=4, who="patient", title="Read an old, finished plan",
          persona="P-017 had an ankle sprain last summer; that plan is archived.",
@@ -114,7 +119,10 @@ CASES = [
                 "is a tel: link, and the nearest-ER link is a maps search that sends no location. The angles found two "
                 "gaps: indirect descriptions (“the back of my leg is puffy, red and warm”, “I can't catch my breath on "
                 "the stairs”) got the referral card instead of the emergency card, and “I <i>fell</i> behind on my "
-                "exercises” showed the emergency card.",
+                "exercises” showed the emergency card. "
+                "<b>Update, 17 Nov:</b> re-run on the hosted demo. Both indirect descriptions now get the emergency "
+                "card (#15, fixed), and “I fell behind” no longer does (#16, fixed). It gets the referral card, "
+                "which is safe but stricter than it needs to be.",
          status="issue", issues=[15, 16], shots=["c08a_emergency.png"],
          table=[("Direct", "My calf is swollen and hot since this morning.", "Emergency card"),
                 ("Direct", "i feel short of breath and my chest hurts…", "Emergency card"),
@@ -416,7 +424,9 @@ def cover():
   (patient coach). Source: github.com/nathanaelhub/limber, issues #13 and #27. Updated 10 November 2026 with
   the fixes since, and a demo dry run of the whole app on 9 November. <b>Updated 13 November 2026:</b> therapist and
   admin cases 10–16 re-run in the new clinic app (the therapist side that also runs on the hosted demo), with new
-  pictures; case 18 adds video analysis on browser pose.</div>
+  pictures; case 18 adds video analysis on browser pose. <b>Updated 17 November 2026:</b> patient cases 1–9
+  re-run on the hosted demo at phone width. All pass except the photo in case 3, which waits on the photo
+  store's CORS rule; #14, #15 and #16 are fixed.</div>
 </section>"""
 
 
