@@ -63,7 +63,9 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 - [x] T021 `src/clinic/schedule.py` (the visit list moved from `app.py`), with tests; Schedule page
 - [x] T022 `src/clinic/people.py`: invite, revoke, disable and re-enable (never the last admin), reassign;
       refused for non-admins; no clinical fields
-- [ ] T023 Deploy and run the "daily work" dry run on the hosted demo
+- [x] T023 Deploy and run the "daily work" dry run on the hosted demo (17 November 2026: Dashboard, red flag
+      handled by phone, AI draft edited and sent, proposed time accepted, weekly summary saved, Exercises, invite,
+      History; all passed. Three bugs found and fixed in #105)
 
 ## Slice 5a: Dashboard, Sessions, Observation logs (Story 5; FR-011)
 
@@ -98,7 +100,9 @@ M2 after slice 2, M3 (the first showing) after slice 4, M4 after slice 6, M5 at 
 ## Slice 8: Cutover (FR-015) → milestone M5
 
 - [ ] T032 **G3**: re-run the 16 user cases against the clinic app, locally and on the hosted demo
-      (cases 10-16, the therapist side, re-run on the hosted clinic app in #89; the rest before the showing)
+      (cases 10-16, the therapist side, re-run on the hosted clinic app in #89; patient cases 1-9 re-run on the
+      hosted demo on 17 November 2026, all passing except the photo upload in case 3, which waits on the R2
+      CORS rule, 020 T016. Tick when case 3 passes)
 - [x] T033 Move to :8501; update the portal default, `deploy/*`, and `interfaces/cli.py`
 - [x] T034 Remove `interfaces/app.py`, `interfaces/app_theme.py`, `.streamlit/`, `streamlit`, `streamlit-webrtc`,
       `pyarrow`, `pandas` (if unused), and the old UI tests, after a list maps each behaviour to its clinic test or
