@@ -101,9 +101,9 @@ when another instance opens the record.
 The therapist side on Vercel is the 019 clinic app, mounted at `/therapist`; each 019 slice deploys and is checked
 on the hosted demo as it merges (`specs/019-clinic-app/tasks.md`).
 
-- [ ] T028 019 slices 1 to 5 online (019 T011, T015, T018, T020, T023, T027)
-- [ ] T029 **G5** = 019 **G2** (019 T030): browser pose against YOLO11 on the three Ultralytics clips
-- [ ] T030 Hosted video analysis = 019 slice 6 (019 T028)
+- [x] T028 019 slices 1 to 5 online (019 T011, T015, T018, T020, T023, T027; the last, T023, the dry run of 17 November 2026)
+- [x] T029 **G5** = 019 **G2** (019 T030): browser pose against YOLO11 on the three Ultralytics clips
+- [x] T030 Hosted video analysis = 019 slice 6 (019 T028); the side the camera sees is measured since #24
 
 ## Done when
 
