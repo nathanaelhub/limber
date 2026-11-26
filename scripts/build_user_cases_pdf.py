@@ -1,4 +1,4 @@
-"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026, the photo and video trial of 5 November 2026, the clinic-app re-run of 13 November 2026, and the hosted re-run of 17 November 2026.
+"""Build docs/user-cases/Limber-User-Cases.pdf from the hand-run walkthrough of 1 November 2026, the photo and video trial of 5 November 2026, the clinic-app re-run of 13 November 2026, the hosted re-run of 17 November 2026, and the side-on video fix of 25 November 2026.
 
     python scripts/build_user_cases_pdf.py            # writes user-cases.html and Limber-User-Cases.pdf
     python scripts/build_user_cases_pdf.py --html     # the HTML only
@@ -278,7 +278,12 @@ CASES = [
                 "(#35, fixed). <b>Update, 13 Nov:</b> the clinic app now analyses clips in the browser (MoveNet) on "
                 "the hosted demo. On the same clips it counts the squats and push-ups 4 of 4 like YOLO, with range of "
                 "motion 8° lower and 14–21° higher; the leg extension still undercounts, so the result now says the "
-                "camera angle may have hidden the movement (last picture).",
+                "camera angle may have hidden the movement (last picture). "
+                "<b>Update, 25 Nov:</b> a closer look showed the push-up clip faces left, so the camera sees the "
+                "<i>left</i> arm. Both pose models are surer of it. The default setting was right, and the hidden arm "
+                "was the right one. Video analysis now measures whichever side the camera saw better and says which "
+                "side it measured (#24, fixed). The leg-extension undercount is now flagged rather than reported as "
+                "fact (#23, closed).",
          status="issue", issues=[23, 24, 35],
          shot_height=1.45, shots=["c18a_leg_extension_3_reps.png", "c18b_push_up_overlay.png",
                                  "c18c_browser_camera_note.png"]),
@@ -305,8 +310,8 @@ FINDINGS = [
     (14, "Settings labels wrap one word per line and overlap with Larger text. Fixed (pull request #20)."),
     (15, "Coach red-flag screen misses indirect descriptions of clot and breathing symptoms (safety). Fixed (#18)."),
     (16, "“I fell behind on my exercises” shows the emergency card (false alarm). Fixed (#19)."),
-    (23, "Video analysis counts 1 rep where a leg-extension clip has 3."),
-    (24, "Push-up results change by up to 20° depending on which arm the exercise setting measures."),
+    (23, "Video analysis counts 1 rep where a leg-extension clip has 3. The result now says the camera angle may have hidden the movement. Closed."),
+    (24, "Push-up results change by up to 20° depending on which arm the exercise setting measures. Fixed 25 Nov: the side the camera sees is measured, and named."),
     (25, "AI reply drafts don't know today's date, so they say “yesterday” about last week. Fixed (#29)."),
     (26, "The draft function makes an AI call for an archived plan. Fixed (#32)."),
     (33, "Dry run: made-up 2024 sessions on the Dashboard. Fixed (#34)."),

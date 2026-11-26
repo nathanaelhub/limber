@@ -134,3 +134,58 @@ def test_hosted_or_without_the_model_there_is_no_yolo(tmp_db, fake_clock, monkey
         assert 'name="mode" value="browser"' in c.get("/therapist/video").text
         assert c.post("/therapist/api/video/yolo", data={"patient_id": "P-001", "exercise": "squat"},
                       files=[("files", ("c.mp4", b"x", "video/mp4"))], headers=H).status_code == 404
+
+
+# ---- #24: measure the side the camera sees ----------------------------------------------------------------------
+
+def test_every_left_right_pair_mirrors_both_ways():
+    keys = [k for k, _ in video.exercises()]
+    for base in ("knee_extension", "shoulder_flexion", "seated_hip_flexion", "hip_abduction", "pushup",
+                 "elbow_flexion"):
+        assert video.mirror(base, keys) == base + "_right" and video.mirror(base + "_right", keys) == base
+    for single in ("squat", "partial_squat", "trunk_flexion"):
+        assert video.mirror(single, keys) is None
+
+
+def test_the_hidden_arm_is_swapped_for_the_visible_one(store):
+    """The push-up clip is side-on, facing left: the camera sees the left arm (both models agree)."""
+    result = video.analyze_points(store, "P-001", "pushup_right", None, points("Pushups"))
+    assert result["side"] == "left" and any("Measured the left side" in w for w in result["warnings"])
+    extras = store.load_session(result["session_id"]).source_extras
+    assert extras["side_requested"] == "right" and extras["side_measured"] == "left"
+    assert extras["side_visibility"]["left"] > extras["side_visibility"]["right"]
+    assert result["reps"] == 4
+
+
+def test_the_visible_side_as_chosen_is_kept(store):
+    result = video.analyze_points(store, "P-001", "pushup", None, points("Pushups"))
+    assert result["side"] == "left" and not any("Measured the" in w for w in result["warnings"])
+    extras = store.load_session(result["session_id"]).source_extras
+    assert extras["side_requested"] == extras["side_measured"] == "left"
+
+
+def test_the_session_page_says_which_side_was_measured(tmp_db, fake_clock):
+    seed(tmp_db, fake_clock)
+    with SessionStore(tmp_db, clock=fake_clock).open() as s:
+        swapped = video.analyze_points(s, "P-001", "pushup_right", None, points("Pushups"))["session_id"]
+        squat = video.analyze_points(s, "P-001", "squat", None, points("Squats"))["session_id"]
+    with client(tmp_db, fake_clock) as c:
+        sign_in(c)
+        page = c.get(f"/therapist/logs/{swapped}").text
+        assert "Side measured" in page and "Left side" in page and "the camera saw it better" in page
+        assert "Side measured" not in c.get(f"/therapist/logs/{squat}").text
+
+
+def test_the_clinic_model_path_names_the_side_it_ran(tmp_db, fake_clock, monkeypatch):
+    seed(tmp_db, fake_clock)
+
+    def fake_run(path, exercise, patient, db_path, label, weights):
+        with SessionStore(db_path, clock=fake_clock).open() as s:
+            s.end_session(s.start_session(patient, "video", label, {"pose_model": "yolo11m-pose"}))
+    monkeypatch.setattr(video, "run_yolo", fake_run)
+    with SessionStore(tmp_db, clock=fake_clock).open() as s:
+        result = video.analyze_with_yolo(s, tmp_db, "P-001", "pushup_right", b"clip")
+    assert result["side"] == "right" and result["warnings"] == []
+    with client(tmp_db, fake_clock) as c:
+        sign_in(c)
+        assert "Right side · as chosen" in c.get(f"/therapist/logs/{result['session_id']}").text
