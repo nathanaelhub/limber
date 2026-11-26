@@ -1349,6 +1349,12 @@ class SessionStore:
             "'$.lease_until', ?) WHERE id = ? AND status = 'running'", (this_host(), os.getpid(), until, session_id))
         self.conn.commit()
 
+    def session_note_side(self, session_id: int, side: str) -> None:
+        """Record which side a video was measured on (#24), for a session the engine wrote itself."""
+        self.conn.execute("UPDATE sessions SET source_extras = json_set(COALESCE(source_extras, '{}'), "
+                          "'$.side_measured', ?, '$.side_requested', ?) WHERE id = ?", (side, side, session_id))
+        self.conn.commit()
+
     def session_open_set(self, session_id: int) -> Optional[int]:
         row = self.conn.execute("SELECT id FROM exercise_sets WHERE session_id = ? AND end_time IS NULL "
                                 "ORDER BY ordinal DESC LIMIT 1", (session_id,)).fetchone()

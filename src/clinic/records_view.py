@@ -174,6 +174,8 @@ def log_pane(log: Optional[dict]) -> str:
              + _fact("Events", f'{len(data["events"])}', "Every step the engine recorded") + "</div>")
     warnings = "".join(f'<li><span class="tag urgent">Note</span><span>{_e(w)}</span></li>' for w in summary["warnings"])
     parts = [facts]
+    if log.get("side"):
+        parts.append(f'<p class="small"><span class="strong">Side measured:</span> {_e(log["side"])}</p>')
     if warnings:
         parts.append(f'<section class="sec"><h2>Warnings</h2><ul class="lines">{warnings}</ul></section>')
     if reps:
