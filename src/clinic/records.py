@@ -93,7 +93,18 @@ def log_data(store: SessionStore, session_id: int) -> dict:
     target = data.get("target_reps") or 0
     return {"session": session, "data": data, "reps": reps, "summary": summary, "target": target,
             "completion": round(summary["total_reps"] / target * 100) if target else None,
+            "side": _side_line(session.source_extras or {}),
             "timeline": [timeline_line(e) for e in data["events"]]}
+
+
+def _side_line(extras: dict) -> Optional[str]:
+    """Which side a video was measured on (#24), or None when the exercise has no left and right."""
+    measured = extras.get("side_measured")
+    if not measured:
+        return None
+    why = ("chosen because the camera saw it better" if extras.get("side_requested") not in (None, measured)
+           else "as chosen")
+    return f"{measured.capitalize()} side · {why}"
 
 
 def timeline_line(e: dict) -> tuple:
